@@ -10,21 +10,21 @@ from typing import List
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s:%(message)s")
 
-
-class AgentState(BaseModel):
-    dataset_info: str
-    analysis_plan: str
-    code_output: str
-    error_message: str
-    retry_count: int
-    report: str
-
 class Insight(BaseModel):
     task: str
     goal: str
 
 class InsightsList(BaseModel):
     insights: List[Insight]
+
+
+class AgentState(BaseModel):
+    dataset_info: str
+    analysis_plan: InsightsList = None
+    code_output: str = ""
+    error_message: str = ""
+    retry_count: int = 0
+    report: str = ""
 
 
 analyst_llm = init_chat_model(
@@ -47,7 +47,7 @@ python_tool = PythonREPLTool()
 
 def analyst_node(state: AgentState):
     """Analyst defines analysis plan"""
-    dataset_info = state.get("dataset_info")
+    dataset_info = state.dataset_info
     prompt = f"""
     You are a data analyst. Based on this dataset info:
     {dataset_info}
@@ -57,16 +57,16 @@ def analyst_node(state: AgentState):
     """
     analysis_plan = analyst_structured.invoke([HumanMessage(content=prompt)])
     logging.info(f"Analysis plan defined:\n{analysis_plan}")
-    state["analysis_plan"] = analysis_plan
+    state.analysis_plan = analysis_plan
     return state
 
 
 def coder_node(state: AgentState):
     """Coder writes AND executes Python code"""
-    dataset_info = state["dataset_info"]
-    analysis_plan = state["analysis_plan"]
-    retry_count = state.get("retry_count", 0)
-    error_message = state.get("error_message", "")
+    dataset_info = state.dataset_info
+    analysis_plan = state.analysis_plan
+    retry_count = state.retry_count
+    error_message = state.error_message
 
     error_context = ""
     if error_message:
@@ -112,11 +112,11 @@ def coder_node(state: AgentState):
     
     try:
         output = python_tool.run(code_to_run)
-        state["code_output"] = output
+        state.code_output = output
         logging.info(f"Code output:\n{output}")
     except Exception as e:
         error_output = f"Execution Error: {str(e)}"
-        state["code_output"] = error_output
+        state.code_output = error_output
         logging.error(f"Code execution error:\n{error_output}")
 
     return state
@@ -124,8 +124,8 @@ def coder_node(state: AgentState):
 
 def check_code_success(state: AgentState) -> str:
     """Check if code execution was successful or had errors"""
-    code_output = state.get("code_output", "")
-    retry_count = state.get("retry_count", 0)
+    code_output = state.code_output
+    retry_count = state.retry_count
 
     error_indicators = ["Error", "Exception", "Traceback", "SyntaxError", "NameError", "TypeError"]
     has_error = any(indicator in code_output for indicator in error_indicators)
@@ -143,9 +143,9 @@ def check_code_success(state: AgentState) -> str:
 
 def retry_node(state: AgentState):
     """Update state for retry"""
-    retry_count = state.get("retry_count", 0)
-    state["error_message"] = state["code_output"]
-    state["retry_count"] = retry_count + 1
+    retry_count = state.retry_count
+    state.error_message = state.code_output
+    state.retry_count = retry_count + 1
     return state
 
 
@@ -154,10 +154,10 @@ def finish_node(state: AgentState):
     return {
         "report": f"""
         === ANALYSIS PLAN ===
-        {state["analysis_plan"]}
+        {state.analysis_plan}
 
         === RESULTS ===
-        {state["code_output"]}
+        {state.code_output}
         """
     }
 
@@ -210,9 +210,7 @@ def main():
             {df.describe().to_markdown()}
             Categorical summary:
             {df.describe(include="object").to_markdown()}
-            """,
-            "retry_count": 0,
-            "error_message": ""
+            """
         }
     )
     logging.info("Analysis flow completed")
