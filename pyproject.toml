@@ -1,5 +1,5 @@
 [project]
-name = "data-analyst-agent"
+name = "agent"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
@@ -16,3 +16,7 @@ dependencies = [
   "autogen-ext[ollama]",
   "tabulate",
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["agent*"]
