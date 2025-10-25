@@ -10,6 +10,8 @@ dependencies = [
   "langchain_ollama",
   "langgraph",
   "pandas",
+  "scikit-learn",
+  "scipy",
   "autogen-core",
   "autogen-ext[ollama]",
   "tabulate",
