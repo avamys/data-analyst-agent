@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 
 
@@ -16,8 +16,14 @@ class AgentState(BaseModel):
     analysis_plan: Optional[InsightsList] = None
     code_output: str = ""
     code_written: str = ""
-    error_message: str = ""
-    retry_count: int = 0
+    # error_message: str = ""
+    
+    execution_error: str = ""
     critic_feedback: str = ""
+    debug_suggestions: str = ""
+
+    retry_count: int = 0
     revision_count: int = 0
     report: str = ""
+
+    addressed_insights: List[int] = Field(default_factory=list)

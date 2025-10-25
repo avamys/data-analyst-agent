@@ -18,7 +18,8 @@ def check_code_success(state: AgentState) -> str:
         return "retry"
     elif has_error:
         logger.error(f"Code execution failed after {retry_count + 1} attempts")
-        return "critic"  # Still send to critic even with errors
+        state.execution_error = code_output
+        return "debug"
     else:
         logger.info("Code execution successful")
         return "critic"
@@ -40,14 +41,20 @@ def check_critic_verdict(state: AgentState) -> str:
 
 def retry_node(state: AgentState) -> AgentState:
     """Update state for retry"""
-    state.error_message = state.code_output
     state.retry_count += 1
     return state
 
 def revise_node(state: AgentState) -> AgentState:
     """Prepare state for revision"""
     state.revision_count += 1
-    state.error_message = state.critic_feedback
+    state.retry_count = 0
+    state.execution_error = ""
+    return state
+
+def debug_node(state: AgentState) -> AgentState:
+    """Handle debugging after max retries"""
+    state.retry_count = 0
+    state.execution_error = ""
     return state
 
 def finish_node(state: AgentState) -> dict:

@@ -7,6 +7,7 @@ from agent.nodes.critic import critic_node
 from agent.graph.routing import (
     check_code_success,
     check_critic_verdict,
+    debug_node,
     retry_node,
     revise_node,
     finish_node
@@ -19,6 +20,7 @@ def build_graph() -> StateGraph:
     graph.add_node("analyst", analyst_node)
     graph.add_node("coder", coder_node)
     graph.add_node("critic", critic_node)
+    graph.add_node("debug", debug_node)
     graph.add_node("retry", retry_node)
     graph.add_node("revise", revise_node)
     graph.add_node("finish", finish_node)
@@ -31,6 +33,7 @@ def build_graph() -> StateGraph:
         check_code_success,
         {
             "retry": "retry",
+            "debug": "debug",
             "critic": "critic"
         }
     )
@@ -45,6 +48,7 @@ def build_graph() -> StateGraph:
     )
     
     graph.add_edge("retry", "coder")
+    graph.add_edge("debug", "coder")
     graph.add_edge("revise", "coder")
     graph.add_edge("finish", END)
     

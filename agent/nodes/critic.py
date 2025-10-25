@@ -26,11 +26,17 @@ def critic_node(state: AgentState) -> AgentState:
     CODE OUTPUT RECEIVED:
     {code_output}
     
-    Evaluate if the output adequately answers ALL analysis questions.
+    Evaluate the output carefully:
+    1. Does it address ALL {len(analysis_plan.insights)} analysis tasks?
+    2. Are the results clearly presented and interpretable?
+    3. Are the insights accurate and meaningful?
+    4. Is anything missing or incorrect?
     
-    Respond in this format:
-    VERDICT: [APPROVED/NEEDS_REVISION]
-    FEEDBACK: [Specific feedback about what's missing or wrong]
+    Respond in this EXACT format:
+    VERDICT: [APPROVED or NEEDS_REVISION]
+    FEEDBACK: [If APPROVED: Summarize what was done well. If NEEDS_REVISION: Specific list of what's missing or wrong]
+    
+    Be specific about which tasks (by number) are incomplete or incorrect.
     """
     
     response = analyst_llm.invoke([HumanMessage(content=prompt)])
