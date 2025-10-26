@@ -25,11 +25,21 @@ def coder_node(state: AgentState):
     execution_error = state.execution_error
     revision_count = state.revision_count
     critic_feedback = state.critic_feedback
+    code_written = state.code_written
 
     insights_text = "\n".join([
         f"{i+1}. Task: {insight.task}\n   Goal: {insight.goal}"
         for i, insight in enumerate(analysis_plan.insights)
     ])
+
+    code_written_context = ""
+    if code_written:
+        code_written_context = f"""
+        PREVIOUS CODE WRITTEN:
+        ```python
+        {code_written}
+        ```
+        """
 
     execution_error_context = ""
     if execution_error:
@@ -39,14 +49,14 @@ def coder_node(state: AgentState):
         
         Fix the technical error:
         - Check syntax and indentation
-        - Verify variable names and imports
+        - Verify variable names and imports (Available libraries: pandas, numpy, matplotlib, scipy)
         - Handle missing/null data appropriately
         """
 
     critic_feedback_context = ""
     if critic_feedback and revision_count > 0:
         critic_feedback_context = f"""
-        📋 CRITIC'S FEEDBACK (Revision #{revision_count}):
+        CRITIC'S FEEDBACK (Revision #{revision_count}):
         {critic_feedback}
         
         The previous analysis was incomplete or incorrect.
@@ -72,6 +82,8 @@ def coder_node(state: AgentState):
 
     Analysis plan:
     {insights_text}
+
+    {code_written_context}
 
     {execution_error_context}
 
