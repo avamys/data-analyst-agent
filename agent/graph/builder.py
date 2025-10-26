@@ -4,6 +4,7 @@ from agent.states import AgentState
 from agent.nodes.analyst import analyst_node
 from agent.nodes.coder import coder_node
 from agent.nodes.critic import critic_node
+from agent.nodes.debug import debugger_node
 from agent.graph.routing import (
     check_code_success,
     check_critic_verdict,
@@ -20,7 +21,7 @@ def build_graph() -> StateGraph:
     graph.add_node("analyst", analyst_node)
     graph.add_node("coder", coder_node)
     graph.add_node("critic", critic_node)
-    graph.add_node("debug", debug_node)
+    graph.add_node("debug", debugger_node)
     graph.add_node("retry", retry_node)
     graph.add_node("revise", revise_node)
     graph.add_node("finish", finish_node)
