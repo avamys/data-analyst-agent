@@ -13,8 +13,7 @@ dependencies = [
   "pandas",
   "scikit-learn",
   "scipy",
-  "autogen-core",
-  "autogen-ext[ollama]",
+  "statsmodels",
   "tabulate",
 ]
 
