@@ -48,6 +48,7 @@ def coder_node(state: AgentState):
         {execution_error}
         
         Fix the technical error:
+        - Remove the imports that caused the error (You can't install new packages)
         - Check syntax and indentation
         - Verify variable names and imports (Available libraries: pandas, numpy, matplotlib, scipy)
         - Handle missing/null data appropriately
@@ -65,13 +66,6 @@ def coder_node(state: AgentState):
         - Provide more detailed insights
         - Fix incorrect interpretations
         - Ensure all tasks are completed
-        """
-
-    debug_context = ""
-    if state.debug_suggestions:
-        debug_context = f"""
-        DEBUGGING SUGGESTIONS:
-        {state.debug_suggestions}
         """
 
     prompt = f"""
@@ -96,8 +90,6 @@ def coder_node(state: AgentState):
     - Print results clearly with descriptive labels
     
     {"IMPORTANT: This is revision #" + str(revision_count) + ". Make sure to address the critic's feedback!" if revision_count > 0 else ""}
-
-    {debug_context}
 
     Only respond with the Python code to execute, nothing else.
     """

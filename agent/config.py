@@ -9,8 +9,8 @@ class Settings(BaseSettings):
     analyst_temperature: float = 0.4
     coder_temperature: float = 0.2
     
-    max_code_retries: int = 3
-    max_revisions: int = 2
+    max_code_retries: int = 2
+    max_revisions: int = 1
 
     data_directory: str = "data"
     output_directory: str = "output"

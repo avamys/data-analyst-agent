@@ -10,16 +10,17 @@ def check_code_success(state: AgentState) -> str:
     code_output = state.code_output
     retry_count = state.retry_count
 
-    error_indicators = ["Error", "Exception", "Traceback", "SyntaxError", "NameError", "TypeError"]
+    error_indicators = ["Error", "Exception", "Traceback"]
     has_error = any(indicator in code_output for indicator in error_indicators)
     
     if has_error and retry_count < settings.max_code_retries:
         logger.warning(f"Code execution failed (attempt {retry_count + 1}). Retrying...")
+        state.execution_error = code_output
         return "retry"
     elif has_error:
         logger.error(f"Code execution failed after {retry_count + 1} attempts")
         state.execution_error = code_output
-        return "debug"
+        return "finish"
     else:
         logger.info("Code execution successful")
         return "critic"
@@ -51,14 +52,15 @@ def revise_node(state: AgentState) -> AgentState:
     state.execution_error = ""
     return state
 
-def debug_node(state: AgentState) -> AgentState:
-    """Handle debugging after max retries"""
-    state.retry_count = 0
-    state.execution_error = ""
-    return state
+# def debug_node(state: AgentState) -> AgentState:
+#     """Handle debugging after max retries"""
+#     # state.retry_count = 0  # Optionally reset retry count
+#     state.execution_error = ""
+#     return state
 
 def finish_node(state: AgentState) -> dict:
     """Final report assembly"""
+    critic_feedback = state.critic_feedback
     return {
         "report": f"""
         === ANALYSIS PLAN ===
@@ -68,6 +70,6 @@ def finish_node(state: AgentState) -> dict:
         {state.code_output}
         
         === CRITIC FEEDBACK ===
-        {state.critic_feedback}
+        {critic_feedback if critic_feedback else "No feedback provided."}
         """
     }
