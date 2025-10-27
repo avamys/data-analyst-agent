@@ -16,6 +16,9 @@
 		}
 	  },
 	"runArgs": [
-		"--add-host=host.docker.internal:host-gateway"
-	  ]
+		"--add-host=host.docker.internal:host-gateway",
+		"--network=host"
+	  ],
+	"forwardPorts": [5000],
+  	"remoteUser": "vscode"
 }
