@@ -1,54 +1,64 @@
-"""Graph construction"""
+"""Graph construction for iterative analyst-coder-reporter workflow"""
 from langgraph.graph import StateGraph, END, START
 from agent.states import AgentState
 from agent.nodes.analyst import analyst_node
 from agent.nodes.coder import coder_node
-from agent.nodes.critic import critic_node
+from agent.nodes.reporter import reporter_node
 from agent.graph.routing import (
-    check_code_success,
-    check_critic_verdict,
+    route_analyst_decision,
+    route_coder_result,
     retry_node,
-    revise_node,
-    finish_node
 )
 
+
 def build_graph() -> StateGraph:
-    """Build and compile the agent workflow graph"""
+    """
+    Build the iterative analysis workflow graph:
+    
+    Flow:
+    START → Analyst → (decision) → Coder → (check) → Analyst → ... → Reporter → END
+    
+    The analyst acts as supervisor, deciding when to:
+    - ASK_CODER: Send a new task to coder (continues loop)
+    - FINISH: Complete analysis and move to reporter
+    
+    The coder has retry logic for self-debugging on errors.
+    """
     graph = StateGraph(AgentState)
 
+    # Add nodes
     graph.add_node("analyst", analyst_node)
     graph.add_node("coder", coder_node)
-    graph.add_node("critic", critic_node)
-    # graph.add_node("debug", debugger_node)
+    graph.add_node("reporter", reporter_node)
     graph.add_node("retry", retry_node)
-    graph.add_node("revise", revise_node)
-    graph.add_node("finish", finish_node)
 
+    # Start with analyst
     graph.add_edge(START, "analyst")
-    graph.add_edge("analyst", "coder")
 
+    # Analyst decides: ASK_CODER or FINISH
     graph.add_conditional_edges(
-        "coder",
-        check_code_success,
+        "analyst",
+        route_analyst_decision,
         {
-            "retry": "retry",
-            "finish": "finish",
-            "critic": "critic"
+            "coder": "coder",
+            "reporter": "reporter"
         }
     )
 
+    # After coder executes, check for errors
     graph.add_conditional_edges(
-        "critic",
-        check_critic_verdict,
+        "coder",
+        route_coder_result,
         {
-            "revise": "revise",
-            "finish": "finish"
+            "retry": "retry",  # Retry on error
+            "analyst": "analyst"  # Success -> back to analyst
         }
     )
     
+    # Retry logic
     graph.add_edge("retry", "coder")
-    # graph.add_edge("debug", "coder")
-    graph.add_edge("revise", "coder")
-    graph.add_edge("finish", END)
+    
+    # Reporter is terminal
+    graph.add_edge("reporter", END)
     
     return graph.compile()
