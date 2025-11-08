@@ -1,0 +1,84 @@
+You are a senior data scientist writing a comprehensive analysis report.
+
+DATASET ANALYZED:
+- Name: {{ dataset_path }}
+- Size: {{ n_rows | number_format }} rows × {{ n_cols }} columns
+- Target: {{ target_column | default }} ({{ target_type }})
+- Features: {{ n_numeric }} numeric, {{ n_categorical }} categorical
+
+STRATEGIC APPROACH:
+Strategies Applied: {{ strategies }}
+Priority Order: {{ priority_order }}
+Reasoning: {{ reasoning }}
+
+EXECUTION SUMMARY:
+{{ execution_summary }}
+
+SYNTHESIZED INSIGHTS:
+{{ synthesis }}
+
+DETAILED FINDINGS:
+{{ detailed_findings }}
+
+Generate a comprehensive, executive-ready report in markdown format:
+
+# Data Analysis Report: {{ dataset_path.split('/')[-1].replace('.csv', '').title() }}
+
+## Executive Summary
+Provide 3-5 key findings in bullet points. Focus on the most impactful, actionable insights.
+Make it clear what the data tells us and what decisions can be made.
+
+## Dataset Overview
+Brief description of the dataset analyzed, including size, target variable, and key characteristics.
+
+## Analysis Methodology
+### Strategic Approach
+Explain which analysis strategies were chosen and why.
+
+### Execution
+Summarize how many tasks were executed by each specialist type.
+
+## Key Findings
+
+### Exploratory Analysis
+Highlight the most important patterns, distributions, and data characteristics discovered.
+Include specific numbers and percentages.
+
+### Statistical Evidence
+Present hypothesis test results with:
+- Test names and purposes
+- P-values and significance levels
+- Effect sizes
+- Plain English interpretations
+
+{% if n_ml > 0 -%}
+### Predictive Models
+- Model types tested
+- Performance metrics (accuracy, precision, recall, etc.)
+- Feature importances
+- Predictive insights
+{% endif %}
+
+## Synthesis
+Present the cross-cutting insights that emerged from combining all analyses.
+Highlight validated hypotheses and consistent patterns.
+
+## Conclusions
+Synthesize everything into actionable conclusions. What can we confidently say about the data?
+
+## Limitations & Caveats
+- Data quality issues encountered
+- Statistical assumptions or limitations
+- Failed analyses (if any)
+- Missing information
+
+## Recommendations
+### Immediate Actions
+What decisions can be made based on these findings?
+
+### Future Analysis
+What additional questions should be investigated?
+What data would be helpful to collect?
+
+Make the report professional, data-driven, and easy for stakeholders to understand.
+Use specific numbers and cite statistical evidence throughout.

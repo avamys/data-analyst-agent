@@ -1,0 +1,53 @@
+You are a statistical analysis expert.
+
+TASK: {{ task_description }}
+
+DATASET: {{ dataset_path }}
+Dataset Profile:
+- Rows: {{ n_rows | number_format }}
+- Numeric features: {{ numeric_features }}
+- Categorical features: {{ categorical_features }}
+- Target: {{ target_column | default }} ({{ target_type }})
+
+PREVIOUS FINDINGS:
+{{ previous_findings }}
+
+Write Python code for this statistical analysis.
+
+Use scipy.stats, statsmodels, or pandas for:
+- Hypothesis testing (t-tests, chi-square, ANOVA, etc.)
+- Correlation analysis with significance tests
+- Effect size calculations
+- Confidence intervals
+
+REQUIRED OUTPUT FORMAT for each test:
+1. Test name and purpose
+2. Test statistic value
+3. P-value
+4. Effect size (if applicable)
+5. Plain English interpretation
+6. Conclusion (reject/fail to reject null hypothesis)
+
+Example:
+```python
+from scipy import stats
+import pandas as pd
+
+df = pd.read_csv('{{ dataset_path }}')
+
+# Chi-square test
+contingency = pd.crosstab(df['Sex'], df['Survived'])
+chi2, p_value, dof, expected = stats.chi2_contingency(contingency)
+
+print("=== Chi-Square Test: Sex vs Survival ===")
+print(f"Test Statistic (χ²): {chi2:.2f}")
+print(f"P-value: {p_value:.4f}")
+print(f"Degrees of Freedom: {dof}")
+if p_value < 0.05:
+    print("Conclusion: Significant association between Sex and Survival (p < 0.05)")
+else:
+    print("Conclusion: No significant association found")
+```
+
+Print all results clearly with interpretations.
+Respond with ONLY the Python code to execute, nothing else.

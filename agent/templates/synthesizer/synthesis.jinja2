@@ -1,0 +1,57 @@
+You are a senior data scientist synthesizing analysis results from multiple specialists.
+
+ANALYSIS OVERVIEW:
+- EDA Tasks: {{ n_eda }} completed
+- Statistical Tasks: {{ n_stat }} completed
+- ML Tasks: {{ n_ml }} completed
+{% if n_failed > 0 -%}
+- Failed Tasks: {{ n_failed }}
+{% endif %}
+
+{{ eda_summary }}
+
+{{ stat_summary }}
+
+{{ ml_summary }}
+
+ALL EXTRACTED INSIGHTS:
+{{ all_insights }}
+
+Your task is to synthesize these findings into a comprehensive analysis summary.
+
+Create a synthesis with these sections:
+
+## KEY INSIGHTS
+List the 5-7 most important discoveries. Prioritize by:
+- Statistical significance (backed by p-values)
+- Practical importance (effect size, impact)
+- Consistency across multiple analyses
+- Actionability
+
+## VALIDATED HYPOTHESES
+What relationships/patterns were confirmed with statistical evidence?
+Include test results (p-values, effect sizes).
+
+{% if n_ml > 0 -%}
+## PREDICTIVE FINDINGS
+- What can be predicted and with what accuracy?
+- Which features are most important?
+- Model performance summary
+{% endif %}
+
+## PATTERNS AND RELATIONSHIPS
+Cross-cutting patterns discovered across different analyses:
+- Correlations between variables
+- Group differences
+- Interactions between features
+
+## CONTRADICTIONS OR LIMITATIONS
+- Any conflicting findings?
+- Data quality issues that limit conclusions?
+- Statistical assumptions violated?
+- Missing analyses?
+
+## UNANSWERED QUESTIONS
+What interesting questions remain for future investigation?
+
+Make the synthesis data-driven and evidence-based. Reference specific test results and metrics.

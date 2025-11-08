@@ -1,0 +1,70 @@
+You are a machine learning expert.
+
+TASK: {{ task_description }}
+
+DATASET: {{ dataset_path }}
+Dataset Profile:
+- Rows: {{ n_rows | number_format }}
+- Target: {{ target_column | default }} ({{ target_type }})
+- Numeric features: {{ n_numeric }}
+- Categorical features: {{ n_categorical }}
+- Class imbalance: {{ has_imbalance }}
+
+PREVIOUS FINDINGS:
+{{ previous_findings }}
+
+Write Python code for this ML task.
+
+Use scikit-learn with proper workflow:
+1. Load data and prepare features
+2. Handle missing values if needed
+3. Encode categorical variables
+4. Split train/test (80/20)
+5. Train model
+6. Evaluate with appropriate metrics
+7. Extract insights (feature importance, predictions, etc.)
+
+REQUIRED OUTPUT:
+- Model type and hyperparameters used
+- Training performance
+- Test performance  
+- Key metrics (accuracy, precision, recall, F1 for classification; RMSE, R² for regression)
+- Feature importances (top 10 if available)
+- Clear interpretation
+
+Example for classification:
+```python
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, accuracy_score
+import pandas as pd
+import numpy as np
+
+df = pd.read_csv('{{ dataset_path }}')
+
+# Prepare features
+# ... feature engineering ...
+
+# Train model
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+
+# Evaluate
+train_acc = model.score(X_train, y_train)
+test_acc = model.score(X_test, y_test)
+
+print("=== Model Performance ===")
+print(f"Model: Random Forest Classifier")
+print(f"Training Accuracy: {train_acc:.2%}")
+print(f"Test Accuracy: {test_acc:.2%}")
+
+# Feature importance
+importances = model.feature_importances_
+print("\n=== Top 10 Important Features ===")
+for feat, imp in sorted(zip(feature_names, importances), key=lambda x: x[1], reverse=True)[:10]:
+    print(f"{feat}: {imp:.4f}")
+```
+
+Print comprehensive results with interpretations.
+Respond with ONLY the Python code to execute, nothing else.

@@ -1,96 +1,118 @@
-"""Reporter Agent - Generates final narrative report from all insights"""
-from langchain.chat_models import init_chat_model
-from langchain_core.messages import HumanMessage
+"""Hierarchical Reporter - Generates comprehensive final report"""
 import logging
-from agent.states import AgentState
-from agent.config import settings
-
+from agent.core.base_agent import BaseAgent
+from agent.core.template_manager import prompt_templates
+from agent.states import HierarchicalState
 
 logger = logging.getLogger(__name__)
 
 
-reporter_llm = init_chat_model(
-    settings.reporter_model,
-    model_provider="ollama",
-    base_url=settings.ollama_base_url,
-    temperature=0.3,
-)
-
-
-def reporter_node(state: AgentState) -> AgentState:
+def hierarchical_reporter_node(state: HierarchicalState) -> HierarchicalState:
     """
-    Reporter creates a comprehensive final report:
-    - Summarizes all findings from the investigation
-    - Describes the analytical reasoning chain
-    - Highlights key insights and patterns
-    - Notes limitations and potential next steps
+    Generates comprehensive final report from hierarchical analysis
+    
+    Responsibilities:
+    - Incorporate strategic approach and execution summary
+    - Include synthesized insights
+    - Present detailed findings organized by analysis type
+    - Provide actionable recommendations
     """
-    dataset_info = state.dataset_info
-    conversation_history = state.conversation_history
-    insights_collected = state.insights_collected
+    strategic_plan = state.strategic_plan
+    dataset_profile = state.dataset_profile
+    completed_tasks = state.completed_tasks
+    failed_tasks = state.failed_tasks
+    synthesis = state.synthesis
     
-    # Build complete investigation narrative
-    investigation_narrative = ""
-    if conversation_history:
-        investigation_narrative = "## Investigation Process\n\n"
-        for turn in conversation_history:
-            investigation_narrative += f"### Step {turn.iteration}: {turn.hypothesis}\n\n"
-            investigation_narrative += f"**Approach:** {turn.code_task}\n\n"
-            investigation_narrative += f"**Findings:**\n{turn.code_result}\n\n"
-            investigation_narrative += f"**Interpretation:** {turn.interpretation}\n\n"
-            investigation_narrative += "---\n\n"
+    logger.info("=" * 60)
+    logger.info("REPORTING PHASE")
+    logger.info("=" * 60)
     
-    insights_summary = ""
-    if insights_collected:
-        insights_summary = "## Key Insights\n\n"
-        for i, insight in enumerate(insights_collected, 1):
-            insights_summary += f"{i}. {insight}\n"
-        insights_summary += "\n"
+    # Build execution summary
+    eda_count = len([t for t in completed_tasks if t.specialist == "eda"])
+    stat_count = len([t for t in completed_tasks if t.specialist == "statistical"])
+    ml_count = len([t for t in completed_tasks if t.specialist == "ml"])
     
-    prompt = f"""You are a senior data scientist writing a final analysis report.
+    total_time = sum(t.execution_time for t in completed_tasks)
+    
+    execution_summary = f"""
+Total Tasks: {len(completed_tasks) + len(failed_tasks)}
+- Completed: {len(completed_tasks)}
+- Failed: {len(failed_tasks)}
+- Success Rate: {len(completed_tasks)/(len(completed_tasks)+len(failed_tasks))*100:.1f}%
 
-DATASET ANALYZED:
-{dataset_info[:500]}...
+By Specialist:
+- EDA: {eda_count} tasks
+- Statistical: {stat_count} tasks
+- Machine Learning: {ml_count} tasks
 
-{investigation_narrative}
-
-{insights_summary}
-
-Write a comprehensive final report in markdown format with these sections:
-
-# Data Analysis Report
-
-## Executive Summary
-Provide a high-level overview of the key findings (2-3 sentences).
-
-## Dataset Overview
-Brief description of the data analyzed.
-
-## Analysis Approach
-Describe the analytical reasoning chain - what questions were asked and why.
-
-## Key Findings
-Detailed findings from each investigation step. Include:
-- Patterns discovered
-- Relationships identified
-- Statistical insights
-- Any surprising or noteworthy observations
-
-## Conclusions
-Synthesize the findings into actionable conclusions.
-
-## Limitations & Next Steps
-What are the limitations of this analysis?
-What additional questions could be explored?
-
-Make the report professional, insightful, and easy to understand.
+Total Execution Time: {total_time:.1f} seconds
 """
     
-    response = reporter_llm.invoke([HumanMessage(content=prompt)])
-    report = response.content.strip()
+    # Build detailed findings section
+    detailed_findings = _format_detailed_findings(completed_tasks)
     
-    state.report = report
+    # Build prompt using template
+    strategies = ', '.join([s.value for s in strategic_plan.strategies])
+    priority_order = ' → '.join([s.value for s in strategic_plan.priority_order])
+    
+    prompt = prompt_templates.render(
+        "reporter/final_report.jinja2",
+        dataset_path=state.dataset_path,
+        n_rows=dataset_profile.n_rows,
+        n_cols=dataset_profile.n_cols,
+        target_column=dataset_profile.target_column,
+        target_type=dataset_profile.target_type,
+        n_numeric=len(dataset_profile.numeric_features),
+        n_categorical=len(dataset_profile.categorical_features),
+        strategies=strategies,
+        priority_order=priority_order,
+        reasoning=strategic_plan.reasoning,
+        execution_summary=execution_summary,
+        synthesis=synthesis,
+        detailed_findings=detailed_findings[:3000],
+        n_ml=len([t for t in completed_tasks if t.specialist == "ml"]),
+    )
+    
+    # Use BaseAgent directly - no need for subclass
+    agent = BaseAgent(agent_type="reporter")
+    response = agent.invoke(prompt)
+    report = response.content.strip() if hasattr(response, 'content') else str(response)
+    
     logger.info("Final report generated")
-    logger.info(f"Report preview:\n{report[:500]}...")
+    logger.info(f"Report length: {len(report)} characters")
+    logger.info("=" * 60)
+    
+    # Update state
+    state.report = report
     
     return state
+
+
+def _format_detailed_findings(completed_tasks: list) -> str:
+    """Format detailed findings for inclusion in report"""
+    findings = ""
+    
+    # Group by specialist
+    for specialist in ["eda", "statistical", "ml"]:
+        tasks = [t for t in completed_tasks if t.specialist == specialist]
+        if not tasks:
+            continue
+        
+        findings += f"\n### {specialist.upper()} Findings\n\n"
+        
+        for task in tasks:
+            findings += f"**{task.description}**\n\n"
+            
+            # Include key output lines
+            output_lines = task.output.split('\n')
+            key_lines = [line for line in output_lines if line.strip() and not line.startswith('#')]
+            findings += '\n'.join(key_lines[:15]) + '\n\n'
+            
+            # Include insights
+            if task.insights:
+                findings += "Key Insights:\n"
+                for insight in task.insights:
+                    findings += f"- {insight}\n"
+                findings += "\n"
+    
+    return findings
