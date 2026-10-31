@@ -4,6 +4,7 @@ import logging
 from typing import Any
 
 from langchain_core.messages import HumanMessage
+from ollama import ResponseError
 
 from agent.core.llm_manager import LLMManager
 from agent.states import HierarchicalState
@@ -64,6 +65,12 @@ class BaseAgent:
             self.logger.debug(
                 f"Configured structured output with schema: {output_schema.__name__}"
             )
+
+        # A crashed Ollama runner (HTTP 500) is restarted on the next request,
+        # so one retry keeps a long run alive
+        self.llm = self.llm.with_retry(
+            retry_if_exception_type=(ResponseError,), stop_after_attempt=2
+        )
 
     def invoke(self, prompt: str, **kwargs) -> Any:
         """

@@ -219,8 +219,8 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
   | GPU layers | On GPU | Generation | Prompt (4.3k tokens) |
   |---|---|---|---|
   | auto | 1.65 GB | 4.8 tok/s | slow |
-  | 18 | 3.40 GB | 7.7–10.4 tok/s | ~750 tok/s |
-  | **20 (chosen)** | **3.6 GB** | **~12 tok/s** | n/a |
+  | **18 (chosen)** | **3.40 GB** | **7.7–10.4 tok/s** | ~750 tok/s |
+  | 20 | 3.6 GB | ~12 tok/s | ran out of memory on long prompts in the reference run |
   | 21 | 3.79 GB | 10.6 tok/s | ~765 tok/s |
   | 33 (all) | 5.74 GB, spills to shared | 3.8 tok/s | 99 tok/s |
 
@@ -392,7 +392,7 @@ PLAN.md  README.md
 | 2026-10-30 | `qwen3.5:9b` is the local development model; thinking off, `num_ctx=8192`, output capped | Measured: thinking/defaults hang; explicit settings give a valid plan in 86 s |
 | 2026-10-30 | Baseline = prototype design + bug fixes, tagged `v0.1.0-baseline` | Before/after should compare designs, not a version crippled by trivial bugs |
 | 2026-10-30 | Cap plans at `max_tasks=6` | Keeps a local run to ~30–60 min at current speed |
-| 2026-10-31 | `LLM_NUM_GPU=20` on this machine (in `.env`, not a code default) | Ollama's auto offload left 60% of VRAM unused; 20 layers fills 4 GB without spilling into shared memory |
+| 2026-10-31 | `LLM_NUM_GPU=18` on this machine (in `.env`, not a code default) | Ollama's auto offload left 60% of VRAM unused. 20 layers was faster but the first reference run slowed to ~1 tok/s and then crashed the runner on a long prompt, so 18 keeps ~0.5 GB free |
 | 2026-10-31 | Tracing: **LangSmith only**; MLflow removed | Built for agents; clearer traces. Tracing is opt-in via env, because when it's on, prompts and data samples leave the machine (relevant to the local-first pitch) |
 | 2026-10-31 | Delete untracked `todo.md`, `docs/`, `notebooks/`, and the `multi-specialist` branch | Confirmed by owner; superseded by this plan / `feature/new-flow` |
 

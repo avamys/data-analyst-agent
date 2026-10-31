@@ -87,14 +87,26 @@ def main():
     result = {}
     start = node_start = time.time()
     try:
-        # "updates" gives each node's output, "values" the full state after it
-        for mode, chunk in workflow.stream(
-            initial_state, config=config, stream_mode=["updates", "values"]
+        # "updates" gives each node's output, "values" the full state after it.
+        # subgraphs=True also streams the tasks inside the execution step, so
+        # each task is saved as soon as it finishes.
+        for namespace, mode, chunk in workflow.stream(
+            initial_state,
+            config=config,
+            stream_mode=["updates", "values"],
+            subgraphs=True,
         ):
             if mode == "values":
-                result = chunk
+                if not namespace:
+                    result = chunk
                 continue
             for node, update in chunk.items():
+                if namespace:
+                    results = update.get("completed_tasks", []) + update.get(
+                        "failed_tasks", []
+                    )
+                    store.write_tasks([r for r in results if r.task_id == node])
+                    continue
                 step = len(meta["nodes"]) + 1
                 meta["nodes"].append(
                     {"node": node, "seconds": round(time.time() - node_start, 1)}
