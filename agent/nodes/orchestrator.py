@@ -6,14 +6,49 @@ import pandas as pd
 
 from agent.core.base_agent import BaseAgent
 from agent.core.template_manager import prompt_templates
-from agent.states import DatasetProfile, HierarchicalState, StrategicPlan
+from agent.states import DatasetProfile, HierarchicalState, StrategicPlan, TargetType
 
 logger = logging.getLogger(__name__)
 
 
-def auto_profile_dataset(df: pd.DataFrame, dataset_path: str) -> DatasetProfile:
+# Column names treated as the target when none is given explicitly
+TARGET_NAMES = ["target", "label", "class", "outcome", "y"]
+
+
+def detect_target(
+    df: pd.DataFrame, target: str | None = None
+) -> tuple[str | None, TargetType]:
+    """
+    Pick the target column (explicit name, else a conventional name) and its type
+
+    The type comes from the number of distinct values, not the dtype, so string
+    labels such as "yes"/"no" are classification targets too.
+    """
+    if target is not None:
+        if target not in df.columns:
+            raise ValueError(f"Target {target!r} is not a column of the dataset")
+    else:
+        by_lower = {c.lower(): c for c in df.columns}
+        target = next((by_lower[n] for n in TARGET_NAMES if n in by_lower), None)
+        if target is None:
+            return None, "none"
+
+    n_unique = df[target].nunique()
+    if n_unique == 2:
+        return target, "binary"
+    if not pd.api.types.is_numeric_dtype(df[target]) or n_unique <= 10:
+        return target, "multiclass"
+    return target, "regression"
+
+
+def auto_profile_dataset(
+    df: pd.DataFrame, dataset_path: str, target: str | None = None
+) -> DatasetProfile:
     """
     Automatically profile a dataset to understand its characteristics
+
+    Args:
+        target: Target column; detected from conventional names when omitted
     """
     n_rows, n_cols = df.shape
 
@@ -39,22 +74,7 @@ def auto_profile_dataset(df: pd.DataFrame, dataset_path: str) -> DatasetProfile:
         missing_percentages = (df.isnull().sum() / len(df) * 100).to_dict()
         missing_percentages = {k: v for k, v in missing_percentages.items() if v > 0}
 
-    # Detect target column (common names)
-    target_column = None
-    target_type = "none"
-    for possible_target in ["target", "label", "class", "survived", "outcome", "y"]:
-        if possible_target in [c.lower() for c in df.columns]:
-            target_column = [c for c in df.columns if c.lower() == possible_target][0]
-            # Determine target type
-            if df[target_column].dtype in ["int64", "float64"]:
-                n_unique = df[target_column].nunique()
-                if n_unique == 2:
-                    target_type = "binary"
-                elif n_unique <= 10:
-                    target_type = "multiclass"
-                else:
-                    target_type = "regression"
-            break
+    target_column, target_type = detect_target(df, target)
 
     # Check for class imbalance (if target exists)
     has_imbalance = False
@@ -116,7 +136,7 @@ class OrchestratorAgent(BaseAgent):
 
         # Load and profile dataset
         df = pd.read_csv(dataset_path)
-        profile = auto_profile_dataset(df, dataset_path)
+        profile = auto_profile_dataset(df, dataset_path, state.target_column)
 
         # Build profile summary
         profile_summary = self._build_profile_summary(profile)

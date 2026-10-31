@@ -32,15 +32,15 @@ class LLMManager:
             "model": settings.analyst_model,
             "temperature": 0.2,
         },
-        "eda_specialist": {
+        "eda": {
             "model": settings.coder_model,
             "temperature": 0.3,
         },
-        "statistical_specialist": {
+        "statistical": {
             "model": settings.coder_model,
             "temperature": 0.2,
         },
-        "ml_specialist": {
+        "ml": {
             "model": settings.coder_model,
             "temperature": 0.1,
         },
@@ -78,11 +78,8 @@ class LLMManager:
             >>> llm = LLMManager.get_llm("orchestrator")
             >>> llm = LLMManager.get_llm("planner", temperature=0.1)
         """
-        # Get config defaults
-        config = cls.AGENT_CONFIGS.get(agent_type, {})
-        model_name = model_name or config.get("model", settings.analyst_model)
-        temperature = (
-            temperature if temperature is not None else config.get("temperature", 0.3)
+        model_name, temperature = cls.resolve_config(
+            agent_type, model_name, temperature
         )
 
         # Create cache key
@@ -109,6 +106,25 @@ class LLMManager:
         cls._llm_cache[cache_key] = llm
 
         return llm
+
+    @classmethod
+    def resolve_config(
+        cls,
+        agent_type: str,
+        model_name: str | None = None,
+        temperature: float | None = None,
+    ) -> tuple[str, float]:
+        """Return (model, temperature) for an agent type, applying overrides"""
+        if agent_type not in cls.AGENT_CONFIGS:
+            raise ValueError(
+                f"Unknown agent type: {agent_type!r}. "
+                f"Known: {', '.join(cls.AGENT_CONFIGS)}"
+            )
+        config = cls.AGENT_CONFIGS[agent_type]
+        return (
+            model_name or config["model"],
+            temperature if temperature is not None else config["temperature"],
+        )
 
     @staticmethod
     def _provider_kwargs() -> dict[str, Any]:

@@ -6,11 +6,17 @@ import time
 
 from langchain_experimental.tools import PythonREPLTool
 
+from agent.config import settings
 from agent.core.base_agent import BaseAgent
 from agent.core.template_manager import prompt_templates
 from agent.states import HierarchicalState, SubTask, TaskResult
 
 logger = logging.getLogger(__name__)
+
+# repr() of an exception, e.g. "KeyError('Age')" or "ValueError('x', 2)"
+_EXCEPTION_REPR = re.compile(
+    r"[A-Za-z_][\w.]*(Error|Exception|Exit|Interrupt|Iteration)\(.*\)", re.DOTALL
+)
 
 
 class CodeExecutor:
@@ -74,32 +80,18 @@ class CodeExecutor:
 
     def _has_execution_error(self, output: str) -> bool:
         """
-        Check if the output contains Python error indicators
+        Check if the executed code raised
 
-        Common patterns:
-        - Traceback (most recent call last):
-        - Error: <ErrorType>
-        - Exception: <message>
-        - <ErrorType>Error: <message>
-        - FileNotFoundError(...) - compact error format
+        PythonREPLTool returns repr(exception) as the whole output when the code
+        raises, e.g. "KeyError('Age')". Matching that exact shape (or a full
+        traceback) avoids flagging normal output such as "Mean Squared Error: 0.1".
+        Interim until the sandbox reports exit codes (Phase 2 in PLAN.md).
         """
         if not output:
             return False
-
-        error_patterns = [
-            r"Traceback \(most recent call last\):",
-            r"\w+Error:",  # NameError: message format
-            r"\w+Exception:",  # SomeException: message format
-            r"^\s*File \".*\", line \d+",  # Stack trace lines
-            r"^\w+Error\(",  # FileNotFoundError(...) compact format
-            r"^\w+Exception\(",  # SomeException(...) compact format
-        ]
-
-        for pattern in error_patterns:
-            if re.search(pattern, output, re.MULTILINE):
-                return True
-
-        return False
+        if "Traceback (most recent call last):" in output:
+            return True
+        return bool(_EXCEPTION_REPR.fullmatch(output.strip()))
 
     def _extract_error_message(self, output: str) -> str:
         """
@@ -359,18 +351,20 @@ class CodeExecutionAgent(BaseAgent):
     - Compose results into TaskResult
     """
 
-    def __init__(self, specialist_type: str, max_retries: int = 2, **kwargs):
+    def __init__(self, specialist_type: str, max_retries: int | None = None, **kwargs):
         """
         Initialize code execution agent
 
         Args:
             specialist_type: One of "eda", "statistical", "ml"
-            max_retries: Maximum number of retry attempts if code execution fails (default: 2)
+            max_retries: Retries if code execution fails (default: settings.max_code_retries)
             **kwargs: Additional config passed to BaseAgent
         """
         super().__init__(agent_type=specialist_type, **kwargs)
         self.specialist_type = specialist_type
-        self.max_retries = max_retries
+        self.max_retries = (
+            settings.max_code_retries if max_retries is None else max_retries
+        )
 
         # Compose specialized components
         self.code_generator = CodeGenerator(specialist_type, self.llm)
@@ -477,13 +471,15 @@ class CodeExecutionAgent(BaseAgent):
 
 
 # Factory function - simple and clean
-def get_specialist(specialist_type: str, max_retries: int = 2) -> CodeExecutionAgent:
+def get_specialist(
+    specialist_type: str, max_retries: int | None = None
+) -> CodeExecutionAgent:
     """
     Get specialist instance by type
 
     Args:
         specialist_type: One of "eda", "statistical", "ml"
-        max_retries: Maximum number of retry attempts if code execution fails (default: 2)
+        max_retries: Retries if code execution fails (default: settings.max_code_retries)
 
     Returns:
         CodeExecutionAgent configured for that specialist type

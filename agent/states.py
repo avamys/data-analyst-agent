@@ -16,13 +16,16 @@ class AnalysisStrategy(StrEnum):
     CLUSTERING = "clustering"
 
 
+TargetType = Literal["binary", "multiclass", "regression", "none"]
+
+
 class DatasetProfile(BaseModel):
     """Automated dataset profiling"""
 
     n_rows: int
     n_cols: int
     target_column: str | None = None
-    target_type: Literal["binary", "multiclass", "regression", "none"] = "none"
+    target_type: TargetType = "none"
     feature_types: dict[str, str] = Field(
         default_factory=dict
     )  # {col: "numeric"/"categorical"/"datetime"}
@@ -100,6 +103,7 @@ class HierarchicalState(BaseModel):
     # Input
     dataset_info: str
     dataset_path: str
+    target_column: str | None = None  # Detected from column names when None
 
     # Phase tracking
     current_phase: Literal[

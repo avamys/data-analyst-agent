@@ -38,7 +38,7 @@ class Settings(BaseSettings):
 
     # Workflow control
     max_iterations: int = 10  # Max analyst-coder loops
-    max_code_retries: int = 3  # Max retries per code execution
+    max_code_retries: int = 2  # Retries per task after a failed execution
     max_tasks: int = 6  # Upper bound on planned tasks (keeps local runs tractable)
 
     # Paths

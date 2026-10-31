@@ -5,7 +5,7 @@ import logging
 from agent.config import settings
 from agent.core.base_agent import BaseAgent
 from agent.core.template_manager import prompt_templates
-from agent.states import AnalysisPlan, AnalysisStrategy, HierarchicalState
+from agent.states import AnalysisPlan, AnalysisStrategy, HierarchicalState, SubTask
 
 logger = logging.getLogger(__name__)
 
@@ -57,31 +57,15 @@ class PlannerAgent(BaseAgent):
             estimated_tasks=min(strategic_plan.estimated_tasks, settings.max_tasks),
         )
 
-        # Get structured plan from LLM
-        analysis_plan = self.invoke(prompt)
-
-        # The model may ignore the requested count; dependencies on dropped
-        # tasks are skipped by _compute_execution_order
-        if len(analysis_plan.tasks) > settings.max_tasks:
-            self.logger.warning(
-                f"Plan has {len(analysis_plan.tasks)} tasks, keeping first {settings.max_tasks}"
-            )
-            analysis_plan.tasks = analysis_plan.tasks[: settings.max_tasks]
-
-        # Build execution order respecting dependencies
-        execution_order = _compute_execution_order(analysis_plan.tasks)
-        analysis_plan.execution_order = execution_order
-
-        # Build parallel groups (tasks with no dependencies can run together)
-        parallel_groups = _compute_parallel_groups(analysis_plan.tasks, execution_order)
-        analysis_plan.parallel_groups = parallel_groups
+        # Get structured plan from LLM, then check and repair it
+        analysis_plan = validate_plan(self.invoke(prompt), settings.max_tasks)
 
         # Log the plan
         self._log_analysis_plan(analysis_plan)
 
         # Update state
         state.analysis_plan = analysis_plan
-        state.pending_tasks = execution_order.copy()
+        state.pending_tasks = analysis_plan.execution_order.copy()
         state.current_phase = "execution"
 
         return state
@@ -114,9 +98,6 @@ class PlannerAgent(BaseAgent):
         self.logger.info(
             f"\nExecution Order: {' → '.join(analysis_plan.execution_order)}"
         )
-        self.logger.info(
-            f"Parallel Groups: {len(analysis_plan.parallel_groups)} groups"
-        )
         self.logger.info("=" * 60)
 
 
@@ -130,62 +111,62 @@ def planner_node(state: HierarchicalState) -> HierarchicalState:
     return agent.execute(state)
 
 
-def _compute_execution_order(tasks: list) -> list:
-    """
-    Compute execution order using topological sort
-    """
-    task_dict = {t.id: t for t in tasks}
-    visited = set()
-    order = []
+class PlanValidationError(ValueError):
+    """The planner produced a plan that can't be executed"""
 
-    def visit(task_id):
-        if task_id in visited:
+
+def validate_plan(plan: AnalysisPlan, max_tasks: int) -> AnalysisPlan:
+    """
+    Check and repair an LLM-produced plan, then compute its execution order
+
+    - Duplicate task IDs and dependency cycles raise PlanValidationError
+    - Only the max_tasks highest-priority tasks are kept (ties keep plan order)
+    - Unknown, self, and dropped-task dependencies are removed
+    """
+    plan = plan.model_copy(deep=True)
+
+    ids = [t.id for t in plan.tasks]
+    duplicates = sorted({i for i in ids if ids.count(i) > 1})
+    if duplicates:
+        raise PlanValidationError(f"Duplicate task IDs: {duplicates}")
+
+    kept = {t.id for t in sorted(plan.tasks, key=lambda t: t.priority)[:max_tasks]}
+    if len(kept) < len(plan.tasks):
+        dropped = [t.id for t in plan.tasks if t.id not in kept]
+        logger.warning(f"Plan capped at {max_tasks} tasks, dropped: {dropped}")
+    plan.tasks = [t for t in plan.tasks if t.id in kept]
+
+    for task in plan.tasks:
+        valid = [d for d in task.dependencies if d in kept and d != task.id]
+        if len(valid) < len(task.dependencies):
+            removed = sorted(set(task.dependencies) - set(valid))
+            logger.warning(f"Task {task.id}: removed invalid dependencies {removed}")
+        task.dependencies = valid
+
+    plan.execution_order = _topological_order(plan.tasks)
+    return plan
+
+
+def _topological_order(tasks: list[SubTask]) -> list[str]:
+    """Dependencies first, otherwise plan order; raises on cycles"""
+    by_id = {t.id: t for t in tasks}
+    order: list[str] = []
+    visiting: set[str] = set()
+    done: set[str] = set()
+
+    def visit(task_id: str, path: list[str]):
+        if task_id in done:
             return
-        visited.add(task_id)
+        if task_id in visiting:
+            cycle = " -> ".join([*path[path.index(task_id) :], task_id])
+            raise PlanValidationError(f"Dependency cycle: {cycle}")
+        visiting.add(task_id)
+        for dep in by_id[task_id].dependencies:
+            visit(dep, [*path, task_id])
+        visiting.remove(task_id)
+        done.add(task_id)
+        order.append(task_id)
 
-        task = task_dict.get(task_id)
-        if task:
-            # Visit dependencies first
-            for dep in task.dependencies:
-                if dep in task_dict:
-                    visit(dep)
-            order.append(task_id)
-
-    # Visit all tasks
     for task in tasks:
-        visit(task.id)
-
+        visit(task.id, [])
     return order
-
-
-def _compute_parallel_groups(tasks: list, execution_order: list) -> list:
-    """
-    Group tasks that can run in parallel (no dependencies between them)
-    """
-    task_dict = {t.id: t for t in tasks}
-    groups = []
-    remaining = set(execution_order)
-    completed = set()
-
-    while remaining:
-        # Find tasks whose dependencies are all completed
-        ready = []
-        for task_id in remaining:
-            task = task_dict[task_id]
-            if all(dep in completed for dep in task.dependencies):
-                ready.append(task_id)
-
-        if ready:
-            groups.append(ready)
-            for task_id in ready:
-                remaining.remove(task_id)
-                completed.add(task_id)
-        else:
-            # Shouldn't happen with valid dependencies
-            logger.warning(
-                f"Circular dependency detected in remaining tasks: {remaining}"
-            )
-            groups.append(list(remaining))
-            break
-
-    return groups

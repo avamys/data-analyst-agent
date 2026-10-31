@@ -29,26 +29,7 @@ def hierarchical_reporter_node(state: HierarchicalState) -> HierarchicalState:
     logger.info("REPORTING PHASE")
     logger.info("=" * 60)
 
-    # Build execution summary
-    eda_count = len([t for t in completed_tasks if t.specialist == "eda"])
-    stat_count = len([t for t in completed_tasks if t.specialist == "statistical"])
-    ml_count = len([t for t in completed_tasks if t.specialist == "ml"])
-
-    total_time = sum(t.execution_time for t in completed_tasks)
-
-    execution_summary = f"""
-Total Tasks: {len(completed_tasks) + len(failed_tasks)}
-- Completed: {len(completed_tasks)}
-- Failed: {len(failed_tasks)}
-- Success Rate: {len(completed_tasks) / (len(completed_tasks) + len(failed_tasks)) * 100:.1f}%
-
-By Specialist:
-- EDA: {eda_count} tasks
-- Statistical: {stat_count} tasks
-- Machine Learning: {ml_count} tasks
-
-Total Execution Time: {total_time:.1f} seconds
-"""
+    execution_summary = build_execution_summary(completed_tasks, failed_tasks)
 
     # Build detailed findings section
     detailed_findings = _format_detailed_findings(completed_tasks)
@@ -88,6 +69,32 @@ Total Execution Time: {total_time:.1f} seconds
     state.report = report
 
     return state
+
+
+def build_execution_summary(completed_tasks: list, failed_tasks: list) -> str:
+    """Summarize task outcomes; each task is in exactly one of the two lists"""
+    all_tasks = completed_tasks + failed_tasks
+    total = len(all_tasks)
+    success_rate = len(completed_tasks) / total * 100 if total else 0.0
+    counts = {
+        s: sum(t.specialist == s for t in completed_tasks)
+        for s in ("eda", "statistical", "ml")
+    }
+    total_time = sum(t.execution_time for t in all_tasks)
+
+    return f"""
+Total Tasks: {total}
+- Completed: {len(completed_tasks)}
+- Failed: {len(failed_tasks)}
+- Success Rate: {success_rate:.1f}%
+
+Completed By Specialist:
+- EDA: {counts["eda"]} tasks
+- Statistical: {counts["statistical"]} tasks
+- Machine Learning: {counts["ml"]} tasks
+
+Total Execution Time: {total_time:.1f} seconds
+"""
 
 
 def _format_detailed_findings(completed_tasks: list) -> str:

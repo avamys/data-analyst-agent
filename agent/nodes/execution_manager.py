@@ -36,28 +36,22 @@ def create_specialist_node(task: SubTask) -> Callable:
             logger.info(f"Dependencies: {task.dependencies}")
         logger.info(f"{'=' * 60}\n")
 
-        # Get appropriate specialist
-        specialist = get_specialist(task.specialist, max_retries=2)
-
-        # Execute task
+        specialist = get_specialist(task.specialist)
         result = specialist.execute(task, state)
 
-        # Update state
-        state.completed_tasks.append(result)
-
-        # Log result
+        # Each result goes to exactly one list
         if result.success:
+            state.completed_tasks.append(result)
             logger.info(f"✓ Task {task.id} completed successfully")
             if result.insights:
                 logger.info(f"  Insights: {len(result.insights)} found")
         else:
-            logger.error(f"✗ Task {task.id} failed: {result.error}")
             state.failed_tasks.append(result)
+            logger.error(f"✗ Task {task.id} failed: {result.error}")
 
-        # Progress update
-        completed = len(state.completed_tasks)
+        done = len(state.completed_tasks) + len(state.failed_tasks)
         total = len(state.analysis_plan.tasks)
-        logger.info(f"Progress: {completed}/{total} tasks completed\n")
+        logger.info(f"Progress: {done}/{total} tasks finished\n")
 
         return state
 
@@ -166,18 +160,13 @@ def execution_manager_node(state: HierarchicalState) -> HierarchicalState:
                 setattr(state, key, value)
         result_state = state
 
-    # Summary
-    successful = sum(1 for r in result_state.completed_tasks if r.success)
-    failed = len(result_state.completed_tasks) - successful
-
+    n_ok = len(result_state.completed_tasks)
+    n_failed = len(result_state.failed_tasks)
     logger.info("\n" + "=" * 80)
     logger.info("EXECUTION SUMMARY")
     logger.info(f"Total Tasks: {len(state.analysis_plan.tasks)}")
-    logger.info(f"Completed: {len(result_state.completed_tasks)}")
-    logger.info(f"Failed: {failed}")
-    logger.info(
-        f"Success Rate: {successful}/{len(result_state.completed_tasks) if result_state.completed_tasks else 0}"
-    )
+    logger.info(f"Completed: {n_ok}")
+    logger.info(f"Failed: {n_failed}")
     logger.info("=" * 80 + "\n")
 
     return result_state
