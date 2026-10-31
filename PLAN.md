@@ -3,7 +3,7 @@
 > **This is the main plan for the project.** It replaces `todo.md`; everything still useful from there is folded in below (see [Appendix: todo.md mapping](#appendix-todomd-mapping)).
 > Update the checkboxes and the **Status** block as work lands. Record decisions in the [Decision log](#decision-log).
 
-**Status:** Phase 0, planned in detail, not started · **Last updated:** 2026-10-30
+**Status:** Phase 0, in progress: P0.1–P0.4 done (push pending), next is P0.5 · **Last updated:** 2026-10-31
 
 ---
 
@@ -180,32 +180,32 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 #### Steps (roughly one commit each, in this order)
 
 **P0.1 Commit pending work** (S)
-- [ ] Commit the ruff formatting plus the `agent.graph` export as one commit. (Checked: apart from that export and the `run.py` import, the diff is formatting only.)
-- [ ] Commit `PLAN.md` and `.devcontainer/devcontainer-lock.json`.
-- [ ] Push `feature/new-flow`; create `phase-0`.
+- [x] Commit the ruff formatting plus the `agent.graph` export as one commit. (Checked: apart from that export and the `run.py` import, the diff is formatting only.)
+- [x] Commit `PLAN.md` and `.devcontainer/devcontainer-lock.json`.
+- [ ] Push `feature/new-flow` and `phase-0` *(`phase-0` created locally; push pending)*
 
 **P0.2 Repo cleanup** (S)
-- [ ] Delete `todo.md` (superseded by this plan) and `docs/` (~2,300 lines of generated docs that contradict the code).
-- [ ] Delete `notebooks/tests.ipynb` (scratch work).
-- [ ] Move `output/report_hierarchical_titanic.md` to `docs/baseline/legacy_report_titanic.md`. It's the "61.62% survived" example for the README story. Then delete `output/`.
-- [ ] `.gitignore`: add `output/` and `runs/`.
-- [ ] Delete the `multi-specialist` branch. It's a work-in-progress snapshot of the earlier hierarchical version and includes 690 committed MLflow files. Its `validation.py` (an AST import blocklist) is not carried over: a blocklist isn't a security boundary, and the Phase 2 sandbox replaces it.
-- [ ] Keep `feature/advanced_logging` (1 commit of file loggers) for review in Phase 5.
-- [ ] Add `.env.example` (variable names only).
+- [x] Delete `todo.md` (superseded by this plan) and `docs/` (~2,300 lines of generated docs that contradict the code).
+- [x] Delete `notebooks/tests.ipynb` (scratch work).
+- [x] Move `output/report_hierarchical_titanic.md` to `docs/baseline/legacy_report_titanic.md`. It's the "61.62% survived" example for the README story. Then delete `output/`.
+- [x] `.gitignore`: add `output/` and `runs/`.
+- [x] Delete the `multi-specialist` branch. It's a work-in-progress snapshot of the earlier hierarchical version and includes 690 committed MLflow files. Its `validation.py` (an AST import blocklist) is not carried over: a blocklist isn't a security boundary, and the Phase 2 sandbox replaces it.
+- [x] Keep `feature/advanced_logging` (1 commit of file loggers) for review in Phase 5.
+- [x] Add `.env.example` (variable names only).
 
 **P0.3 Tooling & metadata** (S)
-- [ ] `pyproject.toml`:
+- [x] `pyproject.toml`:
   - add description, readme, and license
   - add `[dependency-groups] dev = ["pytest", "ruff", "ipykernel"]` and remove `ipykernel` from runtime deps
   - remove `mlflow` and its usage in `run.py` (LangSmith is the only tracer); the local `mlruns/` folder can then be deleted
   - keep `langsmith`; use the current `LANGSMITH_*` env var names in `.env.example` (the legacy `LANGCHAIN_*` names still work)
   - keep `langchain_experimental` until Phase 2
-- [ ] Add `[tool.ruff]` (line length 88; rules `E, F, I, B, UP`) and `[tool.pytest.ini_options]` (`testpaths = ["tests"]`).
-- [ ] Run `uv lock && uv sync --group dev`, then `ruff check --fix` and fix what's left by hand.
-- [ ] `tests/conftest.py` with small in-memory DataFrame fixtures. Tests must never depend on `data/`, which is gitignored.
+- [x] Add `[tool.ruff]` (line length 88; rules `E, F, I, B, UP`) and `[tool.pytest.ini_options]` (`testpaths = ["tests"]`).
+- [x] Run `uv lock && uv sync --group dev`, then `ruff check --fix` and fix what's left by hand.
+- [x] `tests/conftest.py` with small in-memory DataFrame fixtures. Tests must never depend on `data/`, which is gitignored.
 
 **P0.4 CI** (S). Done early so every later commit is checked.
-- [ ] `.github/workflows/ci.yml` runs on push and PR: `astral-sh/setup-uv` → `uv sync --group dev --locked` → `ruff check` → `ruff format --check` → `pytest`. There's no Ollama in CI, and no test calls an LLM.
+- [x] `.github/workflows/ci.yml` runs on push and PR: `astral-sh/setup-uv` → `uv sync --group dev --locked` → `ruff check` → `ruff format --check` → `pytest`. There's no Ollama in CI, and no test calls an LLM.
 
 **P0.5 Local model configuration** (S–M)
 - [ ] `config.py`: set default models to `qwen3.5:9b`. Add settings `llm_reasoning: bool = False`, `llm_num_ctx: int = 8192`, `llm_max_tokens: int = 2048`, `llm_timeout_s: int = 600`, `max_tasks: int = 6`.
