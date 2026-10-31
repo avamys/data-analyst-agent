@@ -32,12 +32,9 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
 
     # Temperature settings
-    analyst_temperature: float = 0.4
-    coder_temperature: float = 0.2
     reporter_temperature: float = 0.3
 
     # Workflow control
-    max_iterations: int = 10  # Max analyst-coder loops
     max_code_retries: int = 2  # Retries per task after a failed execution
     max_tasks: int = 6  # Upper bound on planned tasks (keeps local runs tractable)
 

@@ -148,11 +148,3 @@ class LLMManager:
         """Clear LLM cache (useful for testing)"""
         cls._llm_cache.clear()
         logger.info("LLM cache cleared")
-
-    @classmethod
-    def get_cache_info(cls) -> dict[str, int]:
-        """Get cache statistics"""
-        return {
-            "cached_llms": len(cls._llm_cache),
-            "cache_keys": list(cls._llm_cache.keys()),
-        }

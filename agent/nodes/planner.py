@@ -65,7 +65,6 @@ class PlannerAgent(BaseAgent):
 
         # Update state
         state.analysis_plan = analysis_plan
-        state.pending_tasks = analysis_plan.execution_order.copy()
         state.current_phase = "execution"
 
         return state

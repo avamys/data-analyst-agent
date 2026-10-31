@@ -71,15 +71,10 @@ def synthesizer_node(state: HierarchicalState) -> HierarchicalState:
         response.content.strip() if hasattr(response, "content") else str(response)
     )
 
-    # Extract cross-cutting insights
-    cross_insights = _extract_cross_insights(completed_tasks)
-
     logger.info("Synthesis complete")
-    logger.info(f"Cross-insights identified: {len(cross_insights)}")
 
     # Update state
     state.synthesis = synthesis
-    state.cross_insights = cross_insights
     state.current_phase = "reporting"
 
     return state
@@ -111,20 +106,3 @@ def _summarize_results(results: list, category: str) -> str:
             summary += f"ERROR: {result.error}\n"
 
     return summary
-
-
-def _extract_cross_insights(results: list) -> list:
-    """Extract insights that appear across multiple analyses"""
-    # Simple heuristic: insights mentioned by multiple specialists
-    insight_counts = {}
-
-    for result in results:
-        for insight in result.insights:
-            # Normalize insight (lowercase, remove punctuation)
-            normalized = insight.lower().strip(".,!?")
-            insight_counts[normalized] = insight_counts.get(normalized, 0) + 1
-
-    # Insights mentioned more than once
-    cross_insights = [insight for insight, count in insight_counts.items() if count > 1]
-
-    return cross_insights[:10]  # Top 10

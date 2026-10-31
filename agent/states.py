@@ -12,8 +12,6 @@ class AnalysisStrategy(StrEnum):
     EXPLORATORY = "exploratory"
     STATISTICAL = "statistical"
     PREDICTIVE = "predictive"
-    TIME_SERIES = "time_series"
-    CLUSTERING = "clustering"
 
 
 TargetType = Literal["binary", "multiclass", "regression", "none"]
@@ -66,9 +64,6 @@ class AnalysisPlan(BaseModel):
 
     tasks: list[SubTask]
     execution_order: list[str]  # Task IDs in order
-    parallel_groups: list[list[str]] = Field(
-        default_factory=list
-    )  # Tasks that can run in parallel
 
 
 class TaskResult(BaseModel):
@@ -85,16 +80,6 @@ class TaskResult(BaseModel):
     insights: list[str] = Field(default_factory=list)
     artifacts: list[str] = Field(default_factory=list)  # File paths
     metadata: dict[str, Any] = Field(default_factory=dict)
-
-
-class VizOpportunity(BaseModel):
-    """Visualization opportunity identified during analysis"""
-
-    task_id: str
-    description: str
-    plot_type: str  # bar, scatter, box, histogram, heatmap
-    data_summary: str
-    priority: int = 1
 
 
 class HierarchicalState(BaseModel):
@@ -118,19 +103,11 @@ class HierarchicalState(BaseModel):
     analysis_plan: AnalysisPlan | None = None
 
     # Execution layer
-    pending_tasks: list[str] = Field(default_factory=list)
     completed_tasks: list[TaskResult] = Field(default_factory=list)
     failed_tasks: list[TaskResult] = Field(default_factory=list)
-    current_task_index: int = 0
 
     # Synthesis layer
     synthesis: str = ""
-    cross_insights: list[str] = Field(default_factory=list)
-
-    # Visualization
-    viz_opportunities: list[VizOpportunity] = Field(default_factory=list)
-    viz_artifacts: list[str] = Field(default_factory=list)
 
     # Output
     report: str = ""
-    artifacts_dir: str = "output"
