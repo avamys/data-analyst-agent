@@ -54,6 +54,7 @@ class CodeExecutor:
             start_time = time.time()
             output = self.python_tool.run(code)
             execution_time = time.time() - start_time
+            self.logger.debug(f"Code for {task_id}:\n{code}\nOutput:\n{output}")
 
             # Check if output contains error indicators
             # PythonREPLTool returns errors as strings, not exceptions
@@ -393,6 +394,7 @@ class CodeExecutionAgent(BaseAgent):
         last_code = None
         last_error = None
         total_exec_time = 0.0
+        attempts = []
 
         while attempt <= self.max_retries:
             attempt += 1
@@ -418,6 +420,15 @@ class CodeExecutionAgent(BaseAgent):
                 code, task.id
             )
             total_exec_time += exec_time
+            attempts.append(
+                {
+                    "attempt": attempt,
+                    "code": self.code_executor._clean_code(code),
+                    "output": output,
+                    "error": error,
+                    "seconds": round(exec_time, 2),
+                }
+            )
 
             # If successful, extract insights and return
             if success:
@@ -435,6 +446,7 @@ class CodeExecutionAgent(BaseAgent):
                     success=True,
                     error=None,
                     insights=insights,
+                    attempts=attempts,
                     metadata={
                         "strategy": task.strategy.value,
                         "attempts": attempt,
@@ -461,6 +473,7 @@ class CodeExecutionAgent(BaseAgent):
             success=False,
             error=last_error,
             insights=[],
+            attempts=attempts,
             metadata={
                 "strategy": task.strategy.value,
                 "attempts": attempt,

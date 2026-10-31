@@ -79,6 +79,8 @@ class TaskResult(BaseModel):
     error: str | None = None
     insights: list[str] = Field(default_factory=list)
     artifacts: list[str] = Field(default_factory=list)  # File paths
+    # Every execution attempt: attempt, code, output, error, seconds
+    attempts: list[dict[str, Any]] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 

@@ -39,8 +39,7 @@ class Settings(BaseSettings):
     max_tasks: int = 6  # Upper bound on planned tasks (keeps local runs tractable)
 
     # Paths
-    data_directory: str = "data"
-    output_directory: str = "output"
+    runs_directory: str = "runs"  # One subdirectory per run (see agent/run_store.py)
 
     # Logging
     log_level: str = "INFO"

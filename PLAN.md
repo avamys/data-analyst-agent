@@ -3,7 +3,7 @@
 > **This is the main plan for the project.** It replaces `todo.md`; everything still useful from there is folded in below (see [Appendix: todo.md mapping](#appendix-todomd-mapping)).
 > Update the checkboxes and the **Status** block as work lands. Record decisions in the [Decision log](#decision-log).
 
-**Status:** Phase 0 in progress: P0.1–P0.5 done (push blocked on GitHub auth); next P0.6–P0.8, then a reference run and review that define a new Phase 1 (agent quality) · **Last updated:** 2026-10-31
+**Status:** Phase 0 in progress: P0.1–P0.8 done (push blocked on GitHub auth); P0.9 reference run next, then review → new Phase 1 · **Last updated:** 2026-10-31
 
 ---
 
@@ -166,8 +166,8 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 **Exit criteria**
 - [ ] CI green (ruff + pytest) on `main`
 - [ ] `python run.py data/titanic.csv --target Survived` completes on `qwen3.5:9b`
-- [ ] Bugs B1–B6 fixed, each with a test
-- [ ] Each run leaves a complete run directory (logs, every LLM call, state per node, every code attempt)
+- [x] Bugs B1–B6 fixed, each with a test
+- [x] Each run leaves a complete run directory (logs, every LLM call, state per node, every code attempt)
 - [ ] Reference run, annotations, and review committed; commit tagged `v0.1.0-baseline`
 - [ ] New Phase 1 (agent quality) written into this plan from the review
 
@@ -237,27 +237,31 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 | B5 | Regex flags normal output as a failure: `print("ModelError: none")` → failed ([specialists.py:89](agent/core/specialists.py#L89)) | Interim until the Phase 2 sandbox: count it as a failure only if the output contains a traceback, or the *entire* output is a single `XxxError(...)` repr (what `PythonREPLTool` returns on an exception) | output mentioning "Error:" → success; `ValueError('x')` → failure |
 | B6 | Target detection is Titanic-specific (`"survived"` is hard-coded) and non-numeric targets get type `none` ([orchestrator.py:43](agent/nodes/orchestrator.py#L43)) | `--target` override; generic name list; infer type from the number of unique values regardless of dtype (2 → binary, including `"yes"/"no"`) | string target → binary; override wins; no target → `none` |
 
+- [x] All six fixed test-first (`tests/test_llm_manager.py`, `test_execution.py`, `test_planner.py`, `test_profiling.py`). `max_code_retries` default set to 2 (the previous hard-coded behavior).
+
 **P0.7 Remove dead code** (S)
-- [ ] **State:** remove `VizOpportunity`, `viz_opportunities`, `viz_artifacts`, `pending_tasks`, `current_task_index`, and `artifacts_dir`. Also remove `cross_insights` with `_extract_cross_insights` (it only ever matched identical strings) and `parallel_groups` with `_compute_parallel_groups` (replaced by `Send` in Phase 3).
-- [ ] **Config:** remove `max_iterations`, `analyst_temperature`, and `coder_temperature` (unused). Remove `LLMManager.get_cache_info`.
-- [ ] **Strategies:** remove `TIME_SERIES` and `CLUSTERING` from the strategy enum and the orchestrator prompt. They can be chosen but no specialist runs them. Re-add in Phase 7.
+- [x] **State:** remove `VizOpportunity`, `viz_opportunities`, `viz_artifacts`, `pending_tasks`, `current_task_index`, and `artifacts_dir`. Also remove `cross_insights` with `_extract_cross_insights` (it only ever matched identical strings) and `parallel_groups` with `_compute_parallel_groups` (replaced by `Send` in Phase 3).
+- [x] **Config:** remove `max_iterations`, `analyst_temperature`, and `coder_temperature` (unused). Remove `LLMManager.get_cache_info`.
+- [x] **Strategies:** remove `TIME_SERIES` and `CLUSTERING` from the strategy enum and the orchestrator prompt. They can be chosen but no specialist runs them. Re-add in Phase 7.
+- Left in place: `current_phase` is written but never read (wasn't on the list; revisit in the graph redesign).
 
 **P0.8 CLI & local run store** (M). *Moved forward from Phase 2 on 2026-10-31.* Every run must be fully reviewable from local files; LangSmith is the viewer, not the only record.
-- [ ] `run.py <csv_path> [--target COL] [--max-tasks N] [--model NAME]`, accepting any path, not just files in `data/`.
-- [ ] Each run gets its own directory, `runs/<YYYYmmdd-HHMMSS>_<dataset>_<model>/`, plus a `runs/latest` link:
+- [x] `run.py <csv_path> [--target COL] [--max-tasks N] [--model NAME]`, accepting any path, not just files in `data/`.
+- [x] Each run gets its own directory, `runs/<YYYYmmdd-HHMMSS>_<dataset>_<model>/`, plus a `runs/latest` link:
 
   | File | Contents |
   |---|---|
   | `run.log` | Full log at DEBUG level (the console stays at INFO) |
   | `run_meta.json` | Commit SHA (and whether the tree was dirty), command, settings, models, start/end, duration per node, token totals, task counts, status (`ok` / `failed` / `interrupted`), LangSmith trace URL |
-  | `llm_calls.jsonl` | One line per LLM call: node, agent type, model, prompt, raw response, parsed output, tokens, duration, error |
+  | `llm_calls.jsonl` | One line per LLM call: node, agent type, model, prompt, raw response (the JSON for structured calls), tokens, duration, error |
   | `state/NN_<node>.json` | Graph state after each top-level node |
   | `tasks/<task_id>/` | `attempt_N.py` and `attempt_N_output.txt` for every attempt (including failed ones), plus `result.json` |
   | `report.md` | The final report |
 
-- [ ] The run directory is written as the run progresses, so a crashed or interrupted run still leaves everything up to the failure.
-- [ ] LangSmith run name, tags (dataset, model), and metadata (commit SHA, run dir) are set through the graph `config`, so a trace and its run directory point to each other.
-- [ ] Settings `output_directory` → `runs_directory`; `output/` is no longer used.
+- [x] The run directory is written as the run progresses, so a crashed or interrupted run still leaves everything up to the failure. *(State and LLM calls are written per step; task attempts at the end of the execution step, and also in `run.log` as they happen.)*
+- [x] Verified with a 1-task run (2026-10-31): 5 steps, 5 LLM calls, ~10 min.
+- [x] LangSmith run name, tags (dataset, model), and metadata (commit SHA, run dir) are set through the graph `config`, so a trace and its run directory point to each other.
+- [x] Settings `output_directory` → `runs_directory`; `output/` is no longer used.
 
 **P0.9 Reference run** (M, mostly waiting)
 - [ ] Run `scripts/llm_smoke.py`, then `python run.py data/titanic.csv --target Survived` (6 tasks) in the background.

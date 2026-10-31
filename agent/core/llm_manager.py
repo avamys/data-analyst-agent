@@ -22,34 +22,34 @@ class LLMManager:
 
     _llm_cache: dict[str, Any] = {}
 
-    # Default configurations for each agent type
+    # Default configuration per agent type; "model" names the settings field
     AGENT_CONFIGS = {
         "orchestrator": {
-            "model": settings.analyst_model,
+            "model": "analyst_model",
             "temperature": 0.3,
         },
         "planner": {
-            "model": settings.analyst_model,
+            "model": "analyst_model",
             "temperature": 0.2,
         },
         "eda": {
-            "model": settings.coder_model,
+            "model": "coder_model",
             "temperature": 0.3,
         },
         "statistical": {
-            "model": settings.coder_model,
+            "model": "coder_model",
             "temperature": 0.2,
         },
         "ml": {
-            "model": settings.coder_model,
+            "model": "coder_model",
             "temperature": 0.1,
         },
         "synthesizer": {
-            "model": settings.analyst_model,
+            "model": "analyst_model",
             "temperature": 0.3,
         },
         "reporter": {
-            "model": settings.reporter_model,
+            "model": "reporter_model",
             "temperature": settings.reporter_temperature,
         },
     }
@@ -122,7 +122,7 @@ class LLMManager:
             )
         config = cls.AGENT_CONFIGS[agent_type]
         return (
-            model_name or config["model"],
+            model_name or getattr(settings, config["model"]),
             temperature if temperature is not None else config["temperature"],
         )
 
