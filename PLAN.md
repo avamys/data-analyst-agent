@@ -3,7 +3,7 @@
 > **This is the main plan for the project.** It replaces `todo.md`; everything still useful from there is folded in below (see [Appendix: todo.md mapping](#appendix-todomd-mapping)).
 > Update the checkboxes and the **Status** block as work lands. Record decisions in the [Decision log](#decision-log).
 
-**Status:** Phase 0, in progress: P0.1–P0.4 done (push pending), P0.5 done (GPU layers tuned: 4.8 → ~12 tok/s; task cap is a simple truncation until B3), push blocked on GitHub auth; next is P0.6 · **Last updated:** 2026-10-31
+**Status:** Phase 0 in progress: P0.1–P0.5 done (push blocked on GitHub auth); next P0.6–P0.8, then a reference run and review that define a new Phase 1 (agent quality) · **Last updated:** 2026-10-31
 
 ---
 
@@ -157,7 +157,7 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 
 ### Phase 0: Reset & baseline (S–M), detailed
 
-**Goal:** a clean repo with tests and CI that runs end-to-end on `qwen3.5:9b`, with the known bugs fixed and a tagged baseline report for Phase 1 to measure.
+**Goal:** a clean repo with tests and CI that runs end-to-end on `qwen3.5:9b`, with the known bugs fixed, every run fully logged locally, and a reviewed reference run that defines what to fix next.
 
 **What "baseline" means:** the prototype design with its bugs fixed, *not* the redesign. Behavior related to hallucination (truncated context, the LLM typing numbers) is deliberately left alone so the "before" numbers are honest.
 
@@ -166,8 +166,10 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 **Exit criteria**
 - [ ] CI green (ruff + pytest) on `main`
 - [ ] `python run.py data/titanic.csv --target Survived` completes on `qwen3.5:9b`
-- [ ] Baseline report, run metadata, and hand-checked annotations committed; commit tagged `v0.1.0-baseline`
 - [ ] Bugs B1–B6 fixed, each with a test
+- [ ] Each run leaves a complete run directory (logs, every LLM call, state per node, every code attempt)
+- [ ] Reference run, annotations, and review committed; commit tagged `v0.1.0-baseline`
+- [ ] New Phase 1 (agent quality) written into this plan from the review
 
 #### Measured on 2026-10-30 (these shape the phase)
 - `qwen3.5:9b` (Q4_K_M) on this machine: **~5 tok/s**. Only **1.7 of 6.3 GB is in VRAM**, so it runs mostly on CPU.
@@ -240,21 +242,37 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 - [ ] **Config:** remove `max_iterations`, `analyst_temperature`, and `coder_temperature` (unused). Remove `LLMManager.get_cache_info`.
 - [ ] **Strategies:** remove `TIME_SERIES` and `CLUSTERING` from the strategy enum and the orchestrator prompt. They can be chosen but no specialist runs them. Re-add in Phase 7.
 
-**P0.8 CLI & run metadata** (S)
+**P0.8 CLI & local run store** (M). *Moved forward from Phase 2 on 2026-10-31.* Every run must be fully reviewable from local files; LangSmith is the viewer, not the only record.
 - [ ] `run.py <csv_path> [--target COL] [--max-tasks N] [--model NAME]`, accepting any path, not just files in `data/`.
-- [ ] Report filename includes the model and a timestamp: `output/report_<stem>_<model>_<YYYYmmdd-HHMM>.md`.
-- [ ] Write `run_meta.json` next to the report: commit SHA, model, settings, wall time per node, token usage (if reported), task success counts, and the LangSmith run ID/URL when tracing is on. This is the seed for the Phase 2 run store.
-- [ ] Give each run a LangSmith run name, tags (dataset, model), and metadata (commit SHA, settings) through the graph `config`, so traces are easy to find.
+- [ ] Each run gets its own directory, `runs/<YYYYmmdd-HHMMSS>_<dataset>_<model>/`, plus a `runs/latest` link:
 
-**P0.9 Baseline run** (M, mostly waiting)
-- [ ] Run `scripts/llm_smoke.py`, then `python run.py data/titanic.csv --target Survived` in the background. Expect about 30–60 min at current speed.
+  | File | Contents |
+  |---|---|
+  | `run.log` | Full log at DEBUG level (the console stays at INFO) |
+  | `run_meta.json` | Commit SHA (and whether the tree was dirty), command, settings, models, start/end, duration per node, token totals, task counts, status (`ok` / `failed` / `interrupted`), LangSmith trace URL |
+  | `llm_calls.jsonl` | One line per LLM call: node, agent type, model, prompt, raw response, parsed output, tokens, duration, error |
+  | `state/NN_<node>.json` | Graph state after each top-level node |
+  | `tasks/<task_id>/` | `attempt_N.py` and `attempt_N_output.txt` for every attempt (including failed ones), plus `result.json` |
+  | `report.md` | The final report |
+
+- [ ] The run directory is written as the run progresses, so a crashed or interrupted run still leaves everything up to the failure.
+- [ ] LangSmith run name, tags (dataset, model), and metadata (commit SHA, run dir) are set through the graph `config`, so a trace and its run directory point to each other.
+- [ ] Settings `output_directory` → `runs_directory`; `output/` is no longer used.
+
+**P0.9 Reference run** (M, mostly waiting)
+- [ ] Run `scripts/llm_smoke.py`, then `python run.py data/titanic.csv --target Survived` (6 tasks) in the background.
 - [ ] If it breaks partway, fix only what's needed to finish (no redesign) and note each fix.
-- [ ] Commit to `docs/baseline/`: the report, `run_meta.json`, and **`annotations.md`**, a hand check of every claim marked correct, wrong, or unsupported, with the true value. It seeds the Phase 1 judge calibration and the README's "before" story.
-- [ ] Tag the commit **`v0.1.0-baseline`** so Phase 1 can always re-run exactly this version.
+- [ ] Copy the run directory to `docs/baseline/run/` and commit it. Tag the commit **`v0.1.0-baseline`** so the eval phase can always re-run exactly this version.
 
-**P0.10 Wrap-up** (S)
+**P0.10 Review & re-plan** (M)
+- [ ] Review the reference run node by node, using the run directory and the LangSmith trace: what each agent receives, what it produces, where quality is lost, what works.
+- [ ] **`docs/baseline/annotations.md`**: every claim in the report marked correct / wrong / unsupported, with the true value. It seeds the eval judge's calibration and the README's "before" story.
+- [ ] **`docs/baseline/review.md`**: findings per node and the main problems, ranked.
+- [ ] Turn the findings into a new **Phase 1: agent quality**, and shift the later phases by one (eval harness becomes Phase 2, and so on).
+
+**P0.11 Wrap-up** (S)
 - [ ] README stub: what the project is, status "under active rebuild", a link to this plan, and the current quickstart.
-- [ ] PR `phase-0` → `main`; update the Status block at the top.
+- [ ] Push (blocked on GitHub auth, see P0.1); PR `phase-0` → `main`; update the Status block at the top.
 
 #### Phase 0 risks
 | Risk | Mitigation |
@@ -280,7 +298,7 @@ Goal: measure v1 before changing it.
 Goal: safe, inspectable execution with structured outputs.
 - [ ] Sandbox executor (subprocess, timeout, per-task cwd, env scrubbed, network blocked where possible); optional Docker backend.
 - [ ] `analyst_runtime` helper injected into the sandbox: `record_fact`, `save_plot`, `record_table`.
-- [ ] Run store `runs/<run_id>/…` + `meta.json` (model, tokens, timings).
+- [ ] Extend the run store from P0.8 with sandbox outputs, facts, and plots.
 - [ ] Update specialist prompts to use the runtime and drop `print`-scraping.
 - [ ] Profiler loads data once; target detection with `--target` override and string-label support.
 - [ ] Smarter retries: pass a trimmed traceback plus the previous code; final fallback = "simplify the task".
