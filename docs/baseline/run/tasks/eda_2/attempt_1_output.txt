@@ -1,0 +1,30 @@
+=== Missing Value Analysis for 'Age' and 'Cabin' ===
+Total Rows: 891
+--------------------------------------------------
+Column: Age
+Missing Count: 177
+Missing Percentage: 19.87%
+Range (Min-Max): [0.42, 80.0]
+Mean: 29.70 | Median: 28.00
+Interpretation: Age has 177 missing values (19.87%). The median (28.00) is closer to the mean (29.70), suggesting a relatively symmetric distribution. Imputation strategy: Median imputation is preferred over Mean to minimize skew from outliers.
+--------------------------------------------------
+Column: Cabin
+Missing Count: 687
+Missing Percentage: 77.10%
+Unique Non-Missing Values: 147
+Interpretation: Cabin has 687 missing values (77.10%). This indicates that a large portion of passengers did not have a recorded cabin number. Imputation strategy: Since the data is highly sparse and categorical, simple mean/median imputation is invalid. Strategies include: 1) Drop rows if critical, 2) Impute with 'Unknown', or 3) Create a binary flag (HasCabin).
+--------------------------------------------------
+=== Cross-Tabulation: Missingness vs Survival ===
+Passengers with missing Age - Survived: 52, Not Survived: 125
+Passengers with known Age - Survived: 290, Not Survived: 424
+Interpretation: Comparing survival rates between missing and non-missing Age groups can reveal if the missingness is random or informative.
+=== Cross-Tabulation: Cabin Presence vs Survival ===
+Survival Rate with Cabin: 66.67%
+Survival Rate without Cabin: 29.99%
+Interpretation: If survival rates differ significantly, 'Cabin' presence is a strong predictor and should be encoded as a binary feature before imputation.
+=== Age Statistics by Sex ===
+         mean  median  count
+Sex                         
+female  27.92    27.0    261
+male    30.73    29.0    453
+Interpretation: If imputing, consider calculating the median separately for each Sex group to preserve demographic differences.

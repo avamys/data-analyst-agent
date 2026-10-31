@@ -1,0 +1,44 @@
+=== Logistic Regression Baseline Performance ===
+Model: Logistic Regression
+Training Accuracy: 80.20%
+Test Accuracy: 80.45%
+
+Test Set Classification Report:
+              precision    recall  f1-score   support
+
+           0       0.81      0.89      0.85       110
+           1       0.79      0.67      0.72        69
+
+    accuracy                           0.80       179
+   macro avg       0.80      0.78      0.79       179
+weighted avg       0.80      0.80      0.80       179
+
+
+=== Random Forest Classifier Performance ===
+Model: Random Forest Classifier
+Training Accuracy: 98.17%
+Test Accuracy: 82.68%
+
+Test Set Classification Report:
+              precision    recall  f1-score   support
+
+           0       0.84      0.89      0.86       110
+           1       0.81      0.72      0.76        69
+
+    accuracy                           0.83       179
+   macro avg       0.82      0.81      0.81       179
+weighted avg       0.83      0.83      0.82       179
+
+
+=== Top 5 Important Features ===
+Fare: 0.2702
+Sex: 0.2606
+Age: 0.2504
+Pclass: 0.0925
+SibSp: 0.0503
+
+=== Interpretation ===
+The Logistic Regression achieved 80.45% accuracy on the test set.
+The Random Forest Classifier achieved 82.68% accuracy on the test set.
+Random Forest generally outperforms Logistic Regression in this dataset due to its ability to capture non-linear relationships and interactions between features (e.g., Age and Fare).
+Key drivers for survival identified by Random Forest include: Fare, Sex, Age.

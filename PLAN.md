@@ -3,7 +3,7 @@
 > **This is the main plan for the project.** It replaces `todo.md`; everything still useful from there is folded in below (see [Appendix: todo.md mapping](#appendix-todomd-mapping)).
 > Update the checkboxes and the **Status** block as work lands. Record decisions in the [Decision log](#decision-log).
 
-**Status:** Phase 0 in progress: P0.1–P0.8 done (push blocked on GitHub auth); P0.9 reference run next, then review → new Phase 1 · **Last updated:** 2026-10-31
+**Status:** Phase 0 in progress: P0.1–P0.9 done, P0.10 review written ([docs/baseline/review.md](docs/baseline/review.md)); next: agree on the new Phase 1, then wrap up (push blocked on GitHub auth) · **Last updated:** 2026-10-31
 
 ---
 
@@ -168,7 +168,7 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 - [ ] `python run.py data/titanic.csv --target Survived` completes on `qwen3.5:9b`
 - [x] Bugs B1–B6 fixed, each with a test
 - [x] Each run leaves a complete run directory (logs, every LLM call, state per node, every code attempt)
-- [ ] Reference run, annotations, and review committed; commit tagged `v0.1.0-baseline`
+- [x] Reference run, annotations, and review committed; commit tagged `v0.1.0-baseline`
 - [ ] New Phase 1 (agent quality) written into this plan from the review
 
 #### Measured on 2026-10-30 (these shape the phase)
@@ -264,14 +264,15 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 - [x] Settings `output_directory` → `runs_directory`; `output/` is no longer used.
 
 **P0.9 Reference run** (M, mostly waiting)
-- [ ] Run `scripts/llm_smoke.py`, then `python run.py data/titanic.csv --target Survived` (6 tasks) in the background.
-- [ ] If it breaks partway, fix only what's needed to finish (no redesign) and note each fix.
-- [ ] Copy the run directory to `docs/baseline/run/` and commit it. Tag the commit **`v0.1.0-baseline`** so the eval phase can always re-run exactly this version.
+- [x] Run `scripts/llm_smoke.py`, then `python run.py data/titanic.csv --target Survived` (6 tasks) in the background.
+- [x] If it breaks partway, fix only what's needed to finish (no redesign) and note each fix.
+  - First attempt crashed the Ollama runner after 26 min (GPU memory at 20 layers). Fixed in `03d2f98`: `LLM_NUM_GPU=18`, one retry on runner crashes, tasks saved as they finish. Second attempt: 25 min, 6/6 tasks.
+- [x] Copy the run directory to `docs/baseline/run/` and commit it. Tag the commit **`v0.1.0-baseline`** so the eval phase can always re-run exactly this version.
 
 **P0.10 Review & re-plan** (M)
-- [ ] Review the reference run node by node, using the run directory and the LangSmith trace: what each agent receives, what it produces, where quality is lost, what works.
-- [ ] **`docs/baseline/annotations.md`**: every claim in the report marked correct / wrong / unsupported, with the true value. It seeds the eval judge's calibration and the README's "before" story.
-- [ ] **`docs/baseline/review.md`**: findings per node and the main problems, ranked.
+- [x] Review the reference run node by node, using the run directory and the LangSmith trace: what each agent receives, what it produces, where quality is lost, what works.
+- [x] **`docs/baseline/annotations.md`**: every claim in the report marked correct / wrong / unsupported, with the true value. It seeds the eval judge's calibration and the README's "before" story.
+- [x] **`docs/baseline/review.md`**: findings per node and the main problems, ranked.
 - [ ] Turn the findings into a new **Phase 1: agent quality**, and shift the later phases by one (eval harness becomes Phase 2, and so on).
 
 **P0.11 Wrap-up** (S)

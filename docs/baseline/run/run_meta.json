@@ -1,0 +1,59 @@
+{
+  "status": "ok",
+  "started": "2026-10-31T20:42:54",
+  "command": [
+    "run.py",
+    "data/titanic.csv",
+    "--target",
+    "Survived"
+  ],
+  "commit": "03d2f98",
+  "dirty": false,
+  "settings": {
+    "ollama_base_url": "http://host.docker.internal:11434",
+    "analyst_model": "qwen3.5:9b",
+    "coder_model": "qwen3.5:9b",
+    "reporter_model": "qwen3.5:9b",
+    "llm_reasoning": false,
+    "llm_num_ctx": 8192,
+    "llm_max_tokens": 4096,
+    "llm_timeout_s": 900,
+    "llm_num_gpu": 18,
+    "model_provider": "ollama",
+    "reporter_temperature": 0.3,
+    "max_code_retries": 2,
+    "max_tasks": 6,
+    "runs_directory": "runs",
+    "log_level": "INFO"
+  },
+  "nodes": [
+    {
+      "node": "orchestrator",
+      "seconds": 51.2
+    },
+    {
+      "node": "planner",
+      "seconds": 67.1
+    },
+    {
+      "node": "execution_manager",
+      "seconds": 973.9
+    },
+    {
+      "node": "synthesizer",
+      "seconds": 175.7
+    },
+    {
+      "node": "reporter",
+      "seconds": 244.2
+    }
+  ],
+  "finished": "2026-10-31T21:08:07",
+  "seconds": 1512.1,
+  "llm_calls": 13,
+  "input_tokens": 14037,
+  "output_tokens": 13244,
+  "tasks_completed": 6,
+  "tasks_failed": 0,
+  "trace_url": "(removed from committed copy)"
+}
