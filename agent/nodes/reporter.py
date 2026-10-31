@@ -1,4 +1,5 @@
 """Hierarchical Reporter - Generates comprehensive final report"""
+
 import logging
 from agent.core.base_agent import BaseAgent
 from agent.core.template_manager import prompt_templates
@@ -10,7 +11,7 @@ logger = logging.getLogger(__name__)
 def hierarchical_reporter_node(state: HierarchicalState) -> HierarchicalState:
     """
     Generates comprehensive final report from hierarchical analysis
-    
+
     Responsibilities:
     - Incorporate strategic approach and execution summary
     - Include synthesized insights
@@ -22,23 +23,23 @@ def hierarchical_reporter_node(state: HierarchicalState) -> HierarchicalState:
     completed_tasks = state.completed_tasks
     failed_tasks = state.failed_tasks
     synthesis = state.synthesis
-    
+
     logger.info("=" * 60)
     logger.info("REPORTING PHASE")
     logger.info("=" * 60)
-    
+
     # Build execution summary
     eda_count = len([t for t in completed_tasks if t.specialist == "eda"])
     stat_count = len([t for t in completed_tasks if t.specialist == "statistical"])
     ml_count = len([t for t in completed_tasks if t.specialist == "ml"])
-    
+
     total_time = sum(t.execution_time for t in completed_tasks)
-    
+
     execution_summary = f"""
 Total Tasks: {len(completed_tasks) + len(failed_tasks)}
 - Completed: {len(completed_tasks)}
 - Failed: {len(failed_tasks)}
-- Success Rate: {len(completed_tasks)/(len(completed_tasks)+len(failed_tasks))*100:.1f}%
+- Success Rate: {len(completed_tasks) / (len(completed_tasks) + len(failed_tasks)) * 100:.1f}%
 
 By Specialist:
 - EDA: {eda_count} tasks
@@ -47,14 +48,14 @@ By Specialist:
 
 Total Execution Time: {total_time:.1f} seconds
 """
-    
+
     # Build detailed findings section
     detailed_findings = _format_detailed_findings(completed_tasks)
-    
+
     # Build prompt using template
-    strategies = ', '.join([s.value for s in strategic_plan.strategies])
-    priority_order = ' → '.join([s.value for s in strategic_plan.priority_order])
-    
+    strategies = ", ".join([s.value for s in strategic_plan.strategies])
+    priority_order = " → ".join([s.value for s in strategic_plan.priority_order])
+
     prompt = prompt_templates.render(
         "reporter/final_report.jinja2",
         dataset_path=state.dataset_path,
@@ -72,47 +73,51 @@ Total Execution Time: {total_time:.1f} seconds
         detailed_findings=detailed_findings[:3000],
         n_ml=len([t for t in completed_tasks if t.specialist == "ml"]),
     )
-    
+
     # Use BaseAgent directly - no need for subclass
     agent = BaseAgent(agent_type="reporter")
     response = agent.invoke(prompt)
-    report = response.content.strip() if hasattr(response, 'content') else str(response)
-    
+    report = response.content.strip() if hasattr(response, "content") else str(response)
+
     logger.info("Final report generated")
     logger.info(f"Report length: {len(report)} characters")
     logger.info("=" * 60)
-    
+
     # Update state
     state.report = report
-    
+
     return state
 
 
 def _format_detailed_findings(completed_tasks: list) -> str:
     """Format detailed findings for inclusion in report"""
     findings = ""
-    
+
     # Group by specialist
     for specialist in ["eda", "statistical", "ml"]:
         tasks = [t for t in completed_tasks if t.specialist == specialist]
         if not tasks:
             continue
-        
+
         findings += f"\n### {specialist.upper()} Findings\n\n"
-        
+
         for task in tasks:
             findings += f"**{task.description}**\n\n"
-            
+
             # Include key output lines
-            output_lines = task.output.split('\n')
-            key_lines = [line for line in output_lines if line.strip() and not line.startswith('#')]
-            findings += '\n'.join(key_lines[:15]) + '\n\n'
-            
+            output_lines = task.output.split("\n")
+            key_lines = [
+                line
+                for line in output_lines
+                if line.strip() and not line.startswith("#")
+            ]
+            findings += "\n".join(key_lines[:15]) + "\n\n"
+
             # Include insights
             if task.insights:
                 findings += "Key Insights:\n"
                 for insight in task.insights:
                     findings += f"- {insight}\n"
                 findings += "\n"
-    
+
     return findings
