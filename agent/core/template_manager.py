@@ -1,9 +1,10 @@
 """Centralized Jinja2 template management for prompts"""
 
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+import logging
 from pathlib import Path
 from typing import Optional
-import logging
+
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 logger = logging.getLogger(__name__)
 

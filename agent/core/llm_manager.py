@@ -1,9 +1,11 @@
 """Centralized LLM management with caching and configuration"""
 
-from langchain.chat_models import init_chat_model
-from agent.config import settings
-from typing import Optional, Dict, Any
 import logging
+from typing import Any
+
+from langchain.chat_models import init_chat_model
+
+from agent.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +20,7 @@ class LLMManager:
     - Allow runtime overrides
     """
 
-    _llm_cache: Dict[str, Any] = {}
+    _llm_cache: dict[str, Any] = {}
 
     # Default configurations for each agent type
     AGENT_CONFIGS = {
@@ -56,8 +58,8 @@ class LLMManager:
     def get_llm(
         cls,
         agent_type: str,
-        model_name: Optional[str] = None,
-        temperature: Optional[float] = None,
+        model_name: str | None = None,
+        temperature: float | None = None,
         force_new: bool = False,
     ):
         """
@@ -117,7 +119,7 @@ class LLMManager:
         logger.info("LLM cache cleared")
 
     @classmethod
-    def get_cache_info(cls) -> Dict[str, int]:
+    def get_cache_info(cls) -> dict[str, int]:
         """Get cache statistics"""
         return {
             "cached_llms": len(cls._llm_cache),

@@ -1,9 +1,11 @@
 [project]
 name = "agent"
 version = "0.1.0"
+description = "Local-first data analyst agent that plans, runs and reports analyses of CSV datasets"
+readme = "README.md"
+license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
-  "ipykernel",
   "jinja2",
   "matplotlib",
   "langchain",
@@ -11,7 +13,6 @@ dependencies = [
   "langchain_ollama",
   "langgraph",
   "langsmith",
-  "mlflow",
   "pandas",
   "pydantic",
   "pydantic-settings",
@@ -22,6 +23,26 @@ dependencies = [
   "tabulate",
 ]
 
+[dependency-groups]
+dev = [
+  "ipykernel",
+  "pytest",
+  "ruff",
+]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["agent*"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+extend-exclude = ["*.md"]  # code blocks in docs are illustrative sketches
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]  # line length is handled by the formatter
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

@@ -1,5 +1,6 @@
+from typing import Literal
+
 from pydantic_settings import BaseSettings
-from typing import Optional, Literal
 
 
 class Settings(BaseSettings):
@@ -12,7 +13,7 @@ class Settings(BaseSettings):
     reporter_model: str = "llama3.1:8b"
 
     model_provider: Literal["ollama", "openai"] = "ollama"
-    openai_api_key: Optional[str] = None
+    openai_api_key: str | None = None
 
     # Temperature settings
     analyst_temperature: float = 0.4

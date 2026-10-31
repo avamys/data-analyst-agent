@@ -1,10 +1,12 @@
 """Orchestrator Agent - Strategic decision maker for analysis approach"""
 
-import pandas as pd
 import logging
+
+import pandas as pd
+
 from agent.core.base_agent import BaseAgent
 from agent.core.template_manager import prompt_templates
-from agent.states import HierarchicalState, DatasetProfile, StrategicPlan
+from agent.states import DatasetProfile, HierarchicalState, StrategicPlan
 
 logger = logging.getLogger(__name__)
 

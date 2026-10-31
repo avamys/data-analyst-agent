@@ -1,9 +1,10 @@
 """Planner Agent - Decomposes strategies into actionable tasks"""
 
 import logging
+
 from agent.core.base_agent import BaseAgent
 from agent.core.template_manager import prompt_templates
-from agent.states import HierarchicalState, AnalysisPlan, AnalysisStrategy
+from agent.states import AnalysisPlan, AnalysisStrategy, HierarchicalState
 
 logger = logging.getLogger(__name__)
 

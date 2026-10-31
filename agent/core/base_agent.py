@@ -1,10 +1,12 @@
 """Base agent class - generic and reusable"""
 
-from typing import Optional, Any
+import logging
+from typing import Any
+
 from langchain_core.messages import HumanMessage
+
 from agent.core.llm_manager import LLMManager
 from agent.states import HierarchicalState
-import logging
 
 
 class BaseAgent:
@@ -31,10 +33,10 @@ class BaseAgent:
     def __init__(
         self,
         agent_type: str,
-        model_name: Optional[str] = None,
-        temperature: Optional[float] = None,
+        model_name: str | None = None,
+        temperature: float | None = None,
         use_structured_output: bool = False,
-        output_schema: Optional[Any] = None,
+        output_schema: Any | None = None,
     ):
         """
         Initialize agent

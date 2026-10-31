@@ -1,14 +1,14 @@
 """Specialist Agents - Domain experts for different analysis types"""
 
-from langchain_experimental.tools import PythonREPLTool
 import logging
-import time
 import re
-from typing import Tuple
+import time
+
+from langchain_experimental.tools import PythonREPLTool
+
 from agent.core.base_agent import BaseAgent
 from agent.core.template_manager import prompt_templates
-from agent.states import SubTask, TaskResult, HierarchicalState
-
+from agent.states import HierarchicalState, SubTask, TaskResult
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ class CodeExecutor:
         self.python_tool = PythonREPLTool()
         self.logger = logging.getLogger(__name__ + ".CodeExecutor")
 
-    def execute(self, code: str, task_id: str) -> Tuple[bool, str, str, float]:
+    def execute(self, code: str, task_id: str) -> tuple[bool, str, str, float]:
         """
         Execute Python code and return (success, output, error, execution_time)
 

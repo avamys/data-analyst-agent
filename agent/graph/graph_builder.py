@@ -1,14 +1,15 @@
 """Graph builder for hierarchical multi-agent analysis workflow"""
 
-from langgraph.graph import StateGraph, END, START
 import logging
-from agent.states import HierarchicalState
+
+from langgraph.graph import END, START, StateGraph
+
+from agent.nodes.execution_manager import execution_manager_node
 from agent.nodes.orchestrator import orchestrator_node
 from agent.nodes.planner import planner_node
-from agent.nodes.execution_manager import execution_manager_node
-from agent.nodes.synthesizer import synthesizer_node
 from agent.nodes.reporter import hierarchical_reporter_node
-
+from agent.nodes.synthesizer import synthesizer_node
+from agent.states import HierarchicalState
 
 logger = logging.getLogger(__name__)
 

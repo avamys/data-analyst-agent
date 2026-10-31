@@ -1,6 +1,7 @@
 """Hierarchical Reporter - Generates comprehensive final report"""
 
 import logging
+
 from agent.core.base_agent import BaseAgent
 from agent.core.template_manager import prompt_templates
 from agent.states import HierarchicalState

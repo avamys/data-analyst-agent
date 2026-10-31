@@ -1,11 +1,12 @@
 """Execution Manager - Builds and runs dynamic specialist subgraph"""
 
 import logging
-from typing import Callable
-from langgraph.graph import StateGraph, START, END
-from agent.states import HierarchicalState, SubTask, AnalysisPlan
-from agent.core.specialists import get_specialist
+from collections.abc import Callable
 
+from langgraph.graph import END, START, StateGraph
+
+from agent.core.specialists import get_specialist
+from agent.states import AnalysisPlan, HierarchicalState, SubTask
 
 logger = logging.getLogger(__name__)
 
