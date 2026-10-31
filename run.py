@@ -3,15 +3,19 @@
 import argparse
 import logging
 from pathlib import Path
+from uuid import uuid4
 
 from dotenv import load_dotenv
 
-from agent.config import settings
-from agent.data_loader import generate_dataset_info, load_dataset
-from agent.graph import build_hierarchical_graph
-from agent.logging_config import setup_logging
+# Load before anything reads LangSmith env vars
+load_dotenv(".env")
 
-load_dotenv()
+from agent.config import settings  # noqa: E402
+from agent.data_loader import generate_dataset_info, load_dataset  # noqa: E402
+from agent.graph import build_hierarchical_graph  # noqa: E402
+from agent.logging_config import setup_logging  # noqa: E402
+from agent.tracing import trace_url, tracing_enabled  # noqa: E402
+
 logger = logging.getLogger(__name__)
 
 
@@ -45,7 +49,9 @@ def main():
     initial_state = {"dataset_info": dataset_info, "dataset_path": str(datafile)}
 
     # Traced in LangSmith when LANGSMITH_TRACING is enabled
+    run_id = uuid4()
     config = {
+        "run_id": run_id,
         "run_name": f"analysis:{datafile.stem}",
         "tags": [datafile.stem, settings.analyst_model],
         "metadata": {
@@ -56,8 +62,15 @@ def main():
         },
     }
 
-    logger.info("Running analysis flow...")
-    result = workflow.invoke(initial_state, config=config)
+    logger.info(
+        f"Running analysis flow (LangSmith tracing {'on' if tracing_enabled() else 'off'})..."
+    )
+    try:
+        result = workflow.invoke(initial_state, config=config)
+    finally:
+        # Also printed on failure, so a broken run can be inspected
+        if url := trace_url(run_id):
+            logger.info(f"LangSmith trace: {url}")
 
     if result.get("report"):
         output_dir = Path(settings.output_directory)

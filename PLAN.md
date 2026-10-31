@@ -3,7 +3,7 @@
 > **This is the main plan for the project.** It replaces `todo.md`; everything still useful from there is folded in below (see [Appendix: todo.md mapping](#appendix-todomd-mapping)).
 > Update the checkboxes and the **Status** block as work lands. Record decisions in the [Decision log](#decision-log).
 
-**Status:** Phase 0, in progress: P0.1–P0.4 done (push pending), next is P0.5 · **Last updated:** 2026-10-31
+**Status:** Phase 0, in progress: P0.1–P0.4 done (push pending), P0.5 mostly done (task cap is a simple truncation until B3; host GPU check open) · **Last updated:** 2026-10-31
 
 ---
 
@@ -175,6 +175,7 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 - **Ollama's default context is 4,096 tokens**, so longer prompts (the reporter's) get cut off without any warning.
 - **LangChain defaults:** the orchestrator call hung for >10 min. With `reasoning=False, num_ctx=8192, num_predict=600` it finished in **86 s** (729 tokens in, 193 out) and returned a valid, sensible `StrategicPlan`.
 - The orchestrator asked for `estimated_tasks=12`. At this speed that's well over an hour per run, so **cap the task count**.
+- **Update 2026-10-31:** with `num_ctx=8192` only 18% of the model is on the GPU (1.1 of 6.4 GB), about 1.6 tok/s including prompt processing. The bigger context costs VRAM.
 - **Consequence for Phase 1:** 7 cases × 3 repeats is not practical locally at this speed. See [Phase 0 risks](#phase-0-risks).
 
 #### Steps (roughly one commit each, in this order)
@@ -208,9 +209,9 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 - [x] `.github/workflows/ci.yml` runs on push and PR: `astral-sh/setup-uv` → `uv sync --group dev --locked` → `ruff check` → `ruff format --check` → `pytest`. There's no Ollama in CI, and no test calls an LLM.
 
 **P0.5 Local model configuration** (S–M)
-- [ ] `config.py`: set default models to `qwen3.5:9b`. Add settings `llm_reasoning: bool = False`, `llm_num_ctx: int = 8192`, `llm_max_tokens: int = 2048`, `llm_timeout_s: int = 600`, `max_tasks: int = 6`.
-- [ ] `LLMManager.get_llm`: when the provider is `ollama`, pass `reasoning`, `num_ctx`, `num_predict`, and the timeout.
-- [ ] `scripts/llm_smoke.py`: check Ollama is reachable and the model is pulled, make one structured-output call that must parse, then print tok/s and the GPU/CPU split (from `/api/ps`). Run it before every long run.
+- [x] `config.py`: set default models to `qwen3.5:9b`. Add settings `llm_reasoning: bool = False`, `llm_num_ctx: int = 8192`, `llm_max_tokens: int = 2048`, `llm_timeout_s: int = 600`, `max_tasks: int = 6`.
+- [x] `LLMManager.get_llm`: when the provider is `ollama`, pass `reasoning`, `num_ctx`, `num_predict`, and the timeout.
+- [x] `scripts/llm_smoke.py`: check Ollama is reachable and the model is pulled, make one structured-output call that must parse, then print tok/s and the GPU/CPU split (from `/api/ps`). Run it before every long run.
 - [ ] *(Host, not code)* Find out why only 1.7 GB is offloaded to the GPU: check `ollama ps`, GPU VRAM, and other loaded models. Full GPU offload would probably be **5–10× faster**, which is the biggest lever for Phase 1.
 
 **P0.6 Bug fixes, test first** (M). For each: write the failing test, fix, get to green.

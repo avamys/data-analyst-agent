@@ -101,16 +101,30 @@ class LLMManager:
         llm = init_chat_model(
             model_name,
             model_provider=settings.model_provider,
-            base_url=settings.ollama_base_url
-            if settings.model_provider == "ollama"
-            else None,
             temperature=temperature,
+            **cls._provider_kwargs(),
         )
 
         # Cache it
         cls._llm_cache[cache_key] = llm
 
         return llm
+
+    @staticmethod
+    def _provider_kwargs() -> dict[str, Any]:
+        """Provider-specific options passed to init_chat_model"""
+        if settings.model_provider == "ollama":
+            return {
+                "base_url": settings.ollama_base_url,
+                "reasoning": settings.llm_reasoning,
+                "num_ctx": settings.llm_num_ctx,
+                "num_predict": settings.llm_max_tokens,
+                "client_kwargs": {"timeout": settings.llm_timeout_s},
+            }
+        return {
+            "max_tokens": settings.llm_max_tokens,
+            "timeout": settings.llm_timeout_s,
+        }
 
     @classmethod
     def clear_cache(cls):

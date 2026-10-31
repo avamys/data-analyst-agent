@@ -2,6 +2,7 @@
 
 import logging
 
+from agent.config import settings
 from agent.core.base_agent import BaseAgent
 from agent.core.template_manager import prompt_templates
 from agent.states import AnalysisPlan, AnalysisStrategy, HierarchicalState
@@ -53,11 +54,19 @@ class PlannerAgent(BaseAgent):
             n_categorical=len(dataset_profile.categorical_features),
             has_missing=dataset_profile.has_missing,
             has_imbalance=dataset_profile.has_imbalance,
-            estimated_tasks=strategic_plan.estimated_tasks,
+            estimated_tasks=min(strategic_plan.estimated_tasks, settings.max_tasks),
         )
 
         # Get structured plan from LLM
         analysis_plan = self.invoke(prompt)
+
+        # The model may ignore the requested count; dependencies on dropped
+        # tasks are skipped by _compute_execution_order
+        if len(analysis_plan.tasks) > settings.max_tasks:
+            self.logger.warning(
+                f"Plan has {len(analysis_plan.tasks)} tasks, keeping first {settings.max_tasks}"
+            )
+            analysis_plan.tasks = analysis_plan.tasks[: settings.max_tasks]
 
         # Build execution order respecting dependencies
         execution_order = _compute_execution_order(analysis_plan.tasks)
