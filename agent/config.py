@@ -4,8 +4,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    # Read overrides from .env (e.g. ANALYST_MODEL=...); unrelated keys are ignored
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    # Read overrides from .env (e.g. ANALYST_MODEL=...); unrelated keys and
+    # empty values are ignored
+    model_config = SettingsConfigDict(
+        env_file=".env", extra="ignore", env_ignore_empty=True
+    )
 
     # Ollama configuration
     ollama_base_url: str = "http://host.docker.internal:11434"
@@ -21,6 +24,9 @@ class Settings(BaseSettings):
     llm_num_ctx: int = 8192
     llm_max_tokens: int = 4096
     llm_timeout_s: int = 900
+    # Layers to put on the GPU; None lets Ollama decide. Ollama's estimate can be
+    # very conservative on small GPUs, so this is a per-machine setting for .env.
+    llm_num_gpu: int | None = None
 
     model_provider: Literal["ollama", "openai"] = "ollama"
     openai_api_key: str | None = None

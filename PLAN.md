@@ -3,7 +3,7 @@
 > **This is the main plan for the project.** It replaces `todo.md`; everything still useful from there is folded in below (see [Appendix: todo.md mapping](#appendix-todomd-mapping)).
 > Update the checkboxes and the **Status** block as work lands. Record decisions in the [Decision log](#decision-log).
 
-**Status:** Phase 0, in progress: P0.1–P0.4 done (push pending), P0.5 mostly done (task cap is a simple truncation until B3; host GPU check open) · **Last updated:** 2026-10-31
+**Status:** Phase 0, in progress: P0.1–P0.4 done (push pending), P0.5 done (GPU layers tuned: 4.8 → ~12 tok/s; task cap is a simple truncation until B3), push blocked on GitHub auth; next is P0.6 · **Last updated:** 2026-10-31
 
 ---
 
@@ -212,7 +212,17 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 - [x] `config.py`: set default models to `qwen3.5:9b`. Add settings `llm_reasoning: bool = False`, `llm_num_ctx: int = 8192`, `llm_max_tokens: int = 2048`, `llm_timeout_s: int = 600`, `max_tasks: int = 6`.
 - [x] `LLMManager.get_llm`: when the provider is `ollama`, pass `reasoning`, `num_ctx`, `num_predict`, and the timeout.
 - [x] `scripts/llm_smoke.py`: check Ollama is reachable and the model is pulled, make one structured-output call that must parse, then print tok/s and the GPU/CPU split (from `/api/ps`). Run it before every long run.
-- [ ] *(Host, not code)* Find out why only 1.7 GB is offloaded to the GPU: check `ollama ps`, GPU VRAM, and other loaded models. Full GPU offload would probably be **5–10× faster**, which is the biggest lever for Phase 1.
+- [x] *(Host, not code)* Find out why only 1.7 GB is offloaded to the GPU. **Result (2026-10-31):** the GPU has 4 GB dedicated + 7.9 GB shared memory, and the model is ~5.5 GB of weights plus a vision encoder, so it can't fit fully. Ollama's automatic estimate placed only ~1.65 GB on the GPU. Forcing layers with `num_gpu` (new `LLM_NUM_GPU` setting, per machine in `.env`):
+
+  | GPU layers | On GPU | Generation | Prompt (4.3k tokens) |
+  |---|---|---|---|
+  | auto | 1.65 GB | 4.8 tok/s | slow |
+  | 18 | 3.40 GB | 7.7–10.4 tok/s | ~750 tok/s |
+  | **20 (chosen)** | **3.6 GB** | **~12 tok/s** | n/a |
+  | 21 | 3.79 GB | 10.6 tok/s | ~765 tok/s |
+  | 33 (all) | 5.74 GB, spills to shared | 3.8 tok/s | 99 tok/s |
+
+  Shared GPU memory is system RAM reached over the bus, so spilling into it is slower than CPU. Context size (2k/4k/8k) made no difference: only 8 of 32 layers use full attention, so the cache is small.
 
 **P0.6 Bug fixes, test first** (M). For each: write the failing test, fix, get to green.
 
@@ -249,7 +259,7 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 #### Phase 0 risks
 | Risk | Mitigation |
 |---|---|
-| Local inference is slow (~5 tok/s), so evals are expensive | Fix GPU offload (P0.5); Phase 1 replay cache; `--repeats 1` for dev loops and 3 only for published numbers (overnight); decide at Phase 1 start whether to iterate with a cheap hosted model |
+| Local inference is slow (~12 tok/s after GPU tuning, was ~5), so evals are expensive | GPU offload tuned (P0.5); Phase 1 replay cache; `--repeats 1` for dev loops and 3 only for published numbers (overnight); decide at Phase 1 start whether to iterate with a cheap hosted model |
 | qwen3.5 output quirks (thinking, runaway JSON) | Settings are set explicitly (P0.5); the smoke script catches regressions before long runs |
 | `PythonREPLTool` runs LLM-written code in-process until Phase 2 | Run only on the sample datasets, inside the devcontainer |
 
@@ -360,6 +370,7 @@ PLAN.md  README.md
 | 2026-10-30 | `qwen3.5:9b` is the local development model; thinking off, `num_ctx=8192`, output capped | Measured: thinking/defaults hang; explicit settings give a valid plan in 86 s |
 | 2026-10-30 | Baseline = prototype design + bug fixes, tagged `v0.1.0-baseline` | Before/after should compare designs, not a version crippled by trivial bugs |
 | 2026-10-30 | Cap plans at `max_tasks=6` | Keeps a local run to ~30–60 min at current speed |
+| 2026-10-31 | `LLM_NUM_GPU=20` on this machine (in `.env`, not a code default) | Ollama's auto offload left 60% of VRAM unused; 20 layers fills 4 GB without spilling into shared memory |
 | 2026-10-31 | Tracing: **LangSmith only**; MLflow removed | Built for agents; clearer traces. Tracing is opt-in via env, because when it's on, prompts and data samples leave the machine (relevant to the local-first pitch) |
 | 2026-10-31 | Delete untracked `todo.md`, `docs/`, `notebooks/`, and the `multi-specialist` branch | Confirmed by owner; superseded by this plan / `feature/new-flow` |
 

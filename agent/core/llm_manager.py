@@ -119,6 +119,7 @@ class LLMManager:
                 "reasoning": settings.llm_reasoning,
                 "num_ctx": settings.llm_num_ctx,
                 "num_predict": settings.llm_max_tokens,
+                "num_gpu": settings.llm_num_gpu,  # None = Ollama default
                 "client_kwargs": {"timeout": settings.llm_timeout_s},
             }
         return {

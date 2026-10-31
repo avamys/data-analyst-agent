@@ -34,7 +34,8 @@ def main() -> int:
     print(f"Provider: {settings.model_provider} | models: {models}")
     print(
         f"reasoning={settings.llm_reasoning} num_ctx={settings.llm_num_ctx} "
-        f"max_tokens={settings.llm_max_tokens} timeout={settings.llm_timeout_s}s"
+        f"max_tokens={settings.llm_max_tokens} timeout={settings.llm_timeout_s}s "
+        f"num_gpu={settings.llm_num_gpu or 'auto'}"
     )
     print(f"LangSmith tracing: {'on' if tracing_enabled() else 'off'}")
 
@@ -65,12 +66,14 @@ def main() -> int:
         print(f"FAIL: structured output did not parse: {out['parsing_error']}")
         return 1
     usage = out["raw"].usage_metadata or {}
-    out_tokens = usage.get("output_tokens", 0)
+    meta = out["raw"].response_metadata
     print(f"OK: structured output parsed in {secs:.0f}s -> {out['parsed']}")
-    print(
-        f"Tokens in/out: {usage.get('input_tokens')}/{out_tokens} "
-        f"(~{out_tokens / secs:.1f} output tok/s incl. prompt processing)"
-    )
+    print(f"Tokens in/out: {usage.get('input_tokens')}/{usage.get('output_tokens')}")
+    if meta.get("eval_duration"):  # Ollama timings, in nanoseconds
+        print(
+            f"Generation: {meta['eval_count'] / (meta['eval_duration'] / 1e9):.1f} tok/s "
+            f"| model load: {meta.get('load_duration', 0) / 1e9:.0f}s"
+        )
 
     if settings.model_provider == "ollama":
         for m in httpx.get(f"{settings.ollama_base_url}/api/ps", timeout=5).json()[
