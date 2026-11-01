@@ -283,7 +283,7 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 - [x] Turn the findings into a new **Phase 1: agent quality**: done 2026-10-31 with the owner's direction (delegation, feedback loops, synthesis). The eval harness became Phase 2, the leftovers of the old execution/reporting phases became Phase 3 (hardening); Phases 4–7 are unchanged.
 
 **P0.11 Wrap-up** (S)
-- [ ] README stub: what the project is, status "under active rebuild", a link to this plan, and the current quickstart.
+- [x] README stub: what the project is, status "under active rebuild", a link to this plan, and the current quickstart.
 - [ ] Push (blocked on GitHub auth, see P0.1); PR `phase-0` → `main`; update the Status block at the top.
 
 #### Phase 0 risks
