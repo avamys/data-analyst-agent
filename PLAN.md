@@ -3,7 +3,7 @@
 > **This is the main plan for the project.** It replaces `todo.md`; everything still useful from there is folded in below (see [Appendix: todo.md mapping](#appendix-todomd-mapping)).
 > Update the checkboxes and the **Status** block as work lands. Record decisions in the [Decision log](#decision-log).
 
-**Status:** Phase 0 done (PR `phase-0` → `main` to open on GitHub). Phase 1 in progress on `phase-1`: P1.1 done, next P1.2 specialist loop · **Last updated:** 2026-11-01
+**Status:** Phase 1 in progress on `phase-1`: P1.1–P1.2 done (wrong claims 7 → 4, charts 0 → 6); next P1.3 prompts & profile · **Last updated:** 2026-11-01
 
 ---
 
@@ -315,6 +315,7 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 | Step | Run | Time | Wrong | Unsupported | Missing findings | Charts |
 |---|---|---|---|---|---|---|
 | Baseline | `20261031-204254` | 25 min | 7 | 6 | 7 | 0 |
+| P1.2 specialist loop | `20261101-112045` ([check](docs/progress/p1.2/annotations.md)) | 45 min | 4 | 7 | 6 (now *never computed*, not lost) | 6 |
 
 #### Steps (in this order)
 
@@ -326,13 +327,14 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 - [x] Verified 2026-11-01: 1-task run through the full flow (11 min, task ok first attempt); the saved `analysis.py` re-run by hand gives identical output.
 
 **P1.2 Specialist loop** (M–L)
-- [ ] Each step returns structured output: short reasoning plus either `run` (one new cell) or `finish` (task report).
-- [ ] The observation after each run: the latest cell's output (capped), facts and charts so far, the error if any.
-- [ ] `finish` produces the task report; cited facts must exist (validated).
-- [ ] Budget: max steps; on exhaustion the specialist must finish with status `partial`.
-- [ ] Remove `InsightExtractor` and "interpretation in print statements".
-- [ ] Interim: the existing planner and reporter consume task reports (findings + facts) instead of truncated stdout.
-- [ ] Reference run + annotation → progress log.
+- [x] Each step returns structured output: short reasoning plus either `run` (one new cell) or `finish` (task report).
+- [x] The observation after each run: the latest cell's output (capped), facts and charts so far, the error if any.
+- [x] `finish` produces the task report; cited facts must exist (validated).
+- [x] Budget: max steps; on exhaustion the specialist must finish with status `partial`.
+- [x] Remove `InsightExtractor` and "interpretation in print statements".
+- [x] Interim: the existing planner and reporter consume task reports (findings + facts) instead of truncated stdout.
+- [x] Reference run + annotation → progress log.
+- Found on the way: under constrained JSON decoding qwen3.5 almost never emits the status value `answered` (0 of 9), so 4 of 6 tasks reported `failed` and were dropped from the report; renamed to `complete` (3 of 3). A run also stalled for 8 hours overnight, most likely the host sleeping. Task reports now list published outputs.
 
 **P1.3 Prompts & profile** (S–M)
 - [ ] Rewrite specialist prompts as role + rules + environment (installed libraries, runtime helpers, `df`, available inputs) + output contract. No dataset-specific text, no full example pipelines. A test fails if any template mentions a test dataset's columns.
