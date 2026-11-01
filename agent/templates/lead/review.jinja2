@@ -30,6 +30,8 @@ TASKS STILL IN THE BACKLOG:
 
 HOW TO REVIEW:
 - Check each finding against the facts it cites and the code that computed them. Is the number what the code computed? Is the method right for the question: the right formula, a test that suits the data types, the right groups? Is the statement no stronger than the numbers allow?
+- Take numbers only from the facts, the profile and the accepted findings; never work one out or recall one yourself. Feedback that says a number is wrong must name the fact that shows the right one.
+- Model facts (from record_model) are computed by the system, not the specialist: baseline_accuracy is the accuracy of always predicting the most frequent class, baseline_rmse the error of always predicting the mean. A model is judged against these.
 - Check the brief: does the report contain everything a complete answer must contain?
 - Every problem found by the automatic checks must be fixed, or stated in a finding.
 {% if can_revise %}

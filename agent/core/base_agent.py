@@ -68,13 +68,15 @@ class BaseAgent:
                 f"Configured structured output with schema: {output_schema.__name__}"
             )
 
-        # A crashed Ollama runner (HTTP 500) is restarted on the next request, and
-        # a malformed structured response often parses on a second try
+        # A crashed Ollama runner (HTTP 500, or a stream that ends with no data,
+        # a ValueError) is restarted on the next request, and a malformed
+        # structured response often parses on a second try
         self.llm = self.llm.with_retry(
             retry_if_exception_type=(
                 ResponseError,
                 OutputParserException,
                 ValidationError,
+                ValueError,
             ),
             stop_after_attempt=2,
         )

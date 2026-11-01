@@ -5,7 +5,7 @@ from conftest import ScriptedLLM
 
 from agent.config import settings
 from agent.core.llm_manager import LLMManager
-from agent.core.specialists import SpecialistAgent, format_task_report
+from agent.core.specialists import SpecialistAgent, format_facts, format_task_report
 from agent.profiling import auto_profile_dataset
 from agent.states import (
     Brief,
@@ -165,3 +165,17 @@ def test_a_revision_continues_the_script_with_the_leads_feedback(run, tmp_path):
     assert result.revisions == 1 and len(result.reviews) == 1
     script = (tmp_path / "tasks" / "eda_1" / "analysis.py").read_text()
     assert script.count("record_fact(") == 2
+
+
+def test_model_facts_are_shown_whole_other_long_values_capped():
+    # P1.4 run: the lead saw "test_ro…" and asked for it to be "fully reported"
+    scores = {f"score_{i}": 0.1234 for i in range(30)}
+    text = format_facts(
+        {
+            "m": {"value": scores, "desc": "d", "kind": "model"},
+            "t": {"value": scores, "desc": "d"},
+        }
+    )
+    model, table = text.splitlines()
+    assert "score_29" in model and "…" not in model
+    assert "…" in table

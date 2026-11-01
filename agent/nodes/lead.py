@@ -81,7 +81,8 @@ def review_node(state: HierarchicalState) -> dict:
         "lead/review.jinja2",
         profile=profile_summary(state.dataset_profile),
         brief=brief,
-        report=format_task_report(result),
+        # Without its own earlier objection, which the specialist has seen
+        report=format_task_report(result.model_copy(update={"reviews": []})),
         script=script,
         checks=checks,
         accepted=_accepted_findings(state),
@@ -128,13 +129,22 @@ def next_step(state: HierarchicalState) -> str:
 def admit_follow_ups(
     follow_ups: list[Brief], state: HierarchicalState, limit: int
 ) -> list[Brief]:
-    """Up to `limit` follow-ups, with new ids and dependencies on known tasks"""
+    """
+    Up to `limit` follow-ups, with new ids and dependencies on known tasks.
+    Follow-ups that repeat an existing brief's question are dropped: qwen3.5
+    copied backlog briefs as follow-ups.
+    """
     results = state.completed_tasks + state.failed_tasks
     if state.under_review is not None:
         results.append(state.under_review)
     existing = [r.brief for r in results if r.brief] + state.backlog
     known = {b.id for b in existing}
     refs = _refs(existing)
+    asked = {_normalized(b.question) for b in existing}
+    repeats = [b.question for b in follow_ups if _normalized(b.question) in asked]
+    if repeats:
+        logger.warning(f"Follow-ups repeating existing briefs, dropped: {repeats}")
+    follow_ups = [b for b in follow_ups if _normalized(b.question) not in asked]
     if len(follow_ups) > max(limit, 0):
         dropped = [b.question for b in follow_ups[max(limit, 0) :]]
         logger.warning(f"Follow-up budget spent, dropped: {dropped}")
@@ -147,6 +157,10 @@ def admit_follow_ups(
         admitted.append(brief)
         logger.info(f"Follow-up {brief.id} ({brief.specialist}): {brief.question}")
     return admitted
+
+
+def _normalized(question: str) -> str:
+    return " ".join(question.lower().split())
 
 
 def _new_id(specialist: str, taken: set[str]) -> str:

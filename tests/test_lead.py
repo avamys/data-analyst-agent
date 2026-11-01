@@ -12,11 +12,11 @@ from agent.nodes.lead import PlanValidationError, validate_plan
 from agent.states import Brief, LeadPlan, Output, Review, TaskReport
 
 
-def _brief(task_id: str, deps=(), outputs=()) -> Brief:
+def _brief(task_id: str, deps=(), outputs=(), question=None) -> Brief:
     return Brief(
         id=task_id,
         specialist="eda",
-        question=f"question {task_id}",
+        question=question or f"question {task_id}",
         complete_when="c",
         depends_on=list(deps),
         outputs=[Output(name=o, contents="x") for o in outputs],
@@ -152,7 +152,10 @@ def test_revisions_are_capped_and_the_last_objection_is_kept(analyse, monkeypatc
     )
     (result,) = state["completed_tasks"]
     assert result.revisions == 1
-    assert "can't be redone" in llm.prompts[-3]  # the second review
+    second_review = llm.prompts[-3]
+    assert "can't be redone" in second_review
+    # P1.4 run: shown its own earlier objection, the lead argued with it
+    assert "Wrong formula" not in second_review
     assert "Unresolved review issue: Still the wrong formula." in format_task_report(
         result
     )
@@ -163,7 +166,10 @@ def test_follow_ups_are_added_within_budget_with_unique_ids(analyse, monkeypatch
     state, llm = analyse(
         _plan(_brief("eda_1")),
         finish(),
-        accept(_brief("eda_1", deps=["eda_1", "nope"]), _brief("eda_9")),
+        accept(
+            _brief("eda_1", deps=["eda_1", "nope"], question="follow-up"),
+            _brief("eda_9"),
+        ),
         finish(),
         accept(),
     )
@@ -207,3 +213,22 @@ def test_missing_outputs_send_the_task_back_even_if_the_lead_accepts(
         "Publish the outputs later tasks need: ['clean']" in result.reviews[0].feedback
     )
     assert result.published == ["eda_1/clean"]
+
+
+def test_follow_ups_repeating_a_brief_are_dropped(analyse):
+    # P1.4 run: both follow-ups were copies of briefs still in the backlog
+    state, _ = analyse(
+        _plan(_brief("eda_1"), _brief("eda_2")),
+        finish(),
+        accept(_brief("x"), _brief("y", question=" Question  EDA_2")),
+        finish(),  # eda_2
+        accept(),
+        finish(),  # the follow-up
+        accept(),
+    )
+    assert [r.brief.question for r in state["completed_tasks"]] == [
+        "question eda_1",
+        "question eda_2",
+        "question x",
+    ]
+    assert state["follow_ups_added"] == 1
