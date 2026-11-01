@@ -86,7 +86,7 @@ class CodeExecutor:
         PythonREPLTool returns repr(exception) as the whole output when the code
         raises, e.g. "KeyError('Age')". Matching that exact shape (or a full
         traceback) avoids flagging normal output such as "Mean Squared Error: 0.1".
-        Interim until the sandbox reports exit codes (Phase 2 in PLAN.md).
+        Interim until the cell-script runner (P1.1 in PLAN.md).
         """
         if not output:
             return False

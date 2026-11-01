@@ -41,7 +41,10 @@ include = ["agent*"]
 [tool.ruff]
 line-length = 88
 target-version = "py312"
-extend-exclude = ["*.md"]  # code blocks in docs are illustrative sketches
+extend-exclude = [
+  "*.md",               # code blocks in docs are illustrative sketches
+  "docs/baseline/run",  # generated code from the reference run, kept verbatim
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]

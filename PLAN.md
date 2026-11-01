@@ -3,7 +3,7 @@
 > **This is the main plan for the project.** It replaces `todo.md`; everything still useful from there is folded in below (see [Appendix: todo.md mapping](#appendix-todomd-mapping)).
 > Update the checkboxes and the **Status** block as work lands. Record decisions in the [Decision log](#decision-log).
 
-**Status:** Phase 0 in progress: P0.1–P0.9 done, P0.10 review written ([docs/baseline/review.md](docs/baseline/review.md)); next: agree on the new Phase 1, then wrap up (push blocked on GitHub auth) · **Last updated:** 2026-10-31
+**Status:** Phase 0 nearly done (P0.11 wrap-up left; push blocked on GitHub auth). Next: Phase 1, starting with P1.1 cell-script runner · **Last updated:** 2026-10-31
 
 ---
 
@@ -11,25 +11,27 @@
 
 Turn the prototype into a portfolio project that shows off **agent engineering**, not just "agents talking to each other":
 
-> *A local-first data analyst agent. Point it at a CSV and it plans an analysis, runs sandboxed Python, and writes a report in which **every number traces back to code that actually ran**. An eval harness measures how often it is right.*
+> *A local-first data analyst agent. Point it at a CSV and a lead analyst plans the analysis, delegates tasks to specialists who iterate on what their code actually printed, reviews their work, follows up on findings, and writes a report with charts in which **every number traces back to code that actually ran**. An eval harness measures how often it is right.*
 
 The story this project tells:
-1. **v1 hallucinated.** The saved Titanic report says "61.62% survived" (61.62% *died*), reports `Q1, Q3: [nan, nan]` as a finding, and misses a 98% train / 80% test overfitting gap.
-2. **I built an eval harness** that measures this kind of failure.
-3. **I redesigned the system** around sandboxed execution, structured facts, and a verifier loop.
-4. **Here are the before/after numbers**, across local and hosted models.
+1. **The prototype was a pipeline, not a team.** Agents ran once, never saw their own results, and nobody reviewed anybody. The reports got numbers backwards (the legacy "61.62% survived"), or, with a better model, dropped the strongest findings and called overfitting "healthy" ([review](docs/baseline/review.md)).
+2. **I redesigned it around delegation, feedback loops, and synthesis:** specialists iterate on their own output, a lead analyst reviews every task and digs deeper where it matters, and the report is written from complete, recorded results.
+3. **I built an eval harness**, including trap datasets, that measures these failures.
+4. **Here are the before/after numbers** (tagged baseline vs. redesign), across local and hosted models.
 
 ### Principles
-- **Eval first.** Build the harness before the big refactor so every change gets measured. No "it feels better."
-- **Numbers come from code, never from the LLM.** The writer refers to facts by ID and the renderer fills in the values.
+- **Measure every change.** Until the eval harness exists (Phase 2), every Phase 1 step is checked by re-running the reference run and repeating the claim-by-claim annotation. No "it feels better."
+- **Numbers come from code, never from the LLM.** Code records facts; the writer works from them, and every number in the report is checked against them.
+- **Look before you conclude.** Interpretations are written only after seeing real output, by whoever ran the code, and reviewed by someone else.
 - **Deterministic before LLM.** Use plain Python for profiling, graders, and sanity rules. Use the LLM only where judgment is needed.
 - **Local-first, provider-agnostic.** It runs fully on Ollama. Hosted models are optional and used for comparison.
 - **Small, finished, honest.** A narrow scope that works and is measured beats a wide scope that demos once.
 
 ### Definition of done (v1.0)
 - [ ] `uv run analyst run data.csv` produces an HTML/Markdown report with charts, from a clean clone, in one command.
-- [ ] Generated code runs in a sandbox (timeout, no network, isolated working directory).
-- [ ] Every numeric claim in the report resolves to a recorded fact from executed code.
+- [ ] Specialists iterate on their own output; the lead reviews every task (accept / revise / follow-up).
+- [ ] Generated code runs in a sandbox (timeout, no network, isolated working directory), and each task's code is a runnable `.py` script.
+- [ ] Every numeric claim in the report resolves to a recorded fact from executed code; the report includes charts.
 - [ ] The eval suite (≥6 cases, including adversarial "trap" datasets) runs with one command and produces a comparison table.
 - [ ] README shows the before/after eval table, a local vs. hosted model comparison, an architecture diagram, and a demo GIF.
 - [ ] CI runs lint, unit tests, and a deterministic eval smoke test (replayed LLM responses) on every push.
@@ -37,7 +39,7 @@ The story this project tells:
 - [ ] Tagged `v1.0.0`. Optional write-up / blog post.
 
 ### Non-goals (v1)
-Big-data / out-of-core processing, multi-user hosting, auth, human-in-the-loop approval, long-term memory, clustering/time-series specialists. These go in [Stretch](#phase-7--stretch-post-v10).
+Big-data / out-of-core processing, multi-user hosting, auth, human-in-the-loop approval, long-term memory, clustering/time-series specialists, sub-delegation (specialists spawning their own sub-agents). These go in [Stretch](#phase-7--stretch-post-v10).
 
 ---
 
@@ -46,49 +48,54 @@ Big-data / out-of-core processing, multi-user hosting, auth, human-in-the-loop a
 ```mermaid
 flowchart TD
     A[CSV] --> P[Profile<br/>deterministic, no LLM]
-    P --> PL[Plan<br/>LLM → structured tasks + validation]
-    PL --> X{{For each task}}
-    X --> G[Generate code<br/>specialist prompt]
-    G --> S[Sandbox run<br/>timeout · no net · run dir]
-    S -->|exit≠0, retries left| G
-    S -->|ok| F[(Fact store<br/>facts.json · plots · tables)]
-    F --> R[Sanity rules<br/>overfit · leakage · multiple tests]
-    R --> W[Write report<br/>cites fact IDs only]
-    W --> V[Verify<br/>unresolved refs · bare numbers · claim check]
-    V -->|issues, iterations left| W
-    V -->|pass| O[Render<br/>Markdown + HTML + charts]
+    P --> LP[Lead: plan<br/>backlog of task briefs]
+    LP --> D{{Next brief}}
+    D --> S1[Specialist: write a cell]
+    S1 --> R[Run whole cell script<br/>fresh subprocess · timeout]
+    R --> O[Observe: latest output,<br/>facts, charts]
+    O -->|keep going, steps left| S1
+    O -->|finish| TR[Task report<br/>findings citing facts]
+    TR --> LR[Lead: review<br/>+ sanity checks]
+    LR -->|revise, with feedback| S1
+    LR -->|accept / follow-up brief| D
+    D -->|backlog empty or budget spent| W[Lead: write report<br/>from accepted findings + facts + charts]
+    W --> C[Number check<br/>every number matches a fact]
+    C -->|mismatches, once| W
+    C --> OUT[report.md + charts]
 ```
 
-### Key components
+### Roles
 
-| Component | Replaces | Notes |
+| Role | Does | Sees |
 |---|---|---|
-| **Profiler** (pure Python) | `auto_profile_dataset` + `data_loader` | Loads data once. Infers the target with heuristics plus an optional `--target` flag. Handles string targets. |
-| **Planner** (one LLM node) | Orchestrator + Planner | One structured call. Plan is validated (unknown deps, cycles, unknown specialists → repair or fail loudly). |
-| **Sandbox executor** | `PythonREPLTool` + regex error detection | `subprocess` with timeout and a per-task run directory; success = exit code. Docker backend optional. |
-| **Analyst runtime** (injected helper module) | Regex `InsightExtractor` | Generated code calls `record_fact(...)`, `save_plot(...)`, `record_table(...)` → structured outputs on disk. |
-| **Sanity rules** (deterministic) | n/a | Adds caveats automatically: train/test gap, near-perfect feature–target correlation (leakage), many tests without correction, small n. |
-| **Writer** | Synthesizer + Reporter | Gets the fact table, writes prose with `{{fact:eda_1.survival_rate}}` references. Never types numbers. |
-| **Verifier** | n/a | (1) all refs resolve; (2) bare numbers in prose are flagged; (3) LLM check of qualitative claims against facts. Loops back to the writer with issues. |
-| **Renderer** | `report.write_text` | Fills in fact values with formatting, embeds charts, outputs `.md` + `.html`. |
-| **Run store** | `output/`, scattered logs | `runs/<run_id>/` holds `plan.json`, `tasks/<id>/{code.py,stdout.txt,facts.json,*.png}`, `report.{md,html}`, `meta.json` (model, tokens, timings). Inspectable; eval reads from here. |
+| **Lead analyst** | Plans a backlog of briefs from the profile; reviews each task report (accept / send back with feedback / add a follow-up brief); writes the final report | Profile, backlog, accepted findings (compact), the report under review, sanity-check results |
+| **Specialist** (eda / statistical / ml) | Works one brief as a loop of cells; finishes with a task report | Its brief, its own cells, the latest cell's output (size-capped), facts and charts so far, inputs published by earlier tasks |
 
-### Fact protocol (sketch)
+**Brief** (lead → specialist): question, specialist, inputs it may load, what a complete answer contains.
+**Task report** (specialist → lead): findings (each citing the facts that support it), facts, charts, published outputs, open questions / suggested follow-ups, status (answered / partial / failed).
+
+### Execution: cell scripts, one per task
+Each task is a plain Python file, `runs/<run>/tasks/<task_id>/analysis.py`, split into cells with `# %%` markers (the "percent" format VS Code, Spyder, and Jupytext understand). No notebooks: they bloat context and add machinery we don't need.
+
+- Each specialist step appends one cell (or replaces the cell that just failed).
+- The **whole file is re-run in a fresh subprocess** with a timeout. Output, errors, new facts, and charts are captured per cell. No hidden state; a crash only affects that run; the saved script always reproduces the results.
+- Re-running earlier cells is cheap at this scale. Add caching only if it becomes slow.
+- Tasks are isolated from each other. Hand-offs are explicit: a task **publishes** named outputs (e.g. a train/test split, a fitted model), and the lead lists them as inputs in later briefs, which **load** them.
+
+### Runtime helpers (available in every cell script)
 ```python
-# available inside the sandbox
-from analyst_runtime import record_fact, save_plot, record_table
+from analyst_runtime import df, record_fact, save_chart, publish, load
 
 rate = df["Survived"].mean()
-record_fact("survival_rate", rate, desc="Share of passengers who survived", fmt="pct")
-record_fact("chi2_sex_survived_p", p, desc="Chi-square p-value, Sex vs Survived", kind="p_value")
-save_plot(fig, "survival_by_class", caption="Survival rate by passenger class")
+record_fact("survival_rate", rate, desc="Share of passengers who survived")
+save_chart(fig, "survival_by_class", caption="Survival rate by passenger class")
+publish("train_test", (X_train, X_test, y_train, y_test))   # for later tasks
+X_train, X_test, y_train, y_test = load("ml_1/train_test")  # in a later task
 ```
-Facts are namespaced by task (`eda_1.survival_rate`) and carry `value`, `desc`, `fmt`, `kind`, `task_id`, `code_ref`.
+Facts are namespaced by task (`eda_1.survival_rate`) and stored in the run directory with value, description, and the cell that produced them.
 
-### Graph (LangGraph)
-- Real conditional edges: retry loop per task, verifier → writer revision loop with `max_revisions`.
-- Fan out tasks with the `Send` API and a `max_concurrency` setting (1 for local Ollama, higher for hosted).
-- State updates return partial dicts with reducers (no in-place mutation), so streaming/checkpointing work and the task subgraph is visible.
+### Budgets (settings)
+Max steps per task, max revisions per task, max tasks including follow-ups, and max output characters shown per cell. They keep local runs bounded (~45–60 min accepted for now) and the 8k context safe.
 
 ---
 
@@ -169,7 +176,7 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 - [x] Bugs B1–B6 fixed, each with a test
 - [x] Each run leaves a complete run directory (logs, every LLM call, state per node, every code attempt)
 - [x] Reference run, annotations, and review committed; commit tagged `v0.1.0-baseline`
-- [ ] New Phase 1 (agent quality) written into this plan from the review
+- [x] New Phase 1 (agent quality) written into this plan from the review
 
 #### Measured on 2026-10-30 (these shape the phase)
 - `qwen3.5:9b` (Q4_K_M) on this machine: **~5 tok/s**. Only **1.7 of 6.3 GB is in VRAM**, so it runs mostly on CPU.
@@ -178,7 +185,7 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 - **LangChain defaults:** the orchestrator call hung for >10 min. With `reasoning=False, num_ctx=8192, num_predict=600` it finished in **86 s** (729 tokens in, 193 out) and returned a valid, sensible `StrategicPlan`.
 - The orchestrator asked for `estimated_tasks=12`. At this speed that's well over an hour per run, so **cap the task count**.
 - **Update 2026-10-31:** with `num_ctx=8192` only 18% of the model is on the GPU (1.1 of 6.4 GB), about 1.6 tok/s including prompt processing. The bigger context costs VRAM.
-- **Consequence for Phase 1:** 7 cases × 3 repeats is not practical locally at this speed. See [Phase 0 risks](#phase-0-risks).
+- **Consequence for the eval harness (Phase 2):** 7 cases × 3 repeats is not practical locally at this speed. See [Phase 0 risks](#phase-0-risks).
 
 #### Steps (roughly one commit each, in this order)
 
@@ -192,7 +199,7 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 - [x] Delete `notebooks/tests.ipynb` (scratch work).
 - [x] Move `output/report_hierarchical_titanic.md` to `docs/baseline/legacy_report_titanic.md`. It's the "61.62% survived" example for the README story. Then delete `output/`.
 - [x] `.gitignore`: add `output/` and `runs/`.
-- [x] Delete the `multi-specialist` branch. It's a work-in-progress snapshot of the earlier hierarchical version and includes 690 committed MLflow files. Its `validation.py` (an AST import blocklist) is not carried over: a blocklist isn't a security boundary, and the Phase 2 sandbox replaces it.
+- [x] Delete the `multi-specialist` branch. It's a work-in-progress snapshot of the earlier hierarchical version and includes 690 committed MLflow files. Its `validation.py` (an AST import blocklist) is not carried over: a blocklist isn't a security boundary; the P1.1 subprocess runner and Phase 3 isolation replace it.
 - [x] Keep `feature/advanced_logging` (1 commit of file loggers) for review in Phase 5.
 - [x] Add `.env.example` (variable names only).
 
@@ -202,7 +209,7 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
   - add `[dependency-groups] dev = ["pytest", "ruff", "ipykernel"]` and remove `ipykernel` from runtime deps
   - remove `mlflow` and its usage in `run.py` (LangSmith is the only tracer); the local `mlruns/` folder can then be deleted
   - keep `langsmith`; use the current `LANGSMITH_*` env var names in `.env.example` (the legacy `LANGCHAIN_*` names still work)
-  - keep `langchain_experimental` until Phase 2
+  - keep `langchain_experimental` until P1.1 replaces `PythonREPLTool`
 - [x] Add `[tool.ruff]` (line length 88; rules `E, F, I, B, UP`) and `[tool.pytest.ini_options]` (`testpaths = ["tests"]`).
 - [x] Run `uv lock && uv sync --group dev`, then `ruff check --fix` and fix what's left by hand.
 - [x] `tests/conftest.py` with small in-memory DataFrame fixtures. Tests must never depend on `data/`, which is gitignored.
@@ -234,7 +241,7 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 | B2 | Failed tasks are added to both `completed_tasks` and `failed_tasks` ([execution_manager.py:45](agent/nodes/execution_manager.py#L45)), so the success rate is wrong; 0 tasks → `ZeroDivisionError` ([reporter.py:42](agent/nodes/reporter.py#L42)) | Append to exactly one list; extract a pure `build_execution_summary(completed, failed)`; pass failed tasks to the synthesizer explicitly | 4 ok + 1 failed → 5 total, 80%; 0 tasks → no crash |
 | B3 | Cyclic or broken plans silently accepted ([planner.py:123](agent/nodes/planner.py#L123)) | `validate_plan()`: duplicate IDs → error; unknown deps → dropped with a warning; cycles → `PlanValidationError`; enforce `max_tasks` (keep the top N by priority, drop deps on removed tasks) | cycle raises; unknown dep dropped; order respects deps; cap applied |
 | B4 | Retries hard-coded to 2 ([execution_manager.py:39](agent/nodes/execution_manager.py#L39)) | Default from `settings.max_code_retries` | default equals the setting |
-| B5 | Regex flags normal output as a failure: `print("ModelError: none")` → failed ([specialists.py:89](agent/core/specialists.py#L89)) | Interim until the Phase 2 sandbox: count it as a failure only if the output contains a traceback, or the *entire* output is a single `XxxError(...)` repr (what `PythonREPLTool` returns on an exception) | output mentioning "Error:" → success; `ValueError('x')` → failure |
+| B5 | Regex flags normal output as a failure: `print("ModelError: none")` → failed ([specialists.py:89](agent/core/specialists.py#L89)) | Interim until the P1.1 runner: count it as a failure only if the output contains a traceback, or the *entire* output is a single `XxxError(...)` repr (what `PythonREPLTool` returns on an exception) | output mentioning "Error:" → success; `ValueError('x')` → failure |
 | B6 | Target detection is Titanic-specific (`"survived"` is hard-coded) and non-numeric targets get type `none` ([orchestrator.py:43](agent/nodes/orchestrator.py#L43)) | `--target` override; generic name list; infer type from the number of unique values regardless of dtype (2 → binary, including `"yes"/"no"`) | string target → binary; override wins; no target → `none` |
 
 - [x] All six fixed test-first (`tests/test_llm_manager.py`, `test_execution.py`, `test_planner.py`, `test_profiling.py`). `max_code_retries` default set to 2 (the previous hard-coded behavior).
@@ -245,7 +252,7 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 - [x] **Strategies:** remove `TIME_SERIES` and `CLUSTERING` from the strategy enum and the orchestrator prompt. They can be chosen but no specialist runs them. Re-add in Phase 7.
 - Left in place: `current_phase` is written but never read (wasn't on the list; revisit in the graph redesign).
 
-**P0.8 CLI & local run store** (M). *Moved forward from Phase 2 on 2026-10-31.* Every run must be fully reviewable from local files; LangSmith is the viewer, not the only record.
+**P0.8 CLI & local run store** (M). *Moved forward from the old execution phase on 2026-10-31.* Every run must be fully reviewable from local files; LangSmith is the viewer, not the only record.
 - [x] `run.py <csv_path> [--target COL] [--max-tasks N] [--model NAME]`, accepting any path, not just files in `data/`.
 - [x] Each run gets its own directory, `runs/<YYYYmmdd-HHMMSS>_<dataset>_<model>/`, plus a `runs/latest` link:
 
@@ -273,7 +280,7 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 - [x] Review the reference run node by node, using the run directory and the LangSmith trace: what each agent receives, what it produces, where quality is lost, what works.
 - [x] **`docs/baseline/annotations.md`**: every claim in the report marked correct / wrong / unsupported, with the true value. It seeds the eval judge's calibration and the README's "before" story.
 - [x] **`docs/baseline/review.md`**: findings per node and the main problems, ranked.
-- [ ] Turn the findings into a new **Phase 1: agent quality**, and shift the later phases by one (eval harness becomes Phase 2, and so on).
+- [x] Turn the findings into a new **Phase 1: agent quality**: done 2026-10-31 with the owner's direction (delegation, feedback loops, synthesis). The eval harness became Phase 2, the leftovers of the old execution/reporting phases became Phase 3 (hardening); Phases 4–7 are unchanged.
 
 **P0.11 Wrap-up** (S)
 - [ ] README stub: what the project is, status "under active rebuild", a link to this plan, and the current quickstart.
@@ -282,46 +289,98 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 #### Phase 0 risks
 | Risk | Mitigation |
 |---|---|
-| Local inference is slow (~12 tok/s after GPU tuning, was ~5), so evals are expensive | GPU offload tuned (P0.5); Phase 1 replay cache; `--repeats 1` for dev loops and 3 only for published numbers (overnight); decide at Phase 1 start whether to iterate with a cheap hosted model |
+| Local inference is slow (~12 tok/s after GPU tuning, was ~5), so evals are expensive | GPU offload tuned (P0.5); Phase 2 replay cache; `--repeats 1` for dev loops and 3 only for published numbers (overnight); decide at Phase 2 start whether to iterate with a cheap hosted model |
 | qwen3.5 output quirks (thinking, runaway JSON) | Settings are set explicitly (P0.5); the smoke script catches regressions before long runs |
-| `PythonREPLTool` runs LLM-written code in-process until Phase 2 | Run only on the sample datasets, inside the devcontainer |
+| `PythonREPLTool` runs LLM-written code in-process until P1.1 | Run only on the sample datasets, inside the devcontainer |
 
 **Effort:** about 3–5 evenings plus one long background run.
 
-### Phase 1: Eval harness v0 + baseline numbers (M–L)
-Goal: measure v1 before changing it.
+### Phase 1: Agent quality: delegation, feedback loops, synthesis (L), detailed
+
+**Goal:** turn the pipeline into agents that build on and review each other's work. Specialists iterate on what their code actually printed; a lead analyst reviews every task and can send it back or follow up on a finding; the report is synthesized from complete, recorded results, with charts. Design: [section 2](#2-target-architecture).
+
+**Why before the eval harness:** the [baseline review](docs/baseline/review.md) shows the main failures are structural (context loss, blind code, no review, prompts that get copied). Fixing the design matters more than measuring it precisely. The baseline is tagged (`v0.1.0-baseline`), so Phase 2 can still score it.
+
+**Measuring progress until Phase 2:** after each step, re-run the reference run (`run.py data/titanic.csv --target Survived`) and repeat the claim check from [annotations.md](docs/baseline/annotations.md). Log the counts below.
+
+**Exit criteria**
+- [ ] Specialists see their output and iterate; each task's code is a runnable `.py` cell script in the run directory
+- [ ] The lead reviews every task result (accept / revise / follow-up) within budgets
+- [ ] The report is written from accepted findings, facts, and charts; every number in it matches a recorded fact (automatic check)
+- [ ] Reference run: 0 wrong claims, ≤ 2 unsupported, every "computed but missing" baseline finding present, ≥ 2 charts
+- [ ] No dataset-specific text and no example pipelines in prompts
+
+#### Progress log
+| Step | Run | Time | Wrong | Unsupported | Missing findings | Charts |
+|---|---|---|---|---|---|---|
+| Baseline | `20261031-204254` | 25 min | 7 | 6 | 7 | 0 |
+
+#### Steps (in this order)
+
+**P1.1 Cell-script runner** (M)
+- [ ] `agent/execution/`: read/write `# %%` cell files; run the whole file in a fresh subprocess (task directory as working dir, timeout); capture stdout, stderr, and the exception per cell.
+- [ ] `analyst_runtime`: `df`, `record_fact`, `save_chart` (non-interactive backend), `publish` / `load`.
+- [ ] Replaces `PythonREPLTool`; drop `langchain_experimental`.
+- [ ] Tests: cell round-trip; a failing cell is reported by index with its traceback; timeout kills the run; facts, charts, and published outputs land on disk; output that mentions "Error:" is not a failure.
+
+**P1.2 Specialist loop** (M–L)
+- [ ] Each step returns structured output: short reasoning plus either `run` (one new cell) or `finish` (task report).
+- [ ] The observation after each run: the latest cell's output (capped), facts and charts so far, the error if any.
+- [ ] `finish` produces the task report; cited facts must exist (validated).
+- [ ] Budget: max steps; on exhaustion the specialist must finish with status `partial`.
+- [ ] Remove `InsightExtractor` and "interpretation in print statements".
+- [ ] Interim: the existing planner and reporter consume task reports (findings + facts) instead of truncated stdout.
+- [ ] Reference run + annotation → progress log.
+
+**P1.3 Prompts & profile** (S–M)
+- [ ] Rewrite specialist prompts as role + rules + environment (installed libraries, runtime helpers, `df`, available inputs) + output contract. No dataset-specific text, no full example pipelines. A test fails if any template mentions a test dataset's columns.
+- [ ] Specialists save charts where a chart shows the finding better than numbers.
+- [ ] `compile()` each new cell before running it, so syntax errors don't cost a run.
+- [ ] Profiler: exclude the target from features; flag ID-like (unique per row) and free-text columns.
+- [ ] Reference run + annotation → progress log.
+
+**P1.4 Lead analyst** (L)
+- [ ] Merge orchestrator + planner into the lead's planning step: a backlog of briefs, aware of the task budget.
+- [ ] Lead review after each task: accept, send back with feedback (max revisions), or add a follow-up brief; stop when the backlog is empty or the budget is spent.
+- [ ] Deterministic sanity checks on task results, shown to the lead during review: train/test gap, near-perfect feature–target association, class imbalance, many tests without correction.
+- [ ] Graph rewrite: loops as conditional edges; nodes return partial state updates; a failed task is recorded and the run continues.
+- [ ] Reference run + annotation → progress log.
+
+**P1.5 Synthesis & report** (M)
+- [ ] The lead writes the report from accepted findings, the fact table, and charts (replaces synthesizer + reporter).
+- [ ] Number check: every number in the report must match a recorded fact (allowing rounding and percent formatting); mismatches go back to the writer once, any left are listed in the report's limitations.
+- [ ] Charts embedded in `report.md`.
+- [ ] Reference run + annotation → progress log; exit criteria checked.
+
+#### Phase 1 risks
+| Risk | Mitigation |
+|---|---|
+| A 9B model loops forever, finishes too early, or returns malformed steps | Budgets, schema validation with one retry, forced `finish` on exhaustion |
+| Runs get longer (more LLM calls) | Accepted for local testing (~45–60 min); budgets; hosted models later (Phase 4) |
+| 8k context fills up (lead sees many findings) | Capped observations; compact accepted-findings summaries; facts referenced by name |
+
+### Phase 2: Eval harness + before/after numbers (M–L)
+Goal: measure the tagged baseline and the Phase 1 agent on the same suite.
 - [ ] `evals/` package skeleton: case loader, runner, results JSONL, report table.
 - [ ] Dataset generators (seeded) for the synthetic cases + reference script for Titanic ground truth.
-- [ ] Report-level graders: fact-in-text check, must_find / must_not_claim judge, caveat check, run/task success, timing.
+- [ ] Report-level graders (work on both versions): fact-in-text check, must_find / must_not_claim judge, caveat check, run/task success, timing.
+- [ ] Run-store graders for the new agent: recorded facts vs ground truth, review decisions, follow-ups.
 - [ ] LLM record/replay cache.
-- [ ] Judge calibration on ~10 hand-labeled reports.
-- [ ] Run v1 on the suite (`--repeats 3`); commit results as **baseline**.
+- [ ] Judge calibration on ~10 hand-labeled reports (start from [annotations.md](docs/baseline/annotations.md)).
+- [ ] Run `v0.1.0-baseline` and the Phase 1 agent on the suite; commit results.
 
-**Exit:** a committed baseline table for v1. This is the "before" number.
+**Exit:** a committed before/after table.
 
-### Phase 2: Execution harness (M–L)
-Goal: safe, inspectable execution with structured outputs.
-- [ ] Sandbox executor (subprocess, timeout, per-task cwd, env scrubbed, network blocked where possible); optional Docker backend.
-- [ ] `analyst_runtime` helper injected into the sandbox: `record_fact`, `save_plot`, `record_table`.
-- [ ] Extend the run store from P0.8 with sandbox outputs, facts, and plots.
-- [ ] Update specialist prompts to use the runtime and drop `print`-scraping.
-- [ ] Profiler loads data once; target detection with `--target` override and string-label support.
-- [ ] Smarter retries: pass a trimmed traceback plus the previous code; final fallback = "simplify the task".
-- [ ] Add fact-accuracy and task-level metrics to the eval; rerun.
+### Phase 3: Hardening, guided by the eval (M)
+Goal: close the gaps the eval exposes.
+- [ ] Sandbox isolation: network blocked, environment scrubbed; optional Docker backend.
+- [ ] If numbers in reports still drift: the writer cites `{{fact:…}}` references and a renderer fills in values.
+- [ ] If the judge finds false qualitative claims: an LLM claim check against facts, looping back to the writer.
+- [ ] Retry strategies targeted at the failure types the eval shows.
+- [ ] Parallel task execution (`Send`, `max_concurrency`) for hosted models.
+- [ ] Re-run the eval; compare with Phase 2.
 
-**Exit:** no in-process `exec`; facts on disk; eval shows task success / fact accuracy.
-
-### Phase 3: Grounded reporting + graph redesign (L)
-Goal: kill hallucinated numbers; make the graph a real agent loop.
-- [ ] Merge Orchestrator + Planner; plan validation with one repair attempt.
-- [ ] Graph rewrite: partial state updates + reducers, `Send` fan-out with `max_concurrency`, conditional retry edges.
-- [ ] Deterministic sanity rules (overfit gap, leakage, multiple comparisons, small n) → caveat facts.
-- [ ] Writer that cites `{{fact:…}}` only; renderer fills values.
-- [ ] Verifier: unresolved refs, bare-number scan, LLM claim check → revision loop (`max_revisions`).
-- [ ] Graph-level failure handling: a failed task degrades the report (listed in Limitations) instead of crashing the run.
-- [ ] Eval: grounded-number rate, false claims on traps, caveat coverage. Compare with baseline.
-
-**Exit:** grounded-number rate ≈ 100%, trap cases pass, clear improvement over baseline.
+**Exit:** trap cases pass; clear improvement over the Phase 2 numbers.
 
 ### Phase 4: Models & providers (S–M)
 - [ ] Provider config: `ollama`, `anthropic`, `openai` via `init_chat_model` (add `langchain-anthropic`).
@@ -332,8 +391,7 @@ Goal: kill hallucinated numbers; make the graph a real agent loop.
 **Exit:** model comparison table committed.
 
 ### Phase 5: Product surface (M)
-- [ ] Charts: specialists save plots via `save_plot`; report embeds them.
-- [ ] HTML report (single self-contained file) + Markdown.
+- [ ] HTML report (single self-contained file, charts embedded) + Markdown.
 - [ ] CLI polish: `analyst run <csv> [--target] [--model] [--out]`, live progress output (stream graph events).
 - [ ] Minimal UI (Streamlit recommended): upload CSV → live task progress → rendered report + run artifacts.
 - [ ] Structured logging; one LangSmith trace per analysis, linked from the run dir and the UI.
@@ -354,6 +412,8 @@ Goal: kill hallucinated numbers; make the graph a real agent loop.
 - Time-series and clustering specialists (`datetime_trend` case becomes a real target).
 - Parallel execution tuning; larger datasets (sampling / DuckDB).
 - Memory of successful analysis patterns across runs.
+- Sub-delegation: specialists split a brief into sub-tasks for their own sub-agents (deferred 2026-10-31; briefs and task reports already allow it).
+- Specialists look at their own charts (qwen3.5 accepts images).
 
 ---
 
@@ -362,8 +422,9 @@ Goal: kill hallucinated numbers; make the graph a real agent loop.
 ```
 agent/                # package (rename TBD, see open decisions)
   profiling.py        # deterministic profiler + target detection
-  planning.py         # planner + plan validation
-  execution/          # sandbox executor, analyst_runtime, run store
+  lead.py             # lead analyst: plan, review, report
+  specialist.py       # specialist loop
+  execution/          # cell-script runner, analyst_runtime, run store
   reporting/          # writer, verifier, sanity rules, renderer
   graph.py            # LangGraph wiring
   llm.py              # provider/model config
@@ -385,7 +446,7 @@ PLAN.md  README.md
 | Date | Decision | Why |
 |---|---|---|
 | 2026-10-29 | `PLAN.md` is the single source of truth; `todo.md` retired | One plan, tracked in git |
-| 2026-10-29 | Eval harness is built **before** the redesign | Need a measured baseline for the before/after story |
+| 2026-10-29 | ~~Eval harness is built **before** the redesign~~ (superseded 2026-10-31) | Need a measured baseline for the before/after story |
 | 2026-10-29 | Numbers in reports come only from recorded facts (writer cites IDs) | Removes the main hallucination path structurally |
 | 2026-10-29 | Replace `PythonREPLTool` with a subprocess sandbox; success = exit code | Security + fixes regex false failures |
 | 2026-10-29 | Merge Orchestrator and Planner | Overlapping responsibilities, one fewer LLM call |
@@ -396,6 +457,13 @@ PLAN.md  README.md
 | 2026-10-31 | `LLM_NUM_GPU=18` on this machine (in `.env`, not a code default) | Ollama's auto offload left 60% of VRAM unused. 20 layers was faster but the first reference run slowed to ~1 tok/s and then crashed the runner on a long prompt, so 18 keeps ~0.5 GB free |
 | 2026-10-31 | Tracing: **LangSmith only**; MLflow removed | Built for agents; clearer traces. Tracing is opt-in via env, because when it's on, prompts and data samples leave the machine (relevant to the local-first pitch) |
 | 2026-10-31 | Delete untracked `todo.md`, `docs/`, `notebooks/`, and the `multi-specialist` branch | Confirmed by owner; superseded by this plan / `feature/new-flow` |
+| 2026-10-31 | New Phase 1 (agent quality) before the eval harness | The baseline review shows structural failures; the tagged baseline keeps the before/after story measurable |
+| 2026-10-31 | Lead analyst + specialists with two feedback loops (specialist iterates on output; lead reviews, revises, follows up) | Owner's direction: delegation and synthesis at both levels, ability to dig deeper and change the plan |
+| 2026-10-31 | Task code is a plain `.py` file with `# %%` cells, re-run whole in a fresh subprocess each step; no Jupyter | Notebooks bloat context; re-running gives no hidden state and reproducible scripts |
+| 2026-10-31 | One session per task with explicit publish/load hand-offs (not one shared session) | Matches delegation; tasks stay reproducible and can't clobber each other |
+| 2026-10-31 | Sub-delegation deferred | Specialist loop + lead follow-ups cover iteration and depth; nesting multiplies LLM calls at ~10 tok/s |
+| 2026-10-31 | Local runs of ~45–60 min are acceptable for now | Owner will test hosted models later |
+| 2026-10-31 | Prompts give rules and an output contract, never example pipelines | The baseline copied the examples verbatim (all 6 ML attempts used the example's model and split) |
 
 ### Open decisions
 - [ ] **Project name / package name** (`agent` is too generic for a portfolio repo).
@@ -409,14 +477,14 @@ PLAN.md  README.md
 
 | Old todo item | Where it lives now |
 |---|---|
-| Code safety checks before execution | Phase 2: sandbox executor |
-| Save analysis artifacts / plots | Phase 2 (run store) + Phase 5 (charts) |
-| Analyst iterates until report complete | Phase 3: verifier → writer loop |
+| Code safety checks before execution | Phase 1 (subprocess runner) + Phase 3 (isolation) |
+| Save analysis artifacts / plots | Phase 0 (run store) + Phase 1 (charts, published outputs) |
+| Analyst iterates until report complete | Phase 1: specialist loop + lead review |
 | Drop debugger, validate imports | Done (debugger removed); covered by sandbox + retries |
 | Multi-dataset CLI | Phase 0 (any CSV path) + Phase 5 (CLI polish) |
 | Streaming output | Phase 5 |
-| Enhanced retry strategy | Phase 2 |
-| Visualization generation | Phase 5 |
+| Enhanced retry strategy | Phase 1 (specialist loop) + Phase 3 |
+| Visualization generation | Phase 1 |
 | Human-in-the-loop | Phase 7 |
 | Memory/history | Phase 7 |
 | Web interface | Phase 5 |
@@ -425,7 +493,8 @@ PLAN.md  README.md
 | PDF/HTML export | Phase 5 (HTML; PDF not planned) |
 | Unit tests | Phase 0 onward |
 | Structured logging / config | Phase 0 + Phase 5 |
-| Graph-level error handling | Phase 3 |
+| Graph-level error handling | Phase 1 (graph rewrite) |
 | Hard-coded retry logic | Phase 0 |
-| Data loading mixed with logic | Phase 2: profiler loads once |
+| Data loading mixed with logic | Phase 1: runtime loads `df` once per script |
 | NL queries / data profiling / self-improvement / large data | Phase 7 or covered by profiler |
+| Collaborative mode (specialized roles) | Phase 1: lead + specialists |
