@@ -3,7 +3,7 @@
 > **This is the main plan for the project.** It replaces `todo.md`; everything still useful from there is folded in below (see [Appendix: todo.md mapping](#appendix-todomd-mapping)).
 > Update the checkboxes and the **Status** block as work lands. Record decisions in the [Decision log](#decision-log).
 
-**Status:** Phase 1 in progress on `phase-1`: P1.1–P1.2 done (wrong claims 7 → 4, charts 0 → 6); next P1.3 prompts & profile · **Last updated:** 2026-11-01
+**Status:** Phase 1 in progress on `phase-1`: P1.1–P1.3 done (wrong claims 7 → 3, charts 0 → 9); next: P1.3 follow-up fixes, then P1.4 lead analyst · **Last updated:** 2026-11-01
 
 ---
 
@@ -316,6 +316,7 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 |---|---|---|---|---|---|---|
 | Baseline | `20261031-204254` | 25 min | 7 | 6 | 7 | 0 |
 | P1.2 specialist loop | `20261101-112045` ([check](docs/progress/p1.2/annotations.md)) | 45 min | 4 | 7 | 6 (now *never computed*, not lost) | 6 |
+| P1.3 prompts & profile | `20261101-121244` ([check](docs/progress/p1.3/annotations.md)) | 54 min | 3 | 7 | 5 (no model trained this run) | 9 |
 
 #### Steps (in this order)
 
@@ -337,11 +338,12 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 - Found on the way: under constrained JSON decoding qwen3.5 almost never emits the status value `answered` (0 of 9), so 4 of 6 tasks reported `failed` and were dropped from the report; renamed to `complete` (3 of 3). A run also stalled for 8 hours overnight, most likely the host sleeping. Task reports now list published outputs.
 
 **P1.3 Prompts & profile** (S–M)
-- [ ] Rewrite specialist prompts as role + rules + environment (installed libraries, runtime helpers, `df`, available inputs) + output contract. No dataset-specific text, no full example pipelines. A test fails if any template mentions a test dataset's columns.
-- [ ] Specialists save charts where a chart shows the finding better than numbers.
-- [ ] `compile()` each new cell before running it, so syntax errors don't cost a run.
-- [ ] Profiler: exclude the target from features; flag ID-like (unique per row) and free-text columns.
-- [ ] Reference run + annotation → progress log.
+- [x] Rewrite specialist prompts as role + rules + environment (installed libraries, runtime helpers, `df`, available inputs) + output contract. No dataset-specific text, no full example pipelines. A test fails if any template mentions a test dataset's columns.
+- [x] Specialists save charts where a chart shows the finding better than numbers.
+- [x] `compile()` each new cell before running it, so syntax errors don't cost a run.
+- [x] Profiler: exclude the target from features; flag ID-like (unique per row) and free-text columns.
+- [x] Reference run + annotation → progress log.
+- Found on the way (fixed before P1.4): findings citing no facts passed validation; a failed cell's replacement dropped its imports; `seaborn` tried despite the library list; the report was cut off by the 8k context. See [check](docs/progress/p1.3/annotations.md).
 
 **P1.4 Lead analyst** (L)
 - [ ] Merge orchestrator + planner into the lead's planning step: a backlog of briefs, aware of the task budget.
