@@ -42,7 +42,7 @@ class Output(BaseModel):
 class Brief(BaseModel):
     """A task the lead hands to a specialist"""
 
-    id: str = Field(description='Short unique id, e.g. "eda_1", "stat_1", "ml_1"')
+    id: str = Field(description="Short unique id that other briefs use in depends_on")
     specialist: Literal["eda", "statistical", "ml"]
     question: str = Field(description="The one question this task answers")
     complete_when: str = Field(description="What a complete answer contains")

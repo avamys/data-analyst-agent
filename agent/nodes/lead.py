@@ -128,20 +128,21 @@ def next_step(state: HierarchicalState) -> str:
 def admit_follow_ups(
     follow_ups: list[Brief], state: HierarchicalState, limit: int
 ) -> list[Brief]:
-    """Up to `limit` follow-ups, with unique ids and dependencies on known tasks"""
-    known = {r.task_id for r in state.completed_tasks + state.failed_tasks}
-    known |= {b.id for b in state.backlog}
+    """Up to `limit` follow-ups, with new ids and dependencies on known tasks"""
+    results = state.completed_tasks + state.failed_tasks
     if state.under_review is not None:
-        known.add(state.under_review.task_id)
+        results.append(state.under_review)
+    existing = [r.brief for r in results if r.brief] + state.backlog
+    known = {b.id for b in existing}
+    refs = _refs(existing)
     if len(follow_ups) > max(limit, 0):
         dropped = [b.question for b in follow_ups[max(limit, 0) :]]
         logger.warning(f"Follow-up budget spent, dropped: {dropped}")
     admitted = []
     for brief in follow_ups[: max(limit, 0)]:
         brief = brief.model_copy(deep=True)
-        if brief.id in known or not brief.id:
-            brief.id = _new_id(brief.specialist, known)
-        brief.depends_on = [d for d in brief.depends_on if d in known]
+        brief.id = _new_id(brief.specialist, known)
+        brief.depends_on = _resolve(brief.depends_on, refs)
         known.add(brief.id)
         admitted.append(brief)
         logger.info(f"Follow-up {brief.id} ({brief.specialist}): {brief.question}")
@@ -153,6 +154,20 @@ def _new_id(specialist: str, taken: set[str]) -> str:
     while f"{ID_PREFIX[specialist]}_{n}" in taken:
         n += 1
     return f"{ID_PREFIX[specialist]}_{n}"
+
+
+def _refs(briefs: list[Brief]) -> dict[str, str]:
+    """What a model may write in depends_on (an id or an output name) -> task id"""
+    refs = {}
+    for brief in briefs:
+        for ref in [brief.id, *(o.name for o in brief.outputs)]:
+            refs.setdefault(ref, brief.id)
+    return refs
+
+
+def _resolve(depends_on: list[str], refs: dict[str, str]) -> list[str]:
+    """Task ids the references point to, in order, without unknowns or repeats"""
+    return list(dict.fromkeys(refs[d] for d in depends_on if d in refs))
 
 
 def _accepted_findings(state: HierarchicalState) -> str:
@@ -174,30 +189,34 @@ def validate_plan(plan: LeadPlan, max_tasks: int) -> list[Brief]:
     """
     Check and repair an LLM-produced plan; return the briefs in execution order
 
-    - Duplicate ids and dependency cycles raise PlanValidationError
     - Only the first max_tasks briefs are kept (the lead lists them by priority)
-    - Unknown, self, and dropped-task dependencies are removed
+    - Ids are assigned here (eda_1, stat_1, ml_1, ...): qwen3.5 left them all
+      empty. Dependencies may name the model's id or an earlier brief's output.
+    - Unknown, self, and dropped-task dependencies are removed; cycles raise
+      PlanValidationError
     - Outputs of tasks no other task depends on are removed: the specialist
       must publish every output, and nothing would load these
     """
     briefs = [b.model_copy(deep=True) for b in plan.briefs]
-
-    ids = [b.id for b in briefs]
-    duplicates = sorted({i for i in ids if ids.count(i) > 1})
-    if duplicates:
-        raise PlanValidationError(f"Duplicate task ids: {duplicates}")
-
     if len(briefs) > max_tasks:
-        dropped = [b.id for b in briefs[max_tasks:]]
+        dropped = [b.question for b in briefs[max_tasks:]]
         logger.warning(f"Plan capped at {max_tasks} tasks, dropped: {dropped}")
         briefs = briefs[:max_tasks]
-    kept = {b.id for b in briefs}
+
+    refs: dict[str, str] = {}
+    for brief in briefs:
+        new_id = _new_id(brief.specialist, set(refs.values()))
+        for ref in [brief.id, *(o.name for o in brief.outputs)]:
+            if ref:
+                refs.setdefault(ref, new_id)
+        refs.setdefault(new_id, new_id)
+        brief.id = new_id
 
     for brief in briefs:
-        valid = [d for d in brief.depends_on if d in kept and d != brief.id]
-        if len(valid) < len(brief.depends_on):
-            removed = sorted(set(brief.depends_on) - set(valid))
-            logger.warning(f"Task {brief.id}: removed invalid dependencies {removed}")
+        valid = [d for d in _resolve(brief.depends_on, refs) if d != brief.id]
+        unknown = [d for d in brief.depends_on if d not in refs]
+        if unknown:
+            logger.warning(f"Task {brief.id}: removed unknown dependencies {unknown}")
         brief.depends_on = valid
 
     needed = {d for b in briefs for d in b.depends_on}

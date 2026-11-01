@@ -55,23 +55,45 @@ def analyse(monkeypatch, tmp_path, small_csv):
 # Plan validation
 
 
+def _questions(briefs) -> list[str]:
+    return [b.question for b in briefs]
+
+
 def test_order_respects_dependencies():
     briefs = validate_plan(
         _plan(_brief("c", ["b"]), _brief("a"), _brief("b", ["a"])), 10
     )
-    order = [b.id for b in briefs]
-    assert order.index("a") < order.index("b") < order.index("c")
+    assert _questions(briefs) == ["question a", "question b", "question c"]
+
+
+def test_ids_are_assigned_and_dependencies_resolve_by_id_or_output():
+    # The P1.4 run: qwen3.5 left every id empty and named outputs in depends_on
+    plan = _plan(
+        _brief("", outputs=["summary"]),
+        Brief(
+            id="",
+            specialist="statistical",
+            question="q",
+            complete_when="c",
+            depends_on=["summary"],
+        ),
+        Brief(id="T3", specialist="ml", question="q", complete_when="c"),
+        _brief("x", deps=["T3"]),
+    )
+    briefs = validate_plan(plan, 10)
+    assert [b.id for b in briefs] == ["eda_1", "stat_1", "ml_1", "eda_2"]
+    assert [b.depends_on for b in briefs] == [[], ["eda_1"], [], ["ml_1"]]
+
+
+def test_duplicate_ids_get_distinct_ids():
+    briefs = validate_plan(_plan(_brief("a"), _brief("a")), 10)
+    assert [b.id for b in briefs] == ["eda_1", "eda_2"]
 
 
 def test_cycle_raises():
     # B3: cycles used to be silently ordered
     with pytest.raises(PlanValidationError, match="cycle"):
         validate_plan(_plan(_brief("a", ["b"]), _brief("b", ["a"])), 10)
-
-
-def test_duplicate_ids_raise():
-    with pytest.raises(PlanValidationError, match="Duplicate"):
-        validate_plan(_plan(_brief("a"), _brief("a")), 10)
 
 
 def test_unknown_and_self_dependencies_are_dropped():
@@ -89,9 +111,9 @@ def test_outputs_nothing_depends_on_are_dropped():
 
 def test_cap_keeps_the_first_briefs_and_drops_dangling_deps():
     briefs = validate_plan(_plan(_brief("a"), _brief("b"), _brief("c", ["b"])), 2)
-    assert [b.id for b in briefs] == ["a", "b"]
+    assert _questions(briefs) == ["question a", "question b"]
     capped = validate_plan(_plan(_brief("a"), _brief("c", ["z"])), 1)
-    assert [b.id for b in capped] == ["a"]
+    assert _questions(capped) == ["question a"]
 
 
 # The loop
