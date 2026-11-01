@@ -34,3 +34,12 @@ def test_dataset_info_and_profile(small_csv):
     assert profile.target_column == "target"
     assert profile.target_type == "binary"
     assert profile.missing_percentages == {"age": 12.5}
+
+
+def test_templates_contain_no_dataset_specific_text():
+    # The baseline copied dataset-specific examples into every analysis
+    words = ["titanic", "survived", "survival", "pclass", "sibsp", "parch", "embarked"]
+    for name in prompt_templates.list_templates():
+        source = prompt_templates.env.loader.get_source(prompt_templates.env, name)[0]
+        found = [w for w in words if w in source.lower()]
+        assert not found, f"{name} mentions {found}"

@@ -24,12 +24,13 @@ class DatasetProfile(BaseModel):
     n_cols: int
     target_column: str | None = None
     target_type: TargetType = "none"
-    feature_types: dict[str, str] = Field(
-        default_factory=dict
-    )  # {col: "numeric"/"categorical"/"datetime"}
+    # Every column: numeric / categorical / datetime / target / id / text
+    feature_types: dict[str, str] = Field(default_factory=dict)
     numeric_features: list[str] = Field(default_factory=list)
     categorical_features: list[str] = Field(default_factory=list)
     datetime_features: list[str] = Field(default_factory=list)
+    id_columns: list[str] = Field(default_factory=list)  # Not features as is
+    text_columns: list[str] = Field(default_factory=list)  # Not features as is
     has_missing: bool = False
     missing_percentages: dict[str, float] = Field(default_factory=dict)
     has_imbalance: bool = False

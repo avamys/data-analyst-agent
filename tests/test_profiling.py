@@ -42,3 +42,32 @@ def test_target_types(values, expected):
 def test_profile_uses_requested_target(small_df):
     profile = auto_profile_dataset(small_df, "x.csv", target="sex")
     assert (profile.target_column, profile.target_type) == ("sex", "binary")
+
+
+def test_ids_and_free_text_are_flagged_and_not_features():
+    n = 50
+    df = pd.DataFrame(
+        {
+            "row_id": range(n),
+            "full_name": [
+                f"Person number {i}, called something long" for i in range(n)
+            ],
+            "code": [f"A{i % 40}" for i in range(n)],  # mostly unique, short
+            "group": ["a", "b"] * (n // 2),
+            "value": [float(i % 7) for i in range(n)],
+            "label": [0, 1] * (n // 2),
+        }
+    )
+    profile = auto_profile_dataset(df, "x.csv", target="label")
+    assert profile.feature_types == {
+        "row_id": "id",
+        "full_name": "text",
+        "code": "id",
+        "group": "categorical",
+        "value": "numeric",
+        "label": "target",
+    }
+    assert profile.numeric_features == ["value"]
+    assert profile.categorical_features == ["group"]
+    assert profile.id_columns == ["row_id", "code"]
+    assert profile.text_columns == ["full_name"]

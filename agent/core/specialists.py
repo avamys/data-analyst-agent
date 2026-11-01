@@ -2,6 +2,8 @@
 
 import json
 import logging
+import traceback
+from importlib.metadata import version
 from pathlib import Path
 
 from agent.config import settings
@@ -20,9 +22,21 @@ from agent.states import (
 logger = logging.getLogger(__name__)
 
 # First cell of every task script
-SETUP_CELL = (
-    "from agent.execution.runtime import df, load, publish, record_fact, save_chart"
-)
+SETUP_CELL = """import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
+from agent.execution.runtime import df, load, publish, record_fact, save_chart"""
+
+# Analysis libraries task scripts may use (besides the standard library)
+ANALYSIS_LIBRARIES = [
+    "pandas",
+    "numpy",
+    "scipy",
+    "statsmodels",
+    "scikit-learn",
+    "matplotlib",
+]
 
 ROLES = {
     "eda": "exploratory data analysis specialist",
@@ -135,6 +149,21 @@ class SpecialistAgent(BaseAgent):
             if not code:
                 observation = "You chose run but gave no code. Write one cell."
                 continue
+            try:
+                compile(code, "<new cell>", "exec")
+            except SyntaxError as e:
+                error = "".join(traceback.format_exception_only(e))
+                attempts.append(
+                    {
+                        "attempt": step,
+                        "code": code,
+                        "output": "",
+                        "error": error,
+                        "seconds": 0.0,
+                    }
+                )
+                observation = f"Your cell has a syntax error and was not run:\n{error}"
+                continue
             if last is not None and not last.ok:
                 cells[-1] = code  # Replace the cell that failed
             else:
@@ -179,7 +208,10 @@ class SpecialistAgent(BaseAgent):
             task_description=task.description,
             n_rows=profile.n_rows,
             n_cols=profile.n_cols,
-            columns=", ".join(profile.feature_types),
+            columns=", ".join(
+                f"{col} ({kind})" for col, kind in profile.feature_types.items()
+            ),
+            libraries=", ".join(f"{lib} {version(lib)}" for lib in ANALYSIS_LIBRARIES),
             target_column=profile.target_column,
             target_type=profile.target_type,
             previous_findings=self._previous_findings(task, state),

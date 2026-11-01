@@ -114,3 +114,16 @@ def test_published_outputs_are_listed_for_later_tasks(run):
     result, _ = run(run_cell("publish('clean', df.dropna())"), finish())
     assert result.published == ["eda_1/clean"]
     assert 'load("eda_1/clean")' in format_task_report(result)
+
+
+def test_syntax_errors_are_caught_before_running(run):
+    result, llm = run(run_cell("print('unclosed'"), run_cell("print('ok')"), finish())
+    assert "SyntaxError" in llm.prompts[1]
+    assert "not run" in llm.prompts[1]
+    assert [a["error"] is not None for a in result.attempts] == [True, False]
+    assert result.code.count("print(") == 1  # the broken cell never joined the script
+
+
+def test_cells_can_use_the_standard_imports(run):
+    result, _ = run(run_cell("print(pd.__name__, np.__name__, plt.__name__)"), finish())
+    assert result.attempts[0]["output"] == "pandas numpy matplotlib.pyplot\n"

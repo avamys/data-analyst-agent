@@ -41,6 +41,32 @@ def detect_target(
     return target, "regression"
 
 
+def _column_kind(series: pd.Series) -> str:
+    """
+    numeric, categorical, datetime, or one of the kinds that aren't features as is:
+    id (mostly unique values, e.g. row numbers or ticket codes) or text (long
+    mostly unique strings, e.g. names). One-hot encoding those creates a column
+    per row.
+    """
+    if pd.api.types.is_datetime64_any_dtype(series):
+        return "datetime"
+    values = series.dropna()
+    n_unique = values.nunique()
+    mostly_unique = n_unique > 20 and n_unique > 0.5 * len(values)
+    if pd.api.types.is_numeric_dtype(series):
+        # Integers unique on every row are identifiers; measurements are numeric
+        if (
+            pd.api.types.is_integer_dtype(series)
+            and mostly_unique
+            and n_unique == len(series)
+        ):
+            return "id"
+        return "numeric"
+    if mostly_unique:
+        return "text" if values.astype(str).str.len().mean() > 20 else "id"
+    return "categorical"
+
+
 def auto_profile_dataset(
     df: pd.DataFrame, dataset_path: str, target: str | None = None
 ) -> DatasetProfile:
@@ -51,21 +77,20 @@ def auto_profile_dataset(
         target: Target column; detected from conventional names when omitted
     """
     n_rows, n_cols = df.shape
+    target_column, target_type = detect_target(df, target)
 
-    # Identify feature types
-    numeric_features = df.select_dtypes(include=["number"]).columns.tolist()
-    categorical_features = df.select_dtypes(
-        include=["object", "category"]
-    ).columns.tolist()
-    datetime_features = df.select_dtypes(include=["datetime64"]).columns.tolist()
+    # Every column gets a kind; only numeric/categorical/datetime are features
+    feature_types = {
+        col: "target" if col == target_column else _column_kind(df[col])
+        for col in df.columns
+    }
 
-    feature_types = {}
-    for col in numeric_features:
-        feature_types[col] = "numeric"
-    for col in categorical_features:
-        feature_types[col] = "categorical"
-    for col in datetime_features:
-        feature_types[col] = "datetime"
+    def of_kind(kind: str) -> list[str]:
+        return [col for col, k in feature_types.items() if k == kind]
+
+    numeric_features = of_kind("numeric")
+    categorical_features = of_kind("categorical")
+    datetime_features = of_kind("datetime")
 
     # Check for missing values
     has_missing = df.isnull().any().any()
@@ -73,8 +98,6 @@ def auto_profile_dataset(
     if has_missing:
         missing_percentages = (df.isnull().sum() / len(df) * 100).to_dict()
         missing_percentages = {k: v for k, v in missing_percentages.items() if v > 0}
-
-    target_column, target_type = detect_target(df, target)
 
     # Check for class imbalance (if target exists)
     has_imbalance = False
@@ -95,6 +118,8 @@ def auto_profile_dataset(
         numeric_features=numeric_features,
         categorical_features=categorical_features,
         datetime_features=datetime_features,
+        id_columns=of_kind("id"),
+        text_columns=of_kind("text"),
         has_missing=has_missing,
         missing_percentages=missing_percentages,
         has_imbalance=has_imbalance,
@@ -171,6 +196,7 @@ DATASET PROFILE:
   • Numeric: {len(profile.numeric_features)} ({", ".join(profile.numeric_features[:5])}{", ..." if len(profile.numeric_features) > 5 else ""})
   • Categorical: {len(profile.categorical_features)} ({", ".join(profile.categorical_features[:5])}{", ..." if len(profile.categorical_features) > 5 else ""})
   • Temporal: {len(profile.datetime_features)}
+- Not features as they are (ids, free text): {", ".join(profile.id_columns + profile.text_columns) or "none"}
 - Data Quality:
   • Missing values: {"Yes" if profile.has_missing else "No"}"""
 
