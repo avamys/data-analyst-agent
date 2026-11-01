@@ -101,3 +101,15 @@ def test_load_of_unknown_output_names_what_is_available(task_dir):
         task_dir, "from agent.execution.runtime import load\nload('t9/nothing')"
     )
     assert "No published output 't9/nothing'" in result.cells[0].error
+
+
+def test_chart_names_are_made_filename_safe(task_dir):
+    result = _run(
+        task_dir,
+        "from agent.execution.runtime import save_chart\n"
+        "import matplotlib.pyplot as plt\n"
+        "save_chart(plt.figure(), 'ml_1/model comparison', 'c')",
+    )
+    assert result.ok, result.cells[-1].error
+    charts = json.loads((task_dir / "charts.json").read_text())
+    assert (task_dir / charts["ml_1_model_comparison"]["file"]).exists()

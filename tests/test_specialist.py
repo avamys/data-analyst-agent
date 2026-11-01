@@ -56,12 +56,13 @@ def run_cell(code: str) -> SpecialistStep:
     return SpecialistStep(reasoning="r", action="run", code=code)
 
 
-def finish(*facts: str, status="complete") -> SpecialistStep:
-    finding = Finding(statement="s", facts=list(facts))
+def finish(*facts: str, status="complete", cite=True) -> SpecialistStep:
+    """A finish step; its one finding cites `facts` (no finding without facts)"""
+    findings = [Finding(statement="s", facts=list(facts))] if facts or not cite else []
     return SpecialistStep(
         reasoning="r",
         action="finish",
-        report=TaskReport(status=status, findings=[finding]),
+        report=TaskReport(status=status, findings=findings),
     )
 
 
@@ -127,3 +128,19 @@ def test_syntax_errors_are_caught_before_running(run):
 def test_cells_can_use_the_standard_imports(run):
     result, _ = run(run_cell("print(pd.__name__, np.__name__, plt.__name__)"), finish())
     assert result.attempts[0]["output"] == "pandas numpy matplotlib.pyplot\n"
+
+
+def test_findings_must_cite_a_recorded_fact(run):
+    # P1.3: findings that cited nothing passed, with wrong unrecorded numbers
+    result, llm = run(
+        finish(cite=False),  # a finding that cites nothing
+        run_cell("record_fact('n', len(df), 'Rows')"),
+        finish("n"),
+    )
+    assert "cite no recorded fact" in llm.prompts[1]
+    assert result.report.findings[0].facts == ["n"]
+
+
+def test_failed_cell_feedback_asks_for_a_complete_replacement(run):
+    _, llm = run(run_cell("import math\nmath.nope()"), run_cell("print(1)"), finish())
+    assert "replaces the failed cell completely" in llm.prompts[1]

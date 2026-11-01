@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     # Generation limits (Ollama). Thinking mode and the 4k default context make
     # local runs hang or silently truncate prompts, so both are set explicitly.
     llm_reasoning: bool = False
-    llm_num_ctx: int = 8192
+    llm_num_ctx: int = 16384  # 8k cut off reports once task reports got complete
     llm_max_tokens: int = 4096
     llm_timeout_s: int = 900
     # Layers to put on the GPU; None lets Ollama decide. Ollama's estimate can be

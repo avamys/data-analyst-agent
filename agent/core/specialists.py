@@ -36,6 +36,7 @@ ANALYSIS_LIBRARIES = [
     "statsmodels",
     "scikit-learn",
     "matplotlib",
+    "seaborn",
 ]
 
 ROLES = {
@@ -134,12 +135,9 @@ class SpecialistAgent(BaseAgent):
                         "You chose finish but gave no report. Include the report."
                     )
                     continue
-                unknown = self._unknown_citations(decision.report, task_dir)
-                if unknown and step < max_steps:
-                    observation = (
-                        f"Your report cites facts that were never recorded: {unknown}. "
-                        "Record them with record_fact in a new cell, or cite recorded facts."
-                    )
+                problem = self._citation_problem(decision.report, task_dir)
+                if problem and step < max_steps:
+                    observation = problem
                     continue
                 return self._result(
                     task, decision.report, cells, last, attempts, task_dir
@@ -233,7 +231,11 @@ class SpecialistAgent(BaseAgent):
         limit = settings.max_cell_output_chars
         cell = result.cells[-1]
         if cell.error:
-            return f"Cell {index} failed (your next cell replaces it):\n{cell.error[-limit:]}"
+            return (
+                f"Cell {index} failed. Your next cell replaces the failed cell completely,"
+                " so repeat everything it needed (imports, variables), not just the fix:\n"
+                f"{cell.error[-limit:]}"
+            )
         output = cell.output or "(no output)"
         if len(output) > limit:
             output = output[:limit] + f"\n… ({len(output) - limit} more characters cut)"
@@ -249,10 +251,25 @@ class SpecialistAgent(BaseAgent):
         )
 
     @staticmethod
-    def _unknown_citations(report: TaskReport, task_dir: Path) -> list[str]:
+    def _citation_problem(report: TaskReport, task_dir: Path) -> str | None:
+        """Feedback when findings cite unrecorded facts, or none at all"""
         recorded = _read_json(task_dir / "facts.json")
         cited = {name for finding in report.findings for name in finding.facts}
-        return sorted(cited - set(recorded))
+        unknown = sorted(cited - set(recorded))
+        uncited = [f.statement for f in report.findings if not f.facts]
+        problems = []
+        if unknown:
+            problems.append(
+                f"Your report cites facts that were never recorded: {unknown}."
+            )
+        if uncited:
+            problems.append(f"These findings cite no recorded fact: {uncited}.")
+        if not problems:
+            return None
+        return " ".join(problems) + (
+            " Every finding must cite the recorded facts behind it: record missing"
+            " ones with record_fact in a new cell, then finish again."
+        )
 
     def _result(self, task, report, cells, last, attempts, task_dir) -> TaskResult:
         facts = _read_json(task_dir / "facts.json")

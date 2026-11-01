@@ -8,6 +8,7 @@ import json
 import math
 import os
 import pickle
+import re
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +29,7 @@ def record_fact(name: str, value: Any, desc: str) -> None:
 
 def save_chart(fig, name: str, caption: str) -> None:
     """Save a matplotlib figure for the report and close it"""
+    name = re.sub(r"[^\w-]+", "_", name)  # used as a file name
     path = Path("charts") / f"{name}.png"
     path.parent.mkdir(exist_ok=True)
     fig.savefig(path, dpi=100, bbox_inches="tight")

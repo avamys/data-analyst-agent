@@ -17,6 +17,7 @@ dependencies = [
   "pydantic-settings",
   "python-dotenv",
   "scikit-learn",
+  "seaborn",
   "scipy",
   "statsmodels",
   "tabulate",
