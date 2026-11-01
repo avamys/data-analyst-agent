@@ -62,6 +62,9 @@ def format_task_report(result: TaskResult) -> str:
     if result.charts:
         lines.append("Charts:")
         lines += [f"- {name}: {c['caption']}" for name, c in result.charts.items()]
+    if result.published:
+        lines.append("Published outputs:")
+        lines += [f'- load("{ref}")' for ref in result.published]
     if report.follow_ups:
         lines.append("Suggested follow-ups:")
         lines += [f"- {q}" for q in report.follow_ups]
@@ -161,7 +164,7 @@ class SpecialistAgent(BaseAgent):
             task, state, cells, observation, task_dir, max_steps, must_finish=True
         )
         report: TaskReport = self.finisher.invoke(prompt)
-        if report.status == "answered":
+        if report.status == "complete":
             report.status = "partial"
         return self._result(task, report, cells, last, attempts, task_dir)
 
@@ -240,6 +243,10 @@ class SpecialistAgent(BaseAgent):
             report=report,
             facts=facts,
             charts=_read_json(task_dir / "charts.json"),
+            published=sorted(
+                f"{task.id}/{p.stem}"
+                for p in (task_dir.parent.parent / "workspace" / task.id).glob("*.pkl")
+            ),
             attempts=attempts,
             metadata={"strategy": task.strategy.value, "steps": len(attempts)},
         )

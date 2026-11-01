@@ -15,8 +15,8 @@ AVAILABLE IN EVERY CELL (imported by the first cell):
 - df: the dataset. Work on copies if you transform it.
 - record_fact(name, value, desc): record a result you will cite. name is a short snake_case id; value is a number, string, list or dict.
 - save_chart(fig, name, caption): save a matplotlib figure for the report.
-- publish(name, obj): make an object (e.g. a train/test split, a fitted model) available to later tasks.
-- load("task_id/name"): load an object published by an earlier task.
+- publish(name, obj): make an object available to later tasks, e.g. publish("train_test", (X_train, X_test, y_train, y_test)).
+- load(ref): load an object an earlier task published, using the ref listed under its "Published outputs", e.g. load("ml_1/train_test").
 
 HOW TO WORK:
 - One cell per step. Cells build on each other: variables from earlier cells exist.
@@ -24,7 +24,9 @@ HOW TO WORK:
 - Do not write conclusions in print statements. You read the output first, then conclude in your report.
 - If a cell fails, fix the problem in your next cell; it replaces the failed one.
 - Record every number you will cite with record_fact, in the cell that computes it.
-- Finish when the task is answered. Each finding is one statement with its numbers and lists the names of the facts that support it. Add follow-up questions the results raise that deserve their own task.
+- If later tasks will need what you built (a cleaned dataset, a train/test split, a fitted model), publish it.
+- If an earlier task published what you need, load it instead of rebuilding it.
+- Finish when the task is complete. Each finding is one statement with its numbers and lists the names of the facts that support it. Add follow-up questions the results raise that deserve their own task.
 
 SCRIPT SO FAR:
 ```python
@@ -41,7 +43,7 @@ CHARTS SAVED SO FAR:
 {{ charts }}
 
 {% if must_finish %}
-Your step budget is spent. Write your report now from the facts recorded above. Use status "partial" if the task is not fully answered.
+Your step budget is spent. Write your report now from the facts recorded above. Use status "partial" if the task is not fully complete.
 {% else %}
 This is step {{ step }} of {{ max_steps }}.{% if step == max_steps %} It is your last step: finish now.{% endif %} Respond with your reasoning, then either action "run" with the code of one new cell, or action "finish" with your report.
 {% endif %}

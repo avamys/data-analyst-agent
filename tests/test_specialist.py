@@ -5,7 +5,7 @@ from langchain_core.runnables import RunnableLambda
 
 from agent.config import settings
 from agent.core.llm_manager import LLMManager
-from agent.core.specialists import SpecialistAgent
+from agent.core.specialists import SpecialistAgent, format_task_report
 from agent.nodes.orchestrator import auto_profile_dataset
 from agent.states import (
     Finding,
@@ -56,7 +56,7 @@ def run_cell(code: str) -> SpecialistStep:
     return SpecialistStep(reasoning="r", action="run", code=code)
 
 
-def finish(*facts: str, status="answered") -> SpecialistStep:
+def finish(*facts: str, status="complete") -> SpecialistStep:
     finding = Finding(statement="s", facts=list(facts))
     return SpecialistStep(
         reasoning="r",
@@ -98,7 +98,7 @@ def test_citing_an_unrecorded_fact_gets_feedback(run):
 def test_spent_budget_forces_a_partial_report(run, monkeypatch):
     monkeypatch.setattr(settings, "max_specialist_steps", 2)
     final = TaskReport(
-        status="answered", findings=[Finding(statement="s", facts=["n"])]
+        status="complete", findings=[Finding(statement="s", facts=["n"])]
     )
     result, llm = run(
         run_cell("record_fact('n', len(df), 'Rows')"),
@@ -108,3 +108,9 @@ def test_spent_budget_forces_a_partial_report(run, monkeypatch):
     assert "step budget is spent" in llm.prompts[-1]
     assert result.report.status == "partial"
     assert result.success
+
+
+def test_published_outputs_are_listed_for_later_tasks(run):
+    result, _ = run(run_cell("publish('clean', df.dropna())"), finish())
+    assert result.published == ["eda_1/clean"]
+    assert 'load("eda_1/clean")' in format_task_report(result)

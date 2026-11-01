@@ -79,8 +79,10 @@ class Finding(BaseModel):
 class TaskReport(BaseModel):
     """What a specialist hands back when it finishes a task"""
 
-    status: Literal["answered", "partial", "failed"] = Field(
-        description="answered: the task is done; partial: only part of it; failed: no usable result"
+    # Not "answered": under constrained JSON decoding qwen3.5 almost never emits it
+    # (0 of 9 even for a finished task) but picks "complete" reliably
+    status: Literal["complete", "partial", "failed"] = Field(
+        description="complete: the task is done; partial: only part of it; failed: no usable result"
     )
     findings: list[Finding] = Field(default_factory=list)
     follow_ups: list[str] = Field(
@@ -114,6 +116,7 @@ class TaskResult(BaseModel):
     report: TaskReport | None = None
     facts: dict[str, Any] = Field(default_factory=dict)  # facts.json of the task
     charts: dict[str, Any] = Field(default_factory=dict)  # charts.json of the task
+    published: list[str] = Field(default_factory=list)  # load() refs, e.g. "ml_1/split"
     artifacts: list[str] = Field(default_factory=list)  # File paths
     # Every run of a new cell: attempt (step), code, output, error, seconds
     attempts: list[dict[str, Any]] = Field(default_factory=list)
