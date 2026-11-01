@@ -1,41 +1,28 @@
 """The specialist loop, driven by a scripted model (no LLM needed)"""
 
 import pytest
-from langchain_core.runnables import RunnableLambda
+from conftest import ScriptedLLM
 
 from agent.config import settings
 from agent.core.llm_manager import LLMManager
 from agent.core.specialists import SpecialistAgent, format_task_report
-from agent.nodes.orchestrator import auto_profile_dataset
+from agent.profiling import auto_profile_dataset
 from agent.states import (
+    Brief,
     Finding,
     HierarchicalState,
+    Output,
+    Review,
     SpecialistStep,
-    SubTask,
     TaskReport,
 )
 
 
-class ScriptedLLM:
-    """Returns the given responses in order and keeps the prompts it was sent"""
-
-    def __init__(self, responses):
-        self.responses = iter(responses)
-        self.prompts = []
-
-    def with_structured_output(self, schema):
-        def respond(messages):
-            self.prompts.append(messages[0].content)
-            return next(self.responses)
-
-        return RunnableLambda(respond)
-
-
 @pytest.fixture
 def run(monkeypatch, tmp_path, small_df, small_csv):
-    """Run the specialist on one task with scripted responses"""
+    """Run the specialist on one brief with scripted responses"""
 
-    def _run(*responses):
+    def _run(*responses, brief=None, previous=None):
         llm = ScriptedLLM(responses)
         monkeypatch.setattr(LLMManager, "get_llm", lambda **_: llm)
         state = HierarchicalState(
@@ -44,10 +31,10 @@ def run(monkeypatch, tmp_path, small_df, small_csv):
             run_dir=str(tmp_path),
             dataset_profile=auto_profile_dataset(small_df, small_csv),
         )
-        task = SubTask(
-            id="eda_1", strategy="exploratory", specialist="eda", description="d"
+        brief = brief or Brief(
+            id="eda_1", specialist="eda", question="q", complete_when="c"
         )
-        return SpecialistAgent("eda").execute(task, state), llm
+        return SpecialistAgent("eda").execute(brief, state, previous), llm
 
     return _run
 
@@ -144,3 +131,37 @@ def test_findings_must_cite_a_recorded_fact(run):
 def test_failed_cell_feedback_asks_for_a_complete_replacement(run):
     _, llm = run(run_cell("import math\nmath.nope()"), run_cell("print(1)"), finish())
     assert "replaces the failed cell completely" in llm.prompts[1]
+
+
+def test_outputs_the_brief_names_must_be_published_before_finishing(run):
+    # P1.2, P1.3: ml_1 never published its split and ml_2 couldn't load it
+    brief = Brief(
+        id="eda_1",
+        specialist="eda",
+        question="q",
+        complete_when="c",
+        outputs=[Output(name="clean", contents="df without missing rows")],
+    )
+    result, llm = run(
+        finish(), run_cell("publish('clean', df.dropna())"), finish(), brief=brief
+    )
+    assert "- clean: df without missing rows" in llm.prompts[0]
+    assert "not published: ['clean']" in llm.prompts[1]
+    assert result.published == ["eda_1/clean"]
+
+
+def test_a_revision_continues_the_script_with_the_leads_feedback(run, tmp_path):
+    first, _ = run(run_cell("record_fact('n', len(df), 'Rows')"), finish("n"))
+    first.reviews.append(Review(reasoning="r", verdict="revise", feedback="Add m."))
+    first.revisions = 1
+    result, llm = run(
+        run_cell("record_fact('m', 2, 'Two')"), finish("n", "m"), previous=first
+    )
+    assert "SENT YOUR REPORT BACK" in llm.prompts[0]
+    assert "Add m." in llm.prompts[0]
+    assert "record_fact('n'" in llm.prompts[0]  # its own script so far
+    assert set(result.facts) == {"n", "m"}
+    assert [(a["attempt"], a["revision"]) for a in result.attempts] == [(1, 0), (2, 1)]
+    assert result.revisions == 1 and len(result.reviews) == 1
+    script = (tmp_path / "tasks" / "eda_1" / "analysis.py").read_text()
+    assert script.count("record_fact(") == 2

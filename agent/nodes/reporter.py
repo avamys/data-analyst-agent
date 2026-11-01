@@ -20,7 +20,6 @@ def hierarchical_reporter_node(state: HierarchicalState) -> HierarchicalState:
     - Present detailed findings organized by analysis type
     - Provide actionable recommendations
     """
-    strategic_plan = state.strategic_plan
     dataset_profile = state.dataset_profile
     completed_tasks = state.completed_tasks
     failed_tasks = state.failed_tasks
@@ -35,10 +34,6 @@ def hierarchical_reporter_node(state: HierarchicalState) -> HierarchicalState:
     # Build detailed findings section
     detailed_findings = _format_detailed_findings(completed_tasks)
 
-    # Build prompt using template
-    strategies = ", ".join([s.value for s in strategic_plan.strategies])
-    priority_order = " → ".join([s.value for s in strategic_plan.priority_order])
-
     prompt = prompt_templates.render(
         "reporter/final_report.jinja2",
         dataset_path=state.dataset_path,
@@ -48,9 +43,11 @@ def hierarchical_reporter_node(state: HierarchicalState) -> HierarchicalState:
         target_type=dataset_profile.target_type,
         n_numeric=len(dataset_profile.numeric_features),
         n_categorical=len(dataset_profile.categorical_features),
-        strategies=strategies,
-        priority_order=priority_order,
-        reasoning=strategic_plan.reasoning,
+        reasoning=state.plan.reasoning,
+        tasks="\n".join(
+            f"- {r.task_id} ({r.specialist}): {r.description}"
+            for r in completed_tasks + failed_tasks
+        ),
         execution_summary=execution_summary,
         synthesis=synthesis,
         detailed_findings=detailed_findings,

@@ -3,6 +3,8 @@
 import numpy as np
 import pandas as pd
 import pytest
+from langchain_core.messages import AIMessage
+from langchain_core.runnables import RunnableLambda
 
 
 @pytest.fixture
@@ -28,3 +30,26 @@ def small_csv(tmp_path, small_df) -> str:
     path = tmp_path / "small.csv"
     small_df.to_csv(path, index=False)
     return str(path)
+
+
+class ScriptedLLM:
+    """
+    Stands in for every model: returns the given responses in call order and
+    keeps the prompts. Structured calls get the objects as they are; plain-text
+    calls get strings wrapped in an AIMessage.
+    """
+
+    def __init__(self, responses):
+        self.responses = iter(responses)
+        self.prompts = []
+
+    def _respond(self, messages):
+        self.prompts.append(messages[0].content)
+        response = next(self.responses)
+        return AIMessage(content=response) if isinstance(response, str) else response
+
+    def with_structured_output(self, schema):
+        return RunnableLambda(self._respond)
+
+    def with_retry(self, **kwargs):
+        return RunnableLambda(self._respond)

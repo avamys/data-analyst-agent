@@ -1,7 +1,8 @@
+import numpy as np
 import pandas as pd
 import pytest
 
-from agent.nodes.orchestrator import auto_profile_dataset, detect_target
+from agent.profiling import auto_profile_dataset, detect_target
 
 
 def test_string_target_is_binary():
@@ -71,3 +72,25 @@ def test_ids_and_free_text_are_flagged_and_not_features():
     assert profile.categorical_features == ["group"]
     assert profile.id_columns == ["row_id", "code"]
     assert profile.text_columns == ["full_name"]
+
+
+def test_columns_that_copy_the_target_are_leakage_suspects(small_df):
+    df = small_df.assign(leak=small_df["target"].map({0: "no", 1: "yes"}))
+    profile = auto_profile_dataset(df, "x.csv")
+    assert profile.leakage_suspects == {"leak": 1.0}
+    assert set(profile.class_shares) == {"0", "1"}
+
+
+def test_near_copies_of_a_numeric_target_are_leakage_suspects():
+    rng = np.random.default_rng(0)
+    y = rng.normal(size=200)
+    df = pd.DataFrame(
+        {
+            "y": y,
+            "copy": y * 2 + rng.normal(0, 0.01, 200),
+            "noise": rng.normal(size=200),
+        }
+    )
+    profile = auto_profile_dataset(df, "x.csv")
+    assert profile.target_type == "regression"
+    assert list(profile.leakage_suspects) == ["copy"]

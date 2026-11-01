@@ -1,12 +1,16 @@
-"""Graph builder for hierarchical multi-agent analysis workflow"""
+"""Graph builder for the lead/specialist analysis workflow"""
 
 import logging
 
 from langgraph.graph import END, START, StateGraph
 
-from agent.nodes.execution_manager import execution_manager_node
-from agent.nodes.orchestrator import orchestrator_node
-from agent.nodes.planner import planner_node
+from agent.nodes.lead import (
+    next_step,
+    plan_node,
+    profile_node,
+    review_node,
+    run_task_node,
+)
 from agent.nodes.reporter import hierarchical_reporter_node
 from agent.nodes.synthesizer import synthesizer_node
 from agent.states import HierarchicalState
@@ -16,32 +20,32 @@ logger = logging.getLogger(__name__)
 
 def build_hierarchical_graph() -> StateGraph:
     """
-    Build the hierarchical multi-agent analysis workflow graph
+    Build the analysis workflow graph
 
     Flow:
-    START → Orchestrator → Planner → Execution Manager → Synthesizer → Reporter → END
+    START → profile → plan → run_task ⇄ review → synthesizer → reporter → END
 
-    Layers:
-    1. Orchestrator: Analyzes dataset, decides strategies
-    2. Planner: Decomposes strategies into tasks
-    3. Execution Manager: Routes tasks to specialists, manages execution
-    4. Synthesizer: Combines findings from all specialists
-    5. Reporter: Generates comprehensive final report
+    - profile: deterministic dataset profile (no LLM)
+    - plan: the lead writes a backlog of briefs
+    - run_task: a specialist works the next brief, or the one sent back
+    - review: the lead accepts it or sends it back, and may add follow-ups;
+      the loop ends when nothing is sent back and the backlog is empty
     """
     graph = StateGraph(HierarchicalState)
 
-    # Add nodes for each layer
-    graph.add_node("orchestrator", orchestrator_node)
-    graph.add_node("planner", planner_node)
-    graph.add_node("execution_manager", execution_manager_node)
+    graph.add_node("profile", profile_node)
+    graph.add_node("plan", plan_node)
+    graph.add_node("run_task", run_task_node)
+    graph.add_node("review", review_node)
     graph.add_node("synthesizer", synthesizer_node)
     graph.add_node("reporter", hierarchical_reporter_node)
 
-    # Linear flow through layers
-    graph.add_edge(START, "orchestrator")
-    graph.add_edge("orchestrator", "planner")
-    graph.add_edge("planner", "execution_manager")
-    graph.add_edge("execution_manager", "synthesizer")
+    routes = {"run_task": "run_task", "synthesizer": "synthesizer"}
+    graph.add_edge(START, "profile")
+    graph.add_edge("profile", "plan")
+    graph.add_conditional_edges("plan", next_step, routes)
+    graph.add_edge("run_task", "review")
+    graph.add_conditional_edges("review", next_step, routes)
     graph.add_edge("synthesizer", "reporter")
     graph.add_edge("reporter", END)
 

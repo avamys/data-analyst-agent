@@ -6,15 +6,16 @@ import traceback
 from importlib.metadata import version
 from pathlib import Path
 
+from agent.checks import missing_outputs
 from agent.config import settings
 from agent.core.base_agent import BaseAgent
 from agent.core.template_manager import prompt_templates
-from agent.execution.cells import join_cells
+from agent.execution.cells import join_cells, split_cells
 from agent.execution.runner import SCRIPT, ScriptResult, prepare_task_dir, run_script
 from agent.states import (
+    Brief,
     HierarchicalState,
     SpecialistStep,
-    SubTask,
     TaskReport,
     TaskResult,
 )
@@ -26,7 +27,14 @@ SETUP_CELL = """import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from agent.execution.runtime import df, load, publish, record_fact, save_chart"""
+from agent.execution.runtime import (
+    df,
+    load,
+    publish,
+    record_fact,
+    record_model,
+    save_chart,
+)"""
 
 # Analysis libraries task scripts may use (besides the standard library)
 ANALYSIS_LIBRARIES = [
@@ -83,6 +91,9 @@ def format_task_report(result: TaskResult) -> str:
     if report.follow_ups:
         lines.append("Suggested follow-ups:")
         lines += [f"- {q}" for q in report.follow_ups]
+    if result.reviews and result.reviews[-1].verdict == "revise":
+        # Sent back once too often: the lead's last objection still stands
+        lines.append(f"Unresolved review issue: {result.reviews[-1].feedback}")
     return "\n".join(lines)
 
 
@@ -92,7 +103,8 @@ class SpecialistAgent(BaseAgent):
 
     Each step the model either runs one new cell (replacing the last cell if it
     failed) or finishes with a report whose findings cite recorded facts. When
-    the step budget runs out it must finish with what it has.
+    the step budget runs out it must finish with what it has. A task the lead
+    sent back continues its own script, with the lead's feedback.
     """
 
     def __init__(self, specialist_type: str, **kwargs):
@@ -109,7 +121,13 @@ class SpecialistAgent(BaseAgent):
             output_schema=TaskReport,
         )
 
-    def execute(self, task: SubTask, state: HierarchicalState) -> TaskResult:
+    def execute(
+        self,
+        task: Brief,
+        state: HierarchicalState,
+        previous: TaskResult | None = None,
+    ) -> TaskResult:
+        """Work a brief; with `previous`, revise it after the lead's last review"""
         task_dir = prepare_task_dir(
             Path(state.run_dir) / "tasks" / task.id,
             state.dataset_path,
@@ -120,10 +138,27 @@ class SpecialistAgent(BaseAgent):
         last: ScriptResult | None = None
         observation = "Nothing has run yet."
         attempts = []
+        revision = None
+        if previous is not None:
+            attempts = list(previous.attempts)
+            revision = {
+                "feedback": previous.reviews[-1].feedback,
+                "report": format_task_report(
+                    previous.model_copy(update={"reviews": []})
+                ),
+            }
+            script = task_dir / SCRIPT
+            if script.exists():
+                # Re-run, so the next cell builds on the current state
+                cells = split_cells(script.read_text())
+                last = run_script(task_dir, timeout=settings.code_timeout_s)
+                observation = self._observe(last, len(cells) - 1)
         max_steps = settings.max_specialist_steps
 
         for step in range(1, max_steps + 1):
-            prompt = self._prompt(task, state, cells, observation, task_dir, step)
+            prompt = self._prompt(
+                task, state, cells, observation, task_dir, step, revision=revision
+            )
             decision: SpecialistStep = self.invoke(prompt)
             self.logger.info(
                 f"{task.id} step {step}: {decision.action}: {decision.reasoning}"
@@ -135,12 +170,12 @@ class SpecialistAgent(BaseAgent):
                         "You chose finish but gave no report. Include the report."
                     )
                     continue
-                problem = self._citation_problem(decision.report, task_dir)
+                problem = self._report_problem(task, decision.report, task_dir)
                 if problem and step < max_steps:
                     observation = problem
                     continue
                 return self._result(
-                    task, decision.report, cells, last, attempts, task_dir
+                    task, decision.report, cells, last, attempts, task_dir, previous
                 )
 
             code = clean_code(decision.code.strip())
@@ -153,7 +188,9 @@ class SpecialistAgent(BaseAgent):
                 error = "".join(traceback.format_exception_only(e))
                 attempts.append(
                     {
-                        "attempt": step,
+                        "attempt": len(attempts) + 1,
+                        "revision": previous.revisions if previous else 0,
+                        "step": step,
                         "code": code,
                         "output": "",
                         "error": error,
@@ -172,7 +209,9 @@ class SpecialistAgent(BaseAgent):
             cell = last.cells[-1]
             attempts.append(
                 {
-                    "attempt": step,
+                    "attempt": len(attempts) + 1,
+                    "revision": previous.revisions if previous else 0,
+                    "step": step,
                     "code": code,
                     "output": cell.output,
                     "error": cell.error,
@@ -188,22 +227,39 @@ class SpecialistAgent(BaseAgent):
         # Budget spent without finishing: report what was found
         self.logger.warning(f"{task.id}: step budget spent, asking for a final report")
         prompt = self._prompt(
-            task, state, cells, observation, task_dir, max_steps, must_finish=True
+            task,
+            state,
+            cells,
+            observation,
+            task_dir,
+            max_steps,
+            revision=revision,
+            must_finish=True,
         )
         report: TaskReport = self.finisher.invoke(prompt)
         if report.status == "complete":
             report.status = "partial"
-        return self._result(task, report, cells, last, attempts, task_dir)
+        return self._result(task, report, cells, last, attempts, task_dir, previous)
 
     def _prompt(
-        self, task, state, cells, observation, task_dir, step, must_finish=False
+        self,
+        task,
+        state,
+        cells,
+        observation,
+        task_dir,
+        step,
+        revision=None,
+        must_finish=False,
     ):
         profile = state.dataset_profile
         return prompt_templates.render(
             "specialists/step.jinja2",
             role=ROLES[self.specialist_type],
             task_id=task.id,
-            task_description=task.description,
+            question=task.question,
+            complete_when=task.complete_when,
+            outputs=task.outputs,
             n_rows=profile.n_rows,
             n_cols=profile.n_cols,
             columns=", ".join(
@@ -221,6 +277,7 @@ class SpecialistAgent(BaseAgent):
                 for name, c in _read_json(task_dir / "charts.json").items()
             )
             or "(none)",
+            revision=revision,
             step=step,
             max_steps=settings.max_specialist_steps,
             must_finish=must_finish,
@@ -242,17 +299,20 @@ class SpecialistAgent(BaseAgent):
         return f"Cell {index} output:\n{output}"
 
     @staticmethod
-    def _previous_findings(task: SubTask, state: HierarchicalState) -> str:
+    def _previous_findings(task: Brief, state: HierarchicalState) -> str:
         results = {r.task_id: r for r in state.completed_tasks}
         return "\n\n".join(
             format_task_report(results[dep])
-            for dep in task.dependencies
+            for dep in task.depends_on
             if dep in results
         )
 
     @staticmethod
-    def _citation_problem(report: TaskReport, task_dir: Path) -> str | None:
-        """Feedback when findings cite unrecorded facts, or none at all"""
+    def _report_problem(task: Brief, report: TaskReport, task_dir: Path) -> str | None:
+        """
+        Feedback when findings cite unrecorded facts or none at all, or when
+        outputs the brief asks for are not published
+        """
         recorded = _read_json(task_dir / "facts.json")
         cited = {name for finding in report.findings for name in finding.facts}
         unknown = sorted(cited - set(recorded))
@@ -264,14 +324,22 @@ class SpecialistAgent(BaseAgent):
             )
         if uncited:
             problems.append(f"These findings cite no recorded fact: {uncited}.")
-        if not problems:
-            return None
-        return " ".join(problems) + (
-            " Every finding must cite the recorded facts behind it: record missing"
-            " ones with record_fact in a new cell, then finish again."
-        )
+        if problems:
+            problems.append(
+                "Every finding must cite the recorded facts behind it: record missing"
+                " ones with record_fact in a new cell, then finish again."
+            )
+        missing = missing_outputs(task, _published(task_dir, task.id))
+        if missing:
+            problems.append(
+                f"Later tasks need outputs you have not published: {missing}."
+                " Publish each with publish(name, obj) in a new cell, then finish again."
+            )
+        return " ".join(problems) or None
 
-    def _result(self, task, report, cells, last, attempts, task_dir) -> TaskResult:
+    def _result(
+        self, task, report, cells, last, attempts, task_dir, previous
+    ) -> TaskResult:
         facts = _read_json(task_dir / "facts.json")
         # Citations that still don't resolve (last step) are dropped
         for finding in report.findings:
@@ -283,7 +351,7 @@ class SpecialistAgent(BaseAgent):
         return TaskResult(
             task_id=task.id,
             specialist=self.specialist_type,
-            description=task.description,
+            description=task.question,
             code=join_cells(cells),
             output="".join(c.output for c in last.cells) if last else "",
             execution_time=sum(a["seconds"] for a in attempts),
@@ -292,17 +360,23 @@ class SpecialistAgent(BaseAgent):
             report=report,
             facts=facts,
             charts=_read_json(task_dir / "charts.json"),
-            published=sorted(
-                f"{task.id}/{p.stem}"
-                for p in (task_dir.parent.parent / "workspace" / task.id).glob("*.pkl")
-            ),
+            published=_published(task_dir, task.id),
             attempts=attempts,
-            metadata={"strategy": task.strategy.value, "steps": len(attempts)},
+            metadata={"steps": len(attempts)},
+            brief=task,
+            revisions=previous.revisions if previous else 0,
+            reviews=previous.reviews if previous else [],
         )
 
 
 def _read_json(path: Path) -> dict:
     return json.loads(path.read_text()) if path.exists() else {}
+
+
+def _published(task_dir: Path, task_id: str) -> list[str]:
+    """load() refs of what a task published, e.g. ["ml_1/train_test"]"""
+    workspace = task_dir.parent.parent / "workspace" / task_id
+    return sorted(f"{task_id}/{p.stem}" for p in workspace.glob("*.pkl"))
 
 
 def get_specialist(specialist_type: str) -> SpecialistAgent:

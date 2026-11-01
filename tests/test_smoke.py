@@ -3,15 +3,16 @@
 from agent.core.template_manager import prompt_templates
 from agent.data_loader import generate_dataset_info, load_dataset
 from agent.graph import build_hierarchical_graph
-from agent.nodes.orchestrator import auto_profile_dataset
+from agent.profiling import auto_profile_dataset
 
 
 def test_graph_compiles():
     graph = build_hierarchical_graph()
     assert {
-        "orchestrator",
-        "planner",
-        "execution_manager",
+        "profile",
+        "plan",
+        "run_task",
+        "review",
         "synthesizer",
         "reporter",
     } <= set(graph.get_graph().nodes)

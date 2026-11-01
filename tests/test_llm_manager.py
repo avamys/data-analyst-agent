@@ -14,7 +14,7 @@ def test_specialists_get_their_own_config(agent_type, temperature):
 
 
 def test_overrides_win():
-    assert LLMManager.resolve_config("planner", model_name="m", temperature=0.9) == (
+    assert LLMManager.resolve_config("lead", model_name="m", temperature=0.9) == (
         "m",
         0.9,
     )

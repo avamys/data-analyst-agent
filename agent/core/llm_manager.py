@@ -24,11 +24,7 @@ class LLMManager:
 
     # Default configuration per agent type; "model" names the settings field
     AGENT_CONFIGS = {
-        "orchestrator": {
-            "model": "analyst_model",
-            "temperature": 0.3,
-        },
-        "planner": {
+        "lead": {
             "model": "analyst_model",
             "temperature": 0.2,
         },
@@ -66,7 +62,7 @@ class LLMManager:
         Get or create LLM for agent type
 
         Args:
-            agent_type: Type of agent (orchestrator, planner, etc.)
+            agent_type: Type of agent (lead, eda, etc.)
             model_name: Override default model
             temperature: Override default temperature
             force_new: Don't use cache, create new instance
@@ -75,8 +71,8 @@ class LLMManager:
             Configured LLM instance
 
         Example:
-            >>> llm = LLMManager.get_llm("orchestrator")
-            >>> llm = LLMManager.get_llm("planner", temperature=0.1)
+            >>> llm = LLMManager.get_llm("lead")
+            >>> llm = LLMManager.get_llm("eda", temperature=0.1)
         """
         model_name, temperature = cls.resolve_config(
             agent_type, model_name, temperature

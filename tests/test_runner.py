@@ -113,3 +113,45 @@ def test_chart_names_are_made_filename_safe(task_dir):
     assert result.ok, result.cells[-1].error
     charts = json.loads((task_dir / "charts.json").read_text())
     assert (task_dir / charts["ml_1_model_comparison"]["file"]).exists()
+
+
+def test_record_model_records_train_test_and_baseline_scores(task_dir):
+    result = _run(
+        task_dir,
+        "from agent.execution.runtime import df, record_model",
+        "from sklearn.linear_model import LogisticRegression\n"
+        "from sklearn.model_selection import train_test_split\n"
+        "X = df[['fare']].fillna(0); y = df['target']\n"
+        "Xtr, Xte, ytr, yte = train_test_split(X, y, random_state=0)\n"
+        "m = LogisticRegression().fit(Xtr, ytr)\n"
+        "scores = record_model('logreg', m, Xtr, ytr, Xte, yte, 'Fare only')\n"
+        "print(sorted(scores))",
+    )
+    assert result.ok, result.cells[-1].error
+    fact = json.loads((task_dir / "facts.json").read_text())["logreg"]
+    assert fact["kind"] == "model"
+    scores = fact["value"]
+    assert scores["kind"] == "classifier"
+    assert {"train_accuracy", "test_accuracy", "baseline_accuracy"} <= set(scores)
+    assert {"test_f1", "test_roc_auc", "test_recall"} <= set(scores)
+    assert list(scores["top_features"]) == ["fare"]
+    assert (scores["n_train"], scores["n_test"]) == (30, 10)
+
+
+def test_record_model_handles_pipelines_and_regressors(task_dir):
+    result = _run(
+        task_dir,
+        "from agent.execution.runtime import df, record_model",
+        "from sklearn.ensemble import RandomForestRegressor\n"
+        "from sklearn.pipeline import make_pipeline\n"
+        "from sklearn.preprocessing import StandardScaler\n"
+        "X = df[['fare', 'target']]; y = df['age'].fillna(40)\n"
+        "m = make_pipeline(StandardScaler(), RandomForestRegressor(n_estimators=5,"
+        " random_state=0)).fit(X[:30], y[:30])\n"
+        "record_model('rf', m, X[:30], y[:30], X[30:], y[30:], 'Age')",
+    )
+    assert result.ok, result.cells[-1].error
+    scores = json.loads((task_dir / "facts.json").read_text())["rf"]["value"]
+    assert scores["kind"] == "regressor"
+    assert {"train_r2", "test_r2", "test_rmse", "baseline_rmse"} <= set(scores)
+    assert set(scores["top_features"]) == {"fare", "target"}

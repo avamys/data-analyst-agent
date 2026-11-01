@@ -6,10 +6,10 @@ DATASET ANALYZED:
 - Target: {{ target_column | default }} ({{ target_type }})
 - Features: {{ n_numeric }} numeric, {{ n_categorical }} categorical
 
-STRATEGIC APPROACH:
-Strategies Applied: {{ strategies }}
-Priority Order: {{ priority_order }}
-Reasoning: {{ reasoning }}
+APPROACH:
+{{ reasoning }}
+Tasks:
+{{ tasks }}
 
 EXECUTION SUMMARY:
 {{ execution_summary }}
@@ -32,8 +32,8 @@ Make it clear what the data tells us and what decisions can be made.
 Brief description of the dataset analyzed, including size, target variable, and key characteristics.
 
 ## Analysis Methodology
-### Strategic Approach
-Explain which analysis strategies were chosen and why.
+### Approach
+Explain which questions the analysis set out to answer and why.
 
 ### Execution
 Summarize how many tasks were executed by each specialist type.

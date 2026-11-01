@@ -71,6 +71,11 @@ def main():
         "tags": [dataset, settings.analyst_model],
         "metadata": {"commit": commit, "run_dir": store.path.name},
         "callbacks": [recorder],
+        # Each task is a run_task + review step, once more per revision
+        "recursion_limit": 10
+        + 2
+        * (settings.max_tasks + settings.max_follow_ups)
+        * (1 + settings.max_revisions),
     }
     meta = {
         "status": "running",
@@ -89,26 +94,20 @@ def main():
     result = {}
     start = node_start = time.time()
     try:
-        # "updates" gives each node's output, "values" the full state after it.
-        # subgraphs=True also streams the tasks inside the execution step, so
-        # each task is saved as soon as it finishes.
-        for namespace, mode, chunk in workflow.stream(
-            initial_state,
-            config=config,
-            stream_mode=["updates", "values"],
-            subgraphs=True,
+        # "updates" gives each node's output, "values" the full state after it
+        for mode, chunk in workflow.stream(
+            initial_state, config=config, stream_mode=["updates", "values"]
         ):
             if mode == "values":
-                if not namespace:
-                    result = chunk
+                result = chunk
                 continue
             for node, update in chunk.items():
-                if namespace:
-                    results = update.get("completed_tasks", []) + update.get(
-                        "failed_tasks", []
-                    )
-                    store.write_tasks([r for r in results if r.task_id == node])
-                    continue
+                # Save each task as soon as it has run or been reviewed
+                if isinstance(update, dict):
+                    tasks = [update.get("under_review")]
+                    tasks += update.get("completed_tasks", [])[-1:]
+                    tasks += update.get("failed_tasks", [])[-1:]
+                    store.write_tasks([t for t in tasks if t is not None])
                 step = len(meta["nodes"]) + 1
                 meta["nodes"].append(
                     {"node": node, "seconds": round(time.time() - node_start, 1)}

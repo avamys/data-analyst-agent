@@ -29,7 +29,6 @@ def synthesizer_node(state: HierarchicalState) -> HierarchicalState:
     if not completed_tasks:
         logger.warning("No completed tasks to synthesize!")
         state.synthesis = "No analysis results to synthesize."
-        state.current_phase = "reporting"
         return state
 
     logger.info("=" * 60)
@@ -74,7 +73,6 @@ def synthesizer_node(state: HierarchicalState) -> HierarchicalState:
 
     # Update state
     state.synthesis = synthesis
-    state.current_phase = "reporting"
 
     return state
 

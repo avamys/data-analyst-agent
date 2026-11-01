@@ -1,18 +1,8 @@
 """State definitions for hierarchical multi-agent analysis workflow"""
 
-from enum import StrEnum
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
-
-
-class AnalysisStrategy(StrEnum):
-    """Types of analysis strategies"""
-
-    EXPLORATORY = "exploratory"
-    STATISTICAL = "statistical"
-    PREDICTIVE = "predictive"
-
 
 TargetType = Literal["binary", "multiclass", "regression", "none"]
 
@@ -35,36 +25,61 @@ class DatasetProfile(BaseModel):
     missing_percentages: dict[str, float] = Field(default_factory=dict)
     has_imbalance: bool = False
     has_temporal: bool = False
+    # Share of each target class (classification targets)
+    class_shares: dict[str, float] = Field(default_factory=dict)
+    # Columns that alone predict the target almost perfectly: column -> score
+    # (accuracy of predicting by the column's groups, or |correlation|)
+    leakage_suspects: dict[str, float] = Field(default_factory=dict)
 
 
-class StrategicPlan(BaseModel):
-    """High-level analysis strategy from orchestrator"""
+class Output(BaseModel):
+    """An object a task publishes for later tasks"""
 
-    strategies: list[AnalysisStrategy]
-    priority_order: list[AnalysisStrategy]
-    reasoning: str
-    estimated_tasks: int
+    name: str = Field(description="snake_case name to publish it under")
+    contents: str = Field(description="What the object is and what it contains")
 
 
-class SubTask(BaseModel):
-    """Individual analysis sub-task"""
+class Brief(BaseModel):
+    """A task the lead hands to a specialist"""
 
-    id: str
-    strategy: AnalysisStrategy
+    id: str = Field(description='Short unique id, e.g. "eda_1", "stat_1", "ml_1"')
     specialist: Literal["eda", "statistical", "ml"]
-    description: str
-    dependencies: list[str] = Field(
-        default_factory=list
-    )  # Task IDs that must complete first
-    priority: int = 1
-    estimated_complexity: int = 1  # 1-5 scale
+    question: str = Field(description="The one question this task answers")
+    complete_when: str = Field(description="What a complete answer contains")
+    depends_on: list[str] = Field(
+        default_factory=list,
+        description="Ids of earlier tasks whose results or outputs this task needs",
+    )
+    outputs: list[Output] = Field(
+        default_factory=list,
+        description="Objects this task must publish because later tasks need them",
+    )
 
 
-class AnalysisPlan(BaseModel):
-    """Detailed execution plan with tasks"""
+class LeadPlan(BaseModel):
+    """The lead's backlog of briefs, in the order they run"""
 
-    tasks: list[SubTask]
-    execution_order: list[str]  # Task IDs in order
+    reasoning: str = Field(
+        description="Briefly: what this analysis must find out about the dataset"
+    )
+    briefs: list[Brief]
+
+
+class Review(BaseModel):
+    """The lead's decision on a task report"""
+
+    reasoning: str = Field(
+        description="Briefly: is each finding supported, is the brief answered, "
+        "and do the checks show a problem"
+    )
+    verdict: Literal["accept", "revise"]
+    feedback: str = Field(
+        default="", description="revise: exactly what the specialist must fix or add"
+    )
+    follow_ups: list[Brief] = Field(
+        default_factory=list,
+        description="New tasks the results call for and the backlog doesn't cover",
+    )
 
 
 class Finding(BaseModel):
@@ -119,9 +134,12 @@ class TaskResult(BaseModel):
     charts: dict[str, Any] = Field(default_factory=dict)  # charts.json of the task
     published: list[str] = Field(default_factory=list)  # load() refs, e.g. "ml_1/split"
     artifacts: list[str] = Field(default_factory=list)  # File paths
-    # Every run of a new cell: attempt (step), code, output, error, seconds
+    # Every new cell tried: attempt, revision, step, code, output, error, seconds
     attempts: list[dict[str, Any]] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    brief: Brief | None = None
+    revisions: int = 0  # Times the lead sent the report back
+    reviews: list[Review] = Field(default_factory=list)
 
 
 class HierarchicalState(BaseModel):
@@ -133,19 +151,14 @@ class HierarchicalState(BaseModel):
     target_column: str | None = None  # Detected from column names when None
     run_dir: str  # Task scripts and their outputs live under <run_dir>/tasks/
 
-    # Phase tracking
-    current_phase: Literal[
-        "orchestration", "planning", "execution", "synthesis", "reporting"
-    ] = "orchestration"
-
-    # Orchestration layer
+    # Lead analyst
     dataset_profile: DatasetProfile | None = None
-    strategic_plan: StrategicPlan | None = None
+    plan: LeadPlan | None = None  # As planned, before follow-ups
+    backlog: list[Brief] = Field(default_factory=list)  # Briefs not started yet
+    under_review: TaskResult | None = None  # The task just run, until accepted
+    follow_ups_added: int = 0
 
-    # Planning layer
-    analysis_plan: AnalysisPlan | None = None
-
-    # Execution layer
+    # Accepted tasks: each result is in exactly one list
     completed_tasks: list[TaskResult] = Field(default_factory=list)
     failed_tasks: list[TaskResult] = Field(default_factory=list)
 

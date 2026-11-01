@@ -1,18 +1,21 @@
-"""Orchestrator Agent - Strategic decision maker for analysis approach"""
+"""Deterministic dataset profile: target, column kinds, data quality, leakage"""
 
 import logging
 
 import pandas as pd
 
-from agent.core.base_agent import BaseAgent
-from agent.core.template_manager import prompt_templates
-from agent.states import DatasetProfile, HierarchicalState, StrategicPlan, TargetType
+from agent.states import DatasetProfile, TargetType
 
 logger = logging.getLogger(__name__)
 
 
 # Column names treated as the target when none is given explicitly
 TARGET_NAMES = ["target", "label", "class", "outcome", "y"]
+
+# A column is a leakage suspect when on its own it removes this share of the
+# errors of always predicting the most frequent class, or (regression) when its
+# |correlation| with the target reaches it
+LEAKAGE_SCORE = 0.9
 
 
 def detect_target(
@@ -109,6 +112,16 @@ def auto_profile_dataset(
     # Has temporal data
     has_temporal = len(datetime_features) > 0
 
+    class_shares = {}
+    leakage_suspects = {}
+    if target_column:
+        if target_type != "regression":
+            shares = df[target_column].value_counts(normalize=True)
+            class_shares = {str(k): round(float(v), 4) for k, v in shares.items()}
+        leakage_suspects = _leakage_suspects(
+            df, target_column, target_type, feature_types
+        )
+
     profile = DatasetProfile(
         n_rows=n_rows,
         n_cols=n_cols,
@@ -124,6 +137,8 @@ def auto_profile_dataset(
         missing_percentages=missing_percentages,
         has_imbalance=has_imbalance,
         has_temporal=has_temporal,
+        class_shares=class_shares,
+        leakage_suspects=leakage_suspects,
     )
 
     logger.info(f"Dataset Profile: {n_rows} rows, {n_cols} cols")
@@ -132,107 +147,79 @@ def auto_profile_dataset(
         f"Features: {len(numeric_features)} numeric, {len(categorical_features)} categorical"
     )
 
+    if leakage_suspects:
+        logger.warning(f"Leakage suspects: {leakage_suspects}")
+
     return profile
 
 
-class OrchestratorAgent(BaseAgent):
+def _leakage_suspects(
+    df: pd.DataFrame, target: str, target_type: str, feature_types: dict[str, str]
+) -> dict[str, float]:
     """
-    Orchestrator analyzes dataset and decides analysis strategy
+    Feature columns that alone predict the target almost perfectly, which usually
+    means they were derived from it
 
-    Responsibilities:
-    - Profile the dataset automatically
-    - Decide which analysis strategies to apply (EDA, Statistical, ML, etc.)
-    - Determine priority order
-    - Estimate complexity
+    Classification: accuracy of predicting the most frequent class within each of
+    the column's values (numeric columns in deciles). Regression: |correlation|.
     """
-
-    def __init__(self, **kwargs):
-        super().__init__(
-            agent_type="orchestrator",
-            use_structured_output=True,
-            output_schema=StrategicPlan,
-            **kwargs,
-        )
-
-    def execute(self, state: HierarchicalState) -> HierarchicalState:
-        """Execute orchestrator logic"""
-        dataset_info = state.dataset_info
-        dataset_path = state.dataset_path
-
-        # Load and profile dataset
-        df = pd.read_csv(dataset_path)
-        profile = auto_profile_dataset(df, dataset_path, state.target_column)
-
-        # Build profile summary
-        profile_summary = self._build_profile_summary(profile)
-
-        # Get prompt from template
-        prompt = prompt_templates.render(
-            "orchestrator/strategy_selection.jinja2",
-            profile_summary=profile_summary,
-            dataset_info=dataset_info[:1000],
-        )
-
-        # Invoke LLM (already configured with structured output)
-        strategic_plan = self.invoke(prompt)
-
-        # Log the strategic plan
-        self._log_strategic_plan(strategic_plan)
-
-        # Update state
-        state.dataset_profile = profile
-        state.strategic_plan = strategic_plan
-        state.current_phase = "planning"
-
-        return state
-
-    def _build_profile_summary(self, profile: DatasetProfile) -> str:
-        """Build formatted profile summary"""
-        summary = f"""
-DATASET PROFILE:
-- Size: {profile.n_rows:,} rows × {profile.n_cols} columns
-- Target Variable: {profile.target_column or "None detected"} ({profile.target_type})
-- Features:
-  • Numeric: {len(profile.numeric_features)} ({", ".join(profile.numeric_features[:5])}{", ..." if len(profile.numeric_features) > 5 else ""})
-  • Categorical: {len(profile.categorical_features)} ({", ".join(profile.categorical_features[:5])}{", ..." if len(profile.categorical_features) > 5 else ""})
-  • Temporal: {len(profile.datetime_features)}
-- Not features as they are (ids, free text): {", ".join(profile.id_columns + profile.text_columns) or "none"}
-- Data Quality:
-  • Missing values: {"Yes" if profile.has_missing else "No"}"""
-
-        if profile.has_missing:
-            missing_info = ", ".join(
-                [
-                    f"{k} ({v:.1f}%)"
-                    for k, v in list(profile.missing_percentages.items())[:3]
-                ]
+    y = df[target]
+    baseline = y.value_counts(normalize=True).iloc[0]
+    suspects = {}
+    for col, kind in feature_types.items():
+        if kind not in ("numeric", "categorical"):
+            continue
+        x = df[col]
+        if target_type == "regression":
+            if kind != "numeric":
+                continue
+            score = abs(x.corr(y))
+            suspect = score >= LEAKAGE_SCORE
+        else:
+            if kind == "numeric" and x.nunique() > 10:
+                x = pd.qcut(x, 10, duplicates="drop")
+            groups = x.astype(str)
+            hits = y.groupby(groups).agg(lambda s: s.value_counts().max()).sum()
+            score = hits / y.notna().sum()
+            suspect = (
+                baseline < 1 and (score - baseline) / (1 - baseline) >= LEAKAGE_SCORE
             )
-            summary += f"\n  • Missing in: {missing_info}"
+        if suspect:
+            suspects[col] = round(float(score), 3)
+    return suspects
 
-        summary += f"""
-  • Class imbalance: {"Yes" if profile.has_imbalance else "No"}
-"""
-        return summary
 
-    def _log_strategic_plan(self, strategic_plan: StrategicPlan):
-        """Log the strategic plan"""
-        self.logger.info("=" * 60)
-        self.logger.info("STRATEGIC PLAN")
-        self.logger.info("=" * 60)
-        self.logger.info(f"Strategies: {[s.value for s in strategic_plan.strategies]}")
-        self.logger.info(
-            f"Priority Order: {[s.value for s in strategic_plan.priority_order]}"
+def profile_summary(profile: DatasetProfile) -> str:
+    """The profile as text for the lead's prompts"""
+
+    def names(cols: list[str]) -> str:
+        return ", ".join(cols) or "none"
+
+    lines = [
+        f"- Size: {profile.n_rows:,} rows × {profile.n_cols} columns",
+        f"- Target: {profile.target_column or 'none detected'} ({profile.target_type})",
+        f"- Numeric features: {names(profile.numeric_features)}",
+        f"- Categorical features: {names(profile.categorical_features)}",
+        f"- Date/time features: {names(profile.datetime_features)}",
+        f"- Not features as they are (ids, free text): "
+        f"{names(profile.id_columns + profile.text_columns)}",
+    ]
+    if profile.class_shares:
+        shares = ", ".join(f"{k}: {v:.1%}" for k, v in profile.class_shares.items())
+        lines.append(
+            f"- Target classes: {shares}"
+            + (" (imbalanced)" if profile.has_imbalance else "")
         )
-        self.logger.info(f"Reasoning: {strategic_plan.reasoning}")
-        self.logger.info(f"Estimated Tasks: {strategic_plan.estimated_tasks}")
-        self.logger.info("=" * 60)
-
-
-def orchestrator_node(state: HierarchicalState) -> HierarchicalState:
-    """
-    Orchestrator node for graph integration
-
-    Creates and executes orchestrator agent.
-    """
-    agent = OrchestratorAgent()
-    return agent.execute(state)
+    missing = ", ".join(
+        f"{col} ({pct:.1f}%)" for col, pct in profile.missing_percentages.items()
+    )
+    lines.append(f"- Missing values: {missing or 'none'}")
+    if profile.leakage_suspects:
+        suspects = ", ".join(
+            f"{col} ({score})" for col, score in profile.leakage_suspects.items()
+        )
+        lines.append(
+            "- WARNING, possible target leakage: these columns alone predict the "
+            f"target almost perfectly: {suspects}"
+        )
+    return "\n".join(lines)

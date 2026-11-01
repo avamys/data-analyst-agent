@@ -52,9 +52,7 @@ def main() -> int:
             return 1
         print("OK: Ollama reachable, models pulled")
 
-    llm = LLMManager.get_llm("orchestrator").with_structured_output(
-        Answer, include_raw=True
-    )
+    llm = LLMManager.get_llm("lead").with_structured_output(Answer, include_raw=True)
     run_id = uuid4()
     start = time.time()
     out = llm.invoke(

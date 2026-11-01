@@ -25,7 +25,7 @@ class PromptTemplateManager:
         from agent.prompts.template_manager import prompt_templates
 
         prompt = prompt_templates.render(
-            "orchestrator/strategy_selection.jinja2",
+            "lead/plan.jinja2",
             profile_summary=profile_summary,
             dataset_info=dataset_info
         )
@@ -116,7 +116,7 @@ class PromptTemplateManager:
 
         Args:
             template_path: Path to template relative to agent/templates/
-                          e.g., "orchestrator/strategy_selection.jinja2"
+                          e.g., "lead/plan.jinja2"
             **context: Variables to pass to template
 
         Returns:

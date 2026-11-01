@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     max_specialist_steps: int = 5  # LLM steps per task (each runs a cell or finishes)
     max_cell_output_chars: int = 3000  # Output of a cell shown to the specialist
     max_tasks: int = 6  # Upper bound on planned tasks (keeps local runs tractable)
+    max_follow_ups: int = 2  # Tasks the lead may add during reviews
+    max_revisions: int = 1  # Times the lead may send one task back
     code_timeout_s: int = 300  # Per run of a task script
 
     # Paths
