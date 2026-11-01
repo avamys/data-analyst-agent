@@ -124,7 +124,7 @@ class PromptTemplateManager:
 
         Example:
             prompt = prompt_templates.render(
-                "specialists/eda_analysis.jinja2",
+                "specialists/step.jinja2",
                 task_description="Analyze correlations",
                 dataset_path="data/titanic.csv",
                 n_rows=891

@@ -3,8 +3,10 @@
 import logging
 from typing import Any
 
+from langchain_core.exceptions import OutputParserException
 from langchain_core.messages import HumanMessage
 from ollama import ResponseError
+from pydantic import ValidationError
 
 from agent.core.llm_manager import LLMManager
 from agent.states import HierarchicalState
@@ -66,10 +68,15 @@ class BaseAgent:
                 f"Configured structured output with schema: {output_schema.__name__}"
             )
 
-        # A crashed Ollama runner (HTTP 500) is restarted on the next request,
-        # so one retry keeps a long run alive
+        # A crashed Ollama runner (HTTP 500) is restarted on the next request, and
+        # a malformed structured response often parses on a second try
         self.llm = self.llm.with_retry(
-            retry_if_exception_type=(ResponseError,), stop_after_attempt=2
+            retry_if_exception_type=(
+                ResponseError,
+                OutputParserException,
+                ValidationError,
+            ),
+            stop_after_attempt=2,
         )
 
     def invoke(self, prompt: str, **kwargs) -> Any:

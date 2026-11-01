@@ -3,6 +3,7 @@
 import logging
 
 from agent.core.base_agent import BaseAgent
+from agent.core.specialists import format_task_report
 from agent.core.template_manager import prompt_templates
 from agent.states import HierarchicalState
 
@@ -45,13 +46,11 @@ def synthesizer_node(state: HierarchicalState) -> HierarchicalState:
     stat_summary = _summarize_results(stat_results, "Statistical Testing")
     ml_summary = _summarize_results(ml_results, "Machine Learning")
 
-    # Collect all insights
-    all_insights = []
-    for result in completed_tasks:
-        all_insights.extend(result.insights)
-
-    # Build prompt
-    insights_text = "\n".join([f"• {insight}" for insight in all_insights[:20]])
+    findings_text = "\n".join(
+        f"• [{r.task_id}] {f.statement}"
+        for r in completed_tasks
+        for f in r.report.findings
+    )
     prompt = prompt_templates.render(
         "synthesizer/synthesis.jinja2",
         n_eda=len(eda_results),
@@ -61,7 +60,7 @@ def synthesizer_node(state: HierarchicalState) -> HierarchicalState:
         eda_summary=eda_summary,
         stat_summary=stat_summary,
         ml_summary=ml_summary,
-        all_insights=insights_text,
+        all_findings=findings_text,
     )
 
     # Use BaseAgent directly - no need for subclass
@@ -81,28 +80,8 @@ def synthesizer_node(state: HierarchicalState) -> HierarchicalState:
 
 
 def _summarize_results(results: list, category: str) -> str:
-    """Summarize results from a category of tasks"""
+    """Task reports (findings and full fact tables) of one category of tasks"""
     if not results:
         return f"\n{category.upper()}: No tasks completed\n"
-
-    summary = f"\n{category.upper()} ({len(results)} tasks):\n"
-
-    for result in results:
-        summary += f"\n[{result.task_id}] {result.description}\n"
-        if result.success:
-            # Include output snippet
-            output_lines = result.output.split("\n")
-            key_lines = [
-                line
-                for line in output_lines
-                if line.strip() and not line.startswith("#")
-            ][:10]
-            summary += "\n".join(key_lines[:5]) + "\n"
-
-            # Include insights
-            if result.insights:
-                summary += f"Key insights: {'; '.join(result.insights[:2])}\n"
-        else:
-            summary += f"ERROR: {result.error}\n"
-
-    return summary
+    reports = "\n\n".join(format_task_report(r) for r in results)
+    return f"\n{category.upper()} ({len(results)} tasks):\n\n{reports}\n"

@@ -3,6 +3,7 @@
 import logging
 
 from agent.core.base_agent import BaseAgent
+from agent.core.specialists import format_task_report
 from agent.core.template_manager import prompt_templates
 from agent.states import HierarchicalState
 
@@ -52,7 +53,7 @@ def hierarchical_reporter_node(state: HierarchicalState) -> HierarchicalState:
         reasoning=strategic_plan.reasoning,
         execution_summary=execution_summary,
         synthesis=synthesis,
-        detailed_findings=detailed_findings[:3000],
+        detailed_findings=detailed_findings,
         n_ml=len([t for t in completed_tasks if t.specialist == "ml"]),
     )
 
@@ -98,34 +99,11 @@ Total Execution Time: {total_time:.1f} seconds
 
 
 def _format_detailed_findings(completed_tasks: list) -> str:
-    """Format detailed findings for inclusion in report"""
+    """Task reports grouped by specialist, with complete fact tables"""
     findings = ""
-
-    # Group by specialist
     for specialist in ["eda", "statistical", "ml"]:
         tasks = [t for t in completed_tasks if t.specialist == specialist]
-        if not tasks:
-            continue
-
-        findings += f"\n### {specialist.upper()} Findings\n\n"
-
-        for task in tasks:
-            findings += f"**{task.description}**\n\n"
-
-            # Include key output lines
-            output_lines = task.output.split("\n")
-            key_lines = [
-                line
-                for line in output_lines
-                if line.strip() and not line.startswith("#")
-            ]
-            findings += "\n".join(key_lines[:15]) + "\n\n"
-
-            # Include insights
-            if task.insights:
-                findings += "Key Insights:\n"
-                for insight in task.insights:
-                    findings += f"- {insight}\n"
-                findings += "\n"
-
+        if tasks:
+            reports = "\n\n".join(format_task_report(t) for t in tasks)
+            findings += f"\n### {specialist.upper()} Findings\n\n{reports}\n"
     return findings

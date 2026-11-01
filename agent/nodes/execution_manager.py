@@ -43,8 +43,7 @@ def create_specialist_node(task: SubTask) -> Callable:
         if result.success:
             state.completed_tasks.append(result)
             logger.info(f"✓ Task {task.id} completed successfully")
-            if result.insights:
-                logger.info(f"  Insights: {len(result.insights)} found")
+            logger.info(f"  Findings: {len(result.report.findings)}")
         else:
             state.failed_tasks.append(result)
             logger.error(f"✗ Task {task.id} failed: {result.error}")

@@ -66,6 +66,40 @@ class AnalysisPlan(BaseModel):
     execution_order: list[str]  # Task IDs in order
 
 
+class Finding(BaseModel):
+    """One conclusion from a task, backed by recorded facts"""
+
+    statement: str = Field(description="One conclusion, stated with its numbers")
+    facts: list[str] = Field(
+        default_factory=list,
+        description="Names of the recorded facts that support the statement",
+    )
+
+
+class TaskReport(BaseModel):
+    """What a specialist hands back when it finishes a task"""
+
+    status: Literal["answered", "partial", "failed"] = Field(
+        description="answered: the task is done; partial: only part of it; failed: no usable result"
+    )
+    findings: list[Finding] = Field(default_factory=list)
+    follow_ups: list[str] = Field(
+        default_factory=list,
+        description="Questions worth a separate task, raised by the results",
+    )
+
+
+class SpecialistStep(BaseModel):
+    """One step of a specialist: run a new cell, or finish with a report"""
+
+    reasoning: str = Field(
+        description="Briefly: what the latest result shows and what to do next"
+    )
+    action: Literal["run", "finish"]
+    code: str = Field(default="", description="Python code for one new cell (run)")
+    report: TaskReport | None = Field(default=None, description="The report (finish)")
+
+
 class TaskResult(BaseModel):
     """Result from executing a single task"""
 
@@ -77,9 +111,11 @@ class TaskResult(BaseModel):
     execution_time: float = 0.0
     success: bool = True
     error: str | None = None
-    insights: list[str] = Field(default_factory=list)
+    report: TaskReport | None = None
+    facts: dict[str, Any] = Field(default_factory=dict)  # facts.json of the task
+    charts: dict[str, Any] = Field(default_factory=dict)  # charts.json of the task
     artifacts: list[str] = Field(default_factory=list)  # File paths
-    # Every execution attempt: attempt, code, output, error, seconds
+    # Every run of a new cell: attempt (step), code, output, error, seconds
     attempts: list[dict[str, Any]] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 

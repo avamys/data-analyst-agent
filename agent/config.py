@@ -35,7 +35,8 @@ class Settings(BaseSettings):
     reporter_temperature: float = 0.3
 
     # Workflow control
-    max_code_retries: int = 2  # Retries per task after a failed execution
+    max_specialist_steps: int = 5  # LLM steps per task (each runs a cell or finishes)
+    max_cell_output_chars: int = 3000  # Output of a cell shown to the specialist
     max_tasks: int = 6  # Upper bound on planned tasks (keeps local runs tractable)
     code_timeout_s: int = 300  # Per run of a task script
 

@@ -1,15 +1,21 @@
-"""Specialist Agents - Domain experts for different analysis types"""
+"""Specialist agents: work a task as a loop of cells, then report findings"""
 
+import json
 import logging
-import re
 from pathlib import Path
 
 from agent.config import settings
 from agent.core.base_agent import BaseAgent
 from agent.core.template_manager import prompt_templates
 from agent.execution.cells import join_cells
-from agent.execution.runner import SCRIPT, prepare_task_dir, run_script
-from agent.states import HierarchicalState, SubTask, TaskResult
+from agent.execution.runner import SCRIPT, ScriptResult, prepare_task_dir, run_script
+from agent.states import (
+    HierarchicalState,
+    SpecialistStep,
+    SubTask,
+    TaskReport,
+    TaskResult,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +23,12 @@ logger = logging.getLogger(__name__)
 SETUP_CELL = (
     "from agent.execution.runtime import df, load, publish, record_fact, save_chart"
 )
+
+ROLES = {
+    "eda": "exploratory data analysis specialist",
+    "statistical": "statistician (hypothesis tests, effect sizes, confidence intervals)",
+    "ml": "machine learning specialist (scikit-learn)",
+}
 
 
 def clean_code(code: str) -> str:
@@ -28,432 +40,219 @@ def clean_code(code: str) -> str:
     return code
 
 
-class CodeExecutor:
-    """Runs generated code as a cell script (setup cell + code) in the task directory"""
-
-    def __init__(self, task_dir: Path):
-        self.task_dir = task_dir
-        self.logger = logging.getLogger(__name__ + ".CodeExecutor")
-
-    def execute(self, code: str, task_id: str) -> tuple[bool, str, str | None, float]:
-        """
-        Execute Python code and return (success, output, error, execution_time)
-
-        The error is the failing cell's traceback.
-        """
-        code = clean_code(code)
-        self.logger.info(f"Executing code for {task_id}:\n{code[:300]}...")
-
-        (self.task_dir / SCRIPT).write_text(join_cells([SETUP_CELL, code]))
-        result = run_script(self.task_dir, timeout=settings.code_timeout_s)
-        output = "".join(cell.output for cell in result.cells)
-        self.logger.debug(f"Code for {task_id}:\n{code}\nOutput:\n{output}")
-
-        if not result.ok:
-            error = result.cells[result.failed_cell].error
-            self.logger.error(
-                f"✗ Code execution failed: {error.strip().splitlines()[-1]}"
-            )
-            return False, output, error, result.seconds
-
-        self.logger.info(f"✓ Code executed successfully in {result.seconds:.2f}s")
-        return True, output, None, result.seconds
+def format_facts(facts: dict, task_id: str | None = None) -> str:
+    """One line per fact: name = value  # description (values capped at 200 chars)"""
+    prefix = f"{task_id}." if task_id else ""
+    lines = []
+    for name, fact in facts.items():
+        value = json.dumps(fact["value"])
+        value = value if len(value) <= 200 else value[:200] + "…"
+        lines.append(f"- {prefix}{name} = {value}  # {fact['desc']}")
+    return "\n".join(lines) or "(none)"
 
 
-class InsightExtractor:
+def format_task_report(result: TaskResult) -> str:
+    """A task's report with its full fact table, for the lead, synthesizer and reporter"""
+    report = result.report or TaskReport(status="failed")
+    lines = [f"[{result.task_id}] {result.description} (status: {report.status})"]
+    lines.append("Findings:")
+    lines += [f"- {f.statement} [facts: {', '.join(f.facts)}]" for f in report.findings]
+    lines.append("Facts:")
+    lines.append(format_facts(result.facts, result.task_id))
+    if result.charts:
+        lines.append("Charts:")
+        lines += [f"- {name}: {c['caption']}" for name, c in result.charts.items()]
+    if report.follow_ups:
+        lines.append("Suggested follow-ups:")
+        lines += [f"- {q}" for q in report.follow_ups]
+    return "\n".join(lines)
+
+
+class SpecialistAgent(BaseAgent):
     """
-    Extracts key insights from code execution output
+    Works one task as a loop: write a cell, run the whole script, read the result
 
-    Responsibilities:
-    - Parse output text for insights using regex patterns
-    - Filter and rank insights by quality
-    - Return structured insight list
+    Each step the model either runs one new cell (replacing the last cell if it
+    failed) or finishes with a report whose findings cite recorded facts. When
+    the step budget runs out it must finish with what it has.
     """
 
-    def __init__(self):
-        self.logger = logging.getLogger(__name__ + ".InsightExtractor")
-
-    def extract(self, output: str) -> list:
-        """
-        Extract key insights from code output
-
-        Args:
-            output: String output from code execution
-
-        Returns:
-            List of insight strings (max 5)
-        """
-        insights = []
-
-        # Look for lines with key findings patterns
-        patterns = [
-            r"(Key finding|Insight|Conclusion|Result|Finding):\s*(.+)",
-            r"(shows?|indicates?|suggests?|reveals?)\s+(.+)",
-        ]
-
-        for pattern in patterns:
-            matches = re.findall(pattern, output, re.IGNORECASE)
-            for match in matches:
-                insight = match[1] if len(match) > 1 else match[0]
-                if len(insight) > 10:  # Filter out too short
-                    insights.append(insight.strip())
-
-        # Also extract any lines starting with "- " (bullet points)
-        bullet_insights = re.findall(r"^-\s+(.+)$", output, re.MULTILINE)
-        insights.extend([b.strip() for b in bullet_insights if len(b) > 15])
-
-        return insights[:5]  # Top 5 insights
-
-
-class CodeGenerator:
-    """
-    Generates Python code using LLM
-
-    Responsibilities:
-    - Build prompts for different specialist types
-    - Get previous findings from dependencies
-    - Build error feedback prompts for retries
-    - Invoke LLM to generate code
-    """
-
-    def __init__(self, specialist_type: str, llm):
+    def __init__(self, specialist_type: str, **kwargs):
+        super().__init__(
+            agent_type=specialist_type,
+            use_structured_output=True,
+            output_schema=SpecialistStep,
+            **kwargs,
+        )
         self.specialist_type = specialist_type
-        self.llm = llm
-        self.logger = logging.getLogger(__name__ + ".CodeGenerator")
-
-    def generate(self, task: SubTask, state: HierarchicalState) -> str:
-        """
-        Generate code for a task
-
-        Args:
-            task: Task to generate code for
-            state: Current state with context
-
-        Returns:
-            Generated Python code as string
-        """
-        prompt = self._build_prompt(task, state)
-        response = self.llm.invoke(prompt)
-        code = (
-            response.content.strip() if hasattr(response, "content") else str(response)
+        self.finisher = BaseAgent(
+            agent_type=specialist_type,
+            use_structured_output=True,
+            output_schema=TaskReport,
         )
-        return code
-
-    def generate_with_error_feedback(
-        self,
-        task: SubTask,
-        state: HierarchicalState,
-        failed_code: str,
-        error_message: str,
-        attempt: int,
-        max_retries: int,
-    ) -> str:
-        """
-        Generate corrected code based on error feedback
-
-        Args:
-            task: Original task
-            state: Current state
-            failed_code: Code that failed to execute
-            error_message: Error message from execution
-            attempt: Current attempt number
-            max_retries: Maximum retry attempts
-
-        Returns:
-            Corrected Python code as string
-        """
-        original_prompt = self._build_prompt(task, state)
-        feedback_prompt = self._build_error_feedback_prompt(
-            original_prompt=original_prompt,
-            failed_code=failed_code,
-            error_message=error_message,
-            attempt=attempt,
-            max_retries=max_retries,
-        )
-        response = self.llm.invoke(feedback_prompt)
-        code = (
-            response.content.strip() if hasattr(response, "content") else str(response)
-        )
-        return code
-
-    def _build_prompt(self, task: SubTask, state: HierarchicalState) -> str:
-        """Build prompt based on specialist type"""
-        previous_findings = self._get_previous_findings(task, state)
-
-        if self.specialist_type == "eda":
-            return prompt_templates.render(
-                "specialists/eda_analysis.jinja2",
-                task_description=task.description,
-                dataset_path=state.dataset_path,
-                n_rows=state.dataset_profile.n_rows,
-                n_cols=state.dataset_profile.n_cols,
-                columns=", ".join(state.dataset_profile.feature_types.keys()),
-                target_column=state.dataset_profile.target_column or "None",
-                previous_findings=previous_findings,
-            )
-        elif self.specialist_type == "statistical":
-            return prompt_templates.render(
-                "specialists/statistical_analysis.jinja2",
-                task_description=task.description,
-                dataset_path=state.dataset_path,
-                n_rows=state.dataset_profile.n_rows,
-                numeric_features=", ".join(state.dataset_profile.numeric_features),
-                categorical_features=", ".join(
-                    state.dataset_profile.categorical_features
-                ),
-                target_column=state.dataset_profile.target_column,
-                target_type=state.dataset_profile.target_type,
-                previous_findings=previous_findings,
-            )
-        elif self.specialist_type == "ml":
-            return prompt_templates.render(
-                "specialists/ml_analysis.jinja2",
-                task_description=task.description,
-                dataset_path=state.dataset_path,
-                n_rows=state.dataset_profile.n_rows,
-                target_column=state.dataset_profile.target_column,
-                target_type=state.dataset_profile.target_type,
-                n_numeric=len(state.dataset_profile.numeric_features),
-                n_categorical=len(state.dataset_profile.categorical_features),
-                has_imbalance=state.dataset_profile.has_imbalance,
-                previous_findings=previous_findings,
-            )
-        else:
-            raise ValueError(f"Unknown specialist type: {self.specialist_type}")
-
-    def _get_previous_findings(self, task: SubTask, state: HierarchicalState) -> str:
-        """Get findings from dependent tasks"""
-        if not task.dependencies:
-            return "No previous findings (this is a starting task)."
-
-        findings = []
-        for dep_id in task.dependencies:
-            dep_result = next(
-                (r for r in state.completed_tasks if r.task_id == dep_id), None
-            )
-            if dep_result and dep_result.success:
-                findings.append(f"\n[From {dep_id}]:\n{dep_result.output[:500]}...")
-
-        return (
-            "\n".join(findings)
-            if findings
-            else "Dependencies completed but no detailed output available."
-        )
-
-    def _build_error_feedback_prompt(
-        self,
-        original_prompt: str,
-        failed_code: str,
-        error_message: str,
-        attempt: int,
-        max_retries: int,
-    ) -> str:
-        """
-        Build a feedback prompt when code execution fails
-
-        Args:
-            original_prompt: The original task prompt
-            failed_code: The code that failed to execute
-            error_message: The error message from execution
-            attempt: Current attempt number
-            max_retries: Maximum retry attempts
-
-        Returns:
-            Enhanced prompt with error feedback
-        """
-        feedback_prompt = f"""
-{original_prompt}
-
-EXECUTION ERROR - ATTEMPT {attempt}/{max_retries + 1}
-
-Your previous code attempt failed with the following error:
-
-```python
-{failed_code}
-```
-
-ERROR MESSAGE:
-{error_message}
-
-Please analyze the error and provide a corrected version of the code that:
-1. Fixes the specific error mentioned above
-2. Handles potential edge cases that might cause similar errors
-3. Still accomplishes the original task requirements
-
-IMPORTANT: Respond with ONLY the corrected Python code, nothing else.
-"""
-        return feedback_prompt
-
-
-class CodeExecutionAgent(BaseAgent):
-    """
-    Unified code execution agent for all specialist types
-
-    Orchestrates three specialized components:
-    - CodeGenerator: Handles LLM interaction and prompt building
-    - CodeExecutor: Executes Python code and detects errors
-    - InsightExtractor: Extracts insights from output
-
-    Responsibilities:
-    - Coordinate the workflow (generate → execute → extract)
-    - Handle retry logic when execution fails
-    - Compose results into TaskResult
-    """
-
-    def __init__(self, specialist_type: str, max_retries: int | None = None, **kwargs):
-        """
-        Initialize code execution agent
-
-        Args:
-            specialist_type: One of "eda", "statistical", "ml"
-            max_retries: Retries if code execution fails (default: settings.max_code_retries)
-            **kwargs: Additional config passed to BaseAgent
-        """
-        super().__init__(agent_type=specialist_type, **kwargs)
-        self.specialist_type = specialist_type
-        self.max_retries = (
-            settings.max_code_retries if max_retries is None else max_retries
-        )
-
-        # Compose specialized components
-        self.code_generator = CodeGenerator(specialist_type, self.llm)
-        self.insight_extractor = InsightExtractor()
 
     def execute(self, task: SubTask, state: HierarchicalState) -> TaskResult:
-        """
-        Execute code generation and execution task with retry mechanism
-
-        Workflow:
-        1. Generate code using CodeGenerator
-        2. Execute code using CodeExecutor
-        3. Extract insights using InsightExtractor
-        4. Retry with error feedback if execution fails
-
-        Args:
-            task: Task to execute
-            state: Current hierarchical state
-
-        Returns:
-            TaskResult with code, output, and insights
-        """
-        # Retry loop with feedback
-        attempt = 0
-        last_code = None
-        last_error = None
-        total_exec_time = 0.0
-        attempts = []
-        task_dir = Path(state.run_dir) / "tasks" / task.id
-        executor = CodeExecutor(
-            prepare_task_dir(task_dir, state.dataset_path, state.run_dir, task.id)
+        task_dir = prepare_task_dir(
+            Path(state.run_dir) / "tasks" / task.id,
+            state.dataset_path,
+            state.run_dir,
+            task.id,
         )
+        cells = [SETUP_CELL]
+        last: ScriptResult | None = None
+        observation = "Nothing has run yet."
+        attempts = []
+        max_steps = settings.max_specialist_steps
 
-        while attempt <= self.max_retries:
-            attempt += 1
-
-            # Generate code (with error feedback if retry)
-            if last_error:
-                self.logger.info(
-                    f"Retry attempt {attempt}/{self.max_retries + 1} for {task.id}"
-                )
-                code = self.code_generator.generate_with_error_feedback(
-                    task=task,
-                    state=state,
-                    failed_code=last_code,
-                    error_message=last_error,
-                    attempt=attempt,
-                    max_retries=self.max_retries,
-                )
-            else:
-                code = self.code_generator.generate(task, state)
-
-            # Execute code
-            success, output, error, exec_time = executor.execute(code, task.id)
-            total_exec_time += exec_time
-            attempts.append(
-                {
-                    "attempt": attempt,
-                    "code": clean_code(code),
-                    "output": output,
-                    "error": error,
-                    "seconds": round(exec_time, 2),
-                }
+        for step in range(1, max_steps + 1):
+            prompt = self._prompt(task, state, cells, observation, task_dir, step)
+            decision: SpecialistStep = self.invoke(prompt)
+            self.logger.info(
+                f"{task.id} step {step}: {decision.action}: {decision.reasoning}"
             )
 
-            # If successful, extract insights and return
-            if success:
-                insights = self.insight_extractor.extract(output)
-                retry_info = f" (succeeded on attempt {attempt})" if attempt > 1 else ""
-                self.logger.info(f"✓ Task {task.id} completed successfully{retry_info}")
-
-                return TaskResult(
-                    task_id=task.id,
-                    specialist=self.specialist_type,
-                    description=task.description,
-                    code=code,
-                    output=output,
-                    execution_time=total_exec_time,
-                    success=True,
-                    error=None,
-                    insights=insights,
-                    attempts=attempts,
-                    metadata={
-                        "strategy": task.strategy.value,
-                        "attempts": attempt,
-                        "retries": attempt - 1,
-                    },
+            if decision.action == "finish":
+                if decision.report is None:
+                    observation = (
+                        "You chose finish but gave no report. Include the report."
+                    )
+                    continue
+                unknown = self._unknown_citations(decision.report, task_dir)
+                if unknown and step < max_steps:
+                    observation = (
+                        f"Your report cites facts that were never recorded: {unknown}. "
+                        "Record them with record_fact in a new cell, or cite recorded facts."
+                    )
+                    continue
+                return self._result(
+                    task, decision.report, cells, last, attempts, task_dir
                 )
 
-            # If failed, prepare for retry
-            last_code = code
-            last_error = error
+            code = clean_code(decision.code.strip())
+            if not code:
+                observation = "You chose run but gave no code. Write one cell."
+                continue
+            if last is not None and not last.ok:
+                cells[-1] = code  # Replace the cell that failed
+            else:
+                cells.append(code)
 
-            if attempt > self.max_retries:
-                self.logger.error(f"✗ Task {task.id} failed after {attempt} attempts")
-                break
+            (task_dir / SCRIPT).write_text(join_cells(cells))
+            last = run_script(task_dir, timeout=settings.code_timeout_s)
+            cell = last.cells[-1]
+            attempts.append(
+                {
+                    "attempt": step,
+                    "code": code,
+                    "output": cell.output,
+                    "error": cell.error,
+                    "seconds": last.seconds,
+                }
+            )
+            self.logger.debug(
+                f"{task.id} cell {len(cells) - 1}:\n{code}\nOutput:\n{cell.output}"
+                + (f"\nError:\n{cell.error}" if cell.error else "")
+            )
+            observation = self._observe(last, len(cells) - 1)
 
-        # All retries exhausted, return failure
+        # Budget spent without finishing: report what was found
+        self.logger.warning(f"{task.id}: step budget spent, asking for a final report")
+        prompt = self._prompt(
+            task, state, cells, observation, task_dir, max_steps, must_finish=True
+        )
+        report: TaskReport = self.finisher.invoke(prompt)
+        if report.status == "answered":
+            report.status = "partial"
+        return self._result(task, report, cells, last, attempts, task_dir)
+
+    def _prompt(
+        self, task, state, cells, observation, task_dir, step, must_finish=False
+    ):
+        profile = state.dataset_profile
+        return prompt_templates.render(
+            "specialists/step.jinja2",
+            role=ROLES[self.specialist_type],
+            task_id=task.id,
+            task_description=task.description,
+            n_rows=profile.n_rows,
+            n_cols=profile.n_cols,
+            columns=", ".join(profile.feature_types),
+            target_column=profile.target_column,
+            target_type=profile.target_type,
+            previous_findings=self._previous_findings(task, state),
+            script=join_cells(cells),
+            observation=observation,
+            facts=format_facts(_read_json(task_dir / "facts.json")),
+            charts="\n".join(
+                f"- {name}: {c['caption']}"
+                for name, c in _read_json(task_dir / "charts.json").items()
+            )
+            or "(none)",
+            step=step,
+            max_steps=settings.max_specialist_steps,
+            must_finish=must_finish,
+        )
+
+    @staticmethod
+    def _observe(result: ScriptResult, index: int) -> str:
+        limit = settings.max_cell_output_chars
+        cell = result.cells[-1]
+        if cell.error:
+            return f"Cell {index} failed (your next cell replaces it):\n{cell.error[-limit:]}"
+        output = cell.output or "(no output)"
+        if len(output) > limit:
+            output = output[:limit] + f"\n… ({len(output) - limit} more characters cut)"
+        return f"Cell {index} output:\n{output}"
+
+    @staticmethod
+    def _previous_findings(task: SubTask, state: HierarchicalState) -> str:
+        results = {r.task_id: r for r in state.completed_tasks}
+        return "\n\n".join(
+            format_task_report(results[dep])
+            for dep in task.dependencies
+            if dep in results
+        )
+
+    @staticmethod
+    def _unknown_citations(report: TaskReport, task_dir: Path) -> list[str]:
+        recorded = _read_json(task_dir / "facts.json")
+        cited = {name for finding in report.findings for name in finding.facts}
+        return sorted(cited - set(recorded))
+
+    def _result(self, task, report, cells, last, attempts, task_dir) -> TaskResult:
+        facts = _read_json(task_dir / "facts.json")
+        # Citations that still don't resolve (last step) are dropped
+        for finding in report.findings:
+            finding.facts = [name for name in finding.facts if name in facts]
+        self.logger.info(
+            f"{task.id} finished ({report.status}): {len(report.findings)} findings, "
+            f"{len(facts)} facts, {len(attempts)} cells run"
+        )
         return TaskResult(
             task_id=task.id,
             specialist=self.specialist_type,
             description=task.description,
-            code=last_code,
-            output=output,
-            execution_time=total_exec_time,
-            success=False,
-            error=last_error,
-            insights=[],
+            code=join_cells(cells),
+            output="".join(c.output for c in last.cells) if last else "",
+            execution_time=sum(a["seconds"] for a in attempts),
+            success=report.status != "failed",
+            error=None if report.status != "failed" else "Specialist reported failure",
+            report=report,
+            facts=facts,
+            charts=_read_json(task_dir / "charts.json"),
             attempts=attempts,
-            metadata={
-                "strategy": task.strategy.value,
-                "attempts": attempt,
-                "retries": attempt - 1,
-                "exhausted_retries": True,
-            },
+            metadata={"strategy": task.strategy.value, "steps": len(attempts)},
         )
 
 
-# Factory function - simple and clean
-def get_specialist(
-    specialist_type: str, max_retries: int | None = None
-) -> CodeExecutionAgent:
-    """
-    Get specialist instance by type
+def _read_json(path: Path) -> dict:
+    return json.loads(path.read_text()) if path.exists() else {}
 
-    Args:
-        specialist_type: One of "eda", "statistical", "ml"
-        max_retries: Retries if code execution fails (default: settings.max_code_retries)
 
-    Returns:
-        CodeExecutionAgent configured for that specialist type
-
-    Example:
-        >>> eda_specialist = get_specialist("eda")
-        >>> stat_specialist = get_specialist("statistical", max_retries=3)
-    """
-    if specialist_type not in ["eda", "statistical", "ml"]:
+def get_specialist(specialist_type: str) -> SpecialistAgent:
+    """Get a specialist by type: one of "eda", "statistical", "ml" """
+    if specialist_type not in ROLES:
         raise ValueError(
-            f"Unknown specialist type: {specialist_type}. "
-            f"Must be one of: eda, statistical, ml"
+            f"Unknown specialist type: {specialist_type}. Must be one of: {', '.join(ROLES)}"
         )
-
-    return CodeExecutionAgent(specialist_type=specialist_type, max_retries=max_retries)
+    return SpecialistAgent(specialist_type=specialist_type)
