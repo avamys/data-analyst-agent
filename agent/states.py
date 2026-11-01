@@ -91,6 +91,7 @@ class HierarchicalState(BaseModel):
     dataset_info: str
     dataset_path: str
     target_column: str | None = None  # Detected from column names when None
+    run_dir: str  # Task scripts and their outputs live under <run_dir>/tasks/
 
     # Phase tracking
     current_phase: Literal[

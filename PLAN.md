@@ -3,7 +3,7 @@
 > **This is the main plan for the project.** It replaces `todo.md`; everything still useful from there is folded in below (see [Appendix: todo.md mapping](#appendix-todomd-mapping)).
 > Update the checkboxes and the **Status** block as work lands. Record decisions in the [Decision log](#decision-log).
 
-**Status:** Phase 0 nearly done (P0.11 wrap-up left; push blocked on GitHub auth). Next: Phase 1, starting with P1.1 cell-script runner · **Last updated:** 2026-10-31
+**Status:** Phase 0 done (PR `phase-0` → `main` to open on GitHub). Phase 1 in progress on `phase-1`: P1.1 done, next P1.2 specialist loop · **Last updated:** 2026-11-01
 
 ---
 
@@ -84,7 +84,8 @@ Each task is a plain Python file, `runs/<run>/tasks/<task_id>/analysis.py`, spli
 
 ### Runtime helpers (available in every cell script)
 ```python
-from analyst_runtime import df, record_fact, save_chart, publish, load
+# Setup cell, written by the runner (agent/execution/runtime.py)
+from agent.execution.runtime import df, load, publish, record_fact, save_chart
 
 rate = df["Survived"].mean()
 record_fact("survival_rate", rate, desc="Share of passengers who survived")
@@ -92,7 +93,7 @@ save_chart(fig, "survival_by_class", caption="Survival rate by passenger class")
 publish("train_test", (X_train, X_test, y_train, y_test))   # for later tasks
 X_train, X_test, y_train, y_test = load("ml_1/train_test")  # in a later task
 ```
-Facts are namespaced by task (`eda_1.survival_rate`) and stored in the run directory with value, description, and the cell that produced them.
+Facts are stored per task in `tasks/<task_id>/facts.json` (so cited as `eda_1.survival_rate`) with value, description, and the cell that produced them; charts in `charts.json` + `charts/`; published outputs in `workspace/<task_id>/`. Each task directory has a `.analyst.json` (data path, run dir, task ID), so `python analysis.py` also runs there by hand.
 
 ### Budgets (settings)
 Max steps per task, max revisions per task, max tasks including follow-ups, and max output characters shown per cell. They keep local runs bounded (~45–60 min accepted for now) and the 8k context safe.
@@ -318,10 +319,11 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 #### Steps (in this order)
 
 **P1.1 Cell-script runner** (M)
-- [ ] `agent/execution/`: read/write `# %%` cell files; run the whole file in a fresh subprocess (task directory as working dir, timeout); capture stdout, stderr, and the exception per cell.
-- [ ] `analyst_runtime`: `df`, `record_fact`, `save_chart` (non-interactive backend), `publish` / `load`.
-- [ ] Replaces `PythonREPLTool`; drop `langchain_experimental`.
-- [ ] Tests: cell round-trip; a failing cell is reported by index with its traceback; timeout kills the run; facts, charts, and published outputs land on disk; output that mentions "Error:" is not a failure.
+- [x] `agent/execution/`: read/write `# %%` cell files; run the whole file in a fresh subprocess (task directory as working dir, timeout); capture stdout, stderr, and the exception per cell.
+- [x] `agent/execution/runtime.py`: `df`, `record_fact`, `save_chart` (non-interactive backend), `publish` / `load`.
+- [x] Replaces `PythonREPLTool`; drop `langchain_experimental`.
+- [x] Tests: cell round-trip; a failing cell is reported by index with its traceback; timeout kills the run; facts, charts, and published outputs land on disk; output that mentions "Error:" is not a failure.
+- [x] Verified 2026-11-01: 1-task run through the full flow (11 min, task ok first attempt); the saved `analysis.py` re-run by hand gives identical output.
 
 **P1.2 Specialist loop** (M–L)
 - [ ] Each step returns structured output: short reasoning plus either `run` (one new cell) or `finish` (task report).
@@ -424,7 +426,7 @@ agent/                # package (rename TBD, see open decisions)
   profiling.py        # deterministic profiler + target detection
   lead.py             # lead analyst: plan, review, report
   specialist.py       # specialist loop
-  execution/          # cell-script runner, analyst_runtime, run store
+  execution/          # cell files, runner + driver, runtime helpers
   reporting/          # writer, verifier, sanity rules, renderer
   graph.py            # LangGraph wiring
   llm.py              # provider/model config

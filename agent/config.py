@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     # Workflow control
     max_code_retries: int = 2  # Retries per task after a failed execution
     max_tasks: int = 6  # Upper bound on planned tasks (keeps local runs tractable)
+    code_timeout_s: int = 300  # Per run of a task script
 
     # Paths
     runs_directory: str = "runs"  # One subdirectory per run (see agent/run_store.py)

@@ -1,5 +1,6 @@
 from agent.config import settings
 from agent.core.specialists import CodeExecutor, get_specialist
+from agent.execution.runner import prepare_task_dir
 from agent.nodes.reporter import build_execution_summary
 from agent.states import TaskResult
 
@@ -35,32 +36,18 @@ def test_retries_default_to_setting():
     assert get_specialist("eda").max_retries == settings.max_code_retries
 
 
-class TestErrorDetection:
-    # B5: normal output mentioning "Error:" used to be flagged as a failure
-    executor = CodeExecutor.__new__(CodeExecutor)
+def test_code_executor_runs_code_in_the_task_dir(tmp_path, small_csv):
+    # B5: output mentioning "Error:" is not a failure; failures carry the traceback
+    task_dir = prepare_task_dir(tmp_path / "tasks" / "t1", small_csv, tmp_path, "t1")
+    executor = CodeExecutor(task_dir)
 
-    def test_metric_names_are_not_errors(self):
-        assert not self.executor._has_execution_error(
-            "Mean Squared Error: 0.12\nRMSE: 0.35"
-        )
-        assert not self.executor._has_execution_error("ModelError: none, all fine")
+    ok, output, _, _ = executor.execute(
+        "```python\nprint('Mean Squared Error: 0.1')\n```", "t1"
+    )
+    assert ok
+    assert output == "Mean Squared Error: 0.1\n"
+    assert "print('Mean Squared Error: 0.1')" in (task_dir / "analysis.py").read_text()
 
-    def test_repl_exception_repr_is_error(self):
-        # PythonREPLTool returns repr(exception) when the code raises
-        assert self.executor._has_execution_error("ValueError('cannot convert')")
-        assert self.executor._has_execution_error("KeyError('Age')\n")
-
-    def test_traceback_is_error(self):
-        assert self.executor._has_execution_error(
-            'Traceback (most recent call last):\n  File "x.py", line 1\nNameError: x'
-        )
-
-    def test_real_execution(self):
-        executor = CodeExecutor()
-        ok, _, _, _ = executor.execute("print('Mean Squared Error: 0.1')", "t1")
-        assert ok
-        ok, _, error, _ = executor.execute(
-            "import pandas as pd\npd.Series([1])['x']", "t2"
-        )
-        assert not ok
-        assert "KeyError" in error
+    ok, _, error, _ = executor.execute("print(len(df))\ndf['missing']", "t1")
+    assert not ok
+    assert "KeyError: 'missing'" in error

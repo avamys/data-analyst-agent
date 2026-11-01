@@ -2,114 +2,62 @@
 
 import logging
 import re
-import time
-
-from langchain_experimental.tools import PythonREPLTool
+from pathlib import Path
 
 from agent.config import settings
 from agent.core.base_agent import BaseAgent
 from agent.core.template_manager import prompt_templates
+from agent.execution.cells import join_cells
+from agent.execution.runner import SCRIPT, prepare_task_dir, run_script
 from agent.states import HierarchicalState, SubTask, TaskResult
 
 logger = logging.getLogger(__name__)
 
-# repr() of an exception, e.g. "KeyError('Age')" or "ValueError('x', 2)"
-_EXCEPTION_REPR = re.compile(
-    r"[A-Za-z_][\w.]*(Error|Exception|Exit|Interrupt|Iteration)\(.*\)", re.DOTALL
+# First cell of every task script
+SETUP_CELL = (
+    "from agent.execution.runtime import df, load, publish, record_fact, save_chart"
 )
 
 
+def clean_code(code: str) -> str:
+    """Remove markdown code fences from generated code"""
+    if code.startswith("```python"):
+        code = code.split("```python")[1].split("```")[0].strip()
+    elif code.startswith("```"):
+        code = code.split("```")[1].split("```")[0].strip()
+    return code
+
+
 class CodeExecutor:
-    """
-    Handles Python code execution and error detection
+    """Runs generated code as a cell script (setup cell + code) in the task directory"""
 
-    Responsibilities:
-    - Execute Python code using PythonREPLTool
-    - Detect execution errors from output
-    - Extract error messages
-    - Clean up code formatting
-    """
-
-    def __init__(self):
-        self.python_tool = PythonREPLTool()
+    def __init__(self, task_dir: Path):
+        self.task_dir = task_dir
         self.logger = logging.getLogger(__name__ + ".CodeExecutor")
 
-    def execute(self, code: str, task_id: str) -> tuple[bool, str, str, float]:
+    def execute(self, code: str, task_id: str) -> tuple[bool, str, str | None, float]:
         """
         Execute Python code and return (success, output, error, execution_time)
 
-        Args:
-            code: Python code to execute
-            task_id: Task identifier for logging
-
-        Returns:
-            Tuple of (success: bool, output: str, error: str, execution_time: float)
+        The error is the failing cell's traceback.
         """
-        # Clean up code formatting
-        code = self._clean_code(code)
-
+        code = clean_code(code)
         self.logger.info(f"Executing code for {task_id}:\n{code[:300]}...")
 
-        try:
-            start_time = time.time()
-            output = self.python_tool.run(code)
-            execution_time = time.time() - start_time
-            self.logger.debug(f"Code for {task_id}:\n{code}\nOutput:\n{output}")
+        (self.task_dir / SCRIPT).write_text(join_cells([SETUP_CELL, code]))
+        result = run_script(self.task_dir, timeout=settings.code_timeout_s)
+        output = "".join(cell.output for cell in result.cells)
+        self.logger.debug(f"Code for {task_id}:\n{code}\nOutput:\n{output}")
 
-            # Check if output contains error indicators
-            # PythonREPLTool returns errors as strings, not exceptions
-            if self._has_execution_error(output):
-                error_msg = self._extract_error_message(output)
-                self.logger.error(f"✗ Code execution failed: {error_msg}")
-                return False, output, error_msg, execution_time
+        if not result.ok:
+            error = result.cells[result.failed_cell].error
+            self.logger.error(
+                f"✗ Code execution failed: {error.strip().splitlines()[-1]}"
+            )
+            return False, output, error, result.seconds
 
-            self.logger.info(f"✓ Code executed successfully in {execution_time:.2f}s")
-            return True, output, None, execution_time
-        except Exception as e:
-            # This catches issues with the tool itself, not the executed code
-            error_msg = str(e)
-            self.logger.error(f"✗ Tool execution failed: {error_msg}")
-            return False, f"TOOL ERROR: {error_msg}", error_msg, 0.0
-
-    def _clean_code(self, code: str) -> str:
-        """Remove markdown code fences from generated code"""
-        if code.startswith("```python"):
-            code = code.split("```python")[1].split("```")[0].strip()
-        elif code.startswith("```"):
-            code = code.split("```")[1].split("```")[0].strip()
-        return code
-
-    def _has_execution_error(self, output: str) -> bool:
-        """
-        Check if the executed code raised
-
-        PythonREPLTool returns repr(exception) as the whole output when the code
-        raises, e.g. "KeyError('Age')". Matching that exact shape (or a full
-        traceback) avoids flagging normal output such as "Mean Squared Error: 0.1".
-        Interim until the cell-script runner (P1.1 in PLAN.md).
-        """
-        if not output:
-            return False
-        if "Traceback (most recent call last):" in output:
-            return True
-        return bool(_EXCEPTION_REPR.fullmatch(output.strip()))
-
-    def _extract_error_message(self, output: str) -> str:
-        """
-        Extract the actual error message from the output
-
-        Handles both full tracebacks and compact error formats
-        """
-        lines = output.strip().split("\n")
-
-        # Look for the last line that looks like an error
-        # Try both "Error:" format and "Error(...)" format
-        for line in reversed(lines):
-            if re.search(r"\w+(Error|Exception)(:|\()", line):
-                return line.strip()
-
-        # If no specific error line found, return last few lines
-        return "\n".join(lines[-3:]) if len(lines) >= 3 else output
+        self.logger.info(f"✓ Code executed successfully in {result.seconds:.2f}s")
+        return True, output, None, result.seconds
 
 
 class InsightExtractor:
@@ -369,7 +317,6 @@ class CodeExecutionAgent(BaseAgent):
 
         # Compose specialized components
         self.code_generator = CodeGenerator(specialist_type, self.llm)
-        self.code_executor = CodeExecutor()
         self.insight_extractor = InsightExtractor()
 
     def execute(self, task: SubTask, state: HierarchicalState) -> TaskResult:
@@ -395,6 +342,10 @@ class CodeExecutionAgent(BaseAgent):
         last_error = None
         total_exec_time = 0.0
         attempts = []
+        task_dir = Path(state.run_dir) / "tasks" / task.id
+        executor = CodeExecutor(
+            prepare_task_dir(task_dir, state.dataset_path, state.run_dir, task.id)
+        )
 
         while attempt <= self.max_retries:
             attempt += 1
@@ -416,14 +367,12 @@ class CodeExecutionAgent(BaseAgent):
                 code = self.code_generator.generate(task, state)
 
             # Execute code
-            success, output, error, exec_time = self.code_executor.execute(
-                code, task.id
-            )
+            success, output, error, exec_time = executor.execute(code, task.id)
             total_exec_time += exec_time
             attempts.append(
                 {
                     "attempt": attempt,
-                    "code": self.code_executor._clean_code(code),
+                    "code": clean_code(code),
                     "output": output,
                     "error": error,
                     "seconds": round(exec_time, 2),

@@ -56,8 +56,10 @@ def main():
     workflow = build_hierarchical_graph()
     initial_state = {
         "dataset_info": dataset_info,
-        "dataset_path": str(args.csv_path),
+        # Absolute, because task scripts run inside their task directories
+        "dataset_path": str(args.csv_path.resolve()),
         "target_column": args.target,
+        "run_dir": str(store.path.resolve()),
     }
 
     commit = _git("rev-parse", "--short", "HEAD")
