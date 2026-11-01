@@ -3,7 +3,7 @@
 > **This is the main plan for the project.** It replaces `todo.md`; everything still useful from there is folded in below (see [Appendix: todo.md mapping](#appendix-todomd-mapping)).
 > Update the checkboxes and the **Status** block as work lands. Record decisions in the [Decision log](#decision-log).
 
-**Status:** Phase 1 in progress on `phase-1`: P1.1–P1.3 done (wrong claims 7 → 3, charts 0 → 9); next: P1.3 follow-up fixes, then P1.4 lead analyst · **Last updated:** 2026-11-01
+**Status:** Phase 1 in progress on `phase-1`: P1.1–P1.3 done (wrong claims 7 → 3, charts 0 → 9); P1.4 lead analyst done (baseline findings absent 7 → 2; wrong claims 5: method errors the review misses); next: P1.5 synthesis & report · **Last updated:** 2026-11-01
 
 ---
 
@@ -317,6 +317,7 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 | Baseline | `20261031-204254` | 25 min | 7 | 6 | 7 | 0 |
 | P1.2 specialist loop | `20261101-112045` ([check](docs/progress/p1.2/annotations.md)) | 45 min | 4 | 7 | 6 (now *never computed*, not lost) | 6 |
 | P1.3 prompts & profile | `20261101-121244` ([check](docs/progress/p1.3/annotations.md)) | 54 min | 3 | 7 | 5 (no model trained this run) | 9 |
+| P1.4 lead analyst | `20261101-192628` ([check](docs/progress/p1.4/annotations.md)) | 120 min | 5 (imputed t-test, unscaled coefficients ranked) | 6 | 2 | 12 (not yet in the report) |
 
 #### Steps (in this order)
 
@@ -346,11 +347,11 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 - Found on the way (fixed before P1.4): findings citing no facts passed validation; a failed cell's replacement dropped its imports; `seaborn` tried despite the library list; the report was cut off by the 8k context. See [check](docs/progress/p1.3/annotations.md).
 
 **P1.4 Lead analyst** (L)
-- [ ] Merge orchestrator + planner into the lead's planning step: a backlog of briefs, aware of the task budget.
-- [ ] Lead review after each task: accept, send back with feedback (max revisions), or add a follow-up brief; stop when the backlog is empty or the budget is spent.
-- [ ] Deterministic sanity checks on task results, shown to the lead during review: train/test gap, near-perfect feature–target association, class imbalance, many tests without correction.
-- [ ] Graph rewrite: loops as conditional edges; nodes return partial state updates; a failed task is recorded and the run continues.
-- [ ] Reference run + annotation → progress log.
+- [x] Merge orchestrator + planner into the lead's planning step: a backlog of briefs, aware of the task budget. Briefs name the outputs to publish; a specialist can't finish without them.
+- [x] Lead review after each task: accept, send back with feedback (max revisions), or add a follow-up brief; stop when the backlog is empty or the budget is spent.
+- [x] Deterministic sanity checks on task results, shown to the lead during review: train/test gap, near-perfect test score, model no better than the majority baseline (via `record_model`), leakage suspects and class imbalance (from the profile). ~~Many tests without correction~~: dropped for now (needs another helper).
+- [x] Graph rewrite: loops as conditional edges; nodes return partial state updates; a failed task is recorded and the run continues.
+- [x] Reference run + annotation → progress log. Two runs failed first (empty brief ids; an Ollama stream with no data), and the second showed reviews introducing errors; fixed before the third. See [check](docs/progress/p1.4/annotations.md).
 
 **P1.5 Synthesis & report** (M)
 - [ ] The lead writes the report from accepted findings, the fact table, and charts (replaces synthesizer + reporter).
@@ -464,6 +465,14 @@ PLAN.md  README.md
 | 2026-11-01 | Context 16k (`llm_num_ctx`), `LLM_NUM_GPU=17` on this machine | Complete task reports made the reporter's prompt + output fill 8k and cut the report off; 16k at 17 layers keeps the same GPU headroom (3.39 GB) at ~12% slower generation |
 | 2026-11-01 | Install `seaborn` for task scripts | Two runs in a row lost steps trying it despite the library list |
 | 2026-11-01 | Every finding must cite at least one recorded fact | Uncited findings carried the remaining wrong statistics in the P1.3 run |
+| 2026-11-01 | Budgets: 6 planned tasks + up to 2 follow-ups, 1 revision per task | Keeps a local run to an estimated 60–75 min |
+| 2026-11-01 | A task sent back continues its own script with the lead's feedback | Keeps its cells and facts; the fix costs a step or two instead of a rerun |
+| 2026-11-01 | `record_model()` helper computes model scores in code | Fact names are free-form, so checks can't find "train accuracy" otherwise; it also makes ML numbers consistent (same metrics, a baseline every time) |
+| 2026-11-01 | Missing brief outputs are enforced in code (specialist can't finish, a lead's accept is overridden); outputs nothing depends on are dropped from the plan | The ML hand-off failed in two runs despite a prompt rule; qwen3.5 lists outputs on every brief |
+| 2026-11-01 | The lead reviews with the task's code, not only its report | The P1.2 Cramér's V error was only visible in the code |
+| 2026-11-01 | Brief ids are assigned in code; `depends_on` may name an id or an output | qwen3.5 left every id empty and named outputs instead (first P1.4 run) |
+| 2026-11-01 | The lead takes numbers only from facts, the profile and accepted findings; the prompts define the trivial baseline | In the second P1.4 run, reviews made up per-class rates and enforced the plan's "mean survival rate" as the baseline accuracy |
+| 2026-11-01 | Keep 1 revision per task despite the 120-min run | 4 of 6 send-backs in the reference run fixed real errors; revisit if runs stay this long |
 | 2026-10-31 | Tracing: **LangSmith only**; MLflow removed | Built for agents; clearer traces. Tracing is opt-in via env, because when it's on, prompts and data samples leave the machine (relevant to the local-first pitch) |
 | 2026-10-31 | Delete untracked `todo.md`, `docs/`, `notebooks/`, and the `multi-specialist` branch | Confirmed by owner; superseded by this plan / `feature/new-flow` |
 | 2026-10-31 | New Phase 1 (agent quality) before the eval harness | The baseline review shows structural failures; the tagged baseline keeps the before/after story measurable |
