@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 # Load before anything reads LangSmith env vars
 load_dotenv(".env")
 
+from agent import context  # noqa: E402
 from agent.config import PRESETS, settings  # noqa: E402
 from agent.core.llm_manager import LLMManager  # noqa: E402
 from agent.data_loader import generate_dataset_info, load_dataset  # noqa: E402
@@ -154,6 +155,13 @@ def main():
             tasks_completed=len(result.get("completed_tasks", [])),
             tasks_failed=len(result.get("failed_tasks", [])),
             unverified_numbers=result.get("unverified_numbers"),
+            # What the agents didn't see: prompt caps that cut, prompts near
+            # the context window (see agent/context.py)
+            context={
+                "largest_prompt_tokens": recorder.max_input_tokens,
+                "window_warnings": context.warnings,
+                "prompt_cuts": dict(context.cuts),
+            },
             trace_url=trace_url(run_id),
         )
         store.write_json("run_meta.json", meta)

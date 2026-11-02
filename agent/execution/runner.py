@@ -50,6 +50,16 @@ def prepare_task_dir(
     return task_dir
 
 
+# LLM-written code gets only what Python needs: never the API keys and other
+# secrets in our environment (loaded from .env)
+SCRIPT_ENV_VARS = ("PATH", "HOME", "LANG", "LC_ALL", "TMPDIR")
+
+
+def _script_env() -> dict[str, str]:
+    env = {k: os.environ[k] for k in SCRIPT_ENV_VARS if k in os.environ}
+    return {**env, "MPLBACKEND": "Agg"}
+
+
 def run_script(task_dir: str | Path, timeout: float) -> ScriptResult:
     task_dir = Path(task_dir)
     n_cells = len(split_cells((task_dir / SCRIPT).read_text()))
@@ -64,7 +74,7 @@ def run_script(task_dir: str | Path, timeout: float) -> ScriptResult:
             capture_output=True,
             text=True,
             timeout=timeout,
-            env={**os.environ, "MPLBACKEND": "Agg"},
+            env=_script_env(),
         )
         problem = (
             None

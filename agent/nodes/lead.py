@@ -8,6 +8,7 @@ import logging
 
 import pandas as pd
 
+from agent import context
 from agent.checks import missing_outputs, sanity_checks
 from agent.config import settings
 from agent.core.base_agent import BaseAgent
@@ -30,6 +31,8 @@ def profile_node(state: HierarchicalState) -> dict:
 
 def plan_node(state: HierarchicalState) -> dict:
     """The lead plans the backlog of briefs"""
+    if len(state.dataset_info) > settings.plan_description_chars:
+        context.record_cut("dataset description")
     prompt = prompt_templates.render(
         "lead/plan.jinja2",
         profile=profile_summary(state.dataset_profile),
@@ -73,6 +76,7 @@ def review_node(state: HierarchicalState) -> dict:
     follow_ups_left = settings.max_follow_ups - state.follow_ups_added
     script = result.code
     if len(script) > settings.review_script_chars:
+        context.record_cut("review script")
         script = "# … (earlier cells cut)\n" + script[-settings.review_script_chars :]
     prompt = prompt_templates.render(
         "lead/review.jinja2",

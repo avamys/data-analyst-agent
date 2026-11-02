@@ -71,6 +71,7 @@ class LLMCallRecorder(BaseCallbackHandler):
         self.calls = 0
         self.input_tokens = 0
         self.output_tokens = 0
+        self.max_input_tokens = 0  # The largest prompt of the run
         self._pending: dict[UUID, dict] = {}
 
     def on_chat_model_start(self, serialized, messages, *, run_id, **kwargs):
@@ -86,6 +87,7 @@ class LLMCallRecorder(BaseCallbackHandler):
         message = response.generations[0][0].message
         usage = message.usage_metadata or {}
         self.input_tokens += usage.get("input_tokens", 0)
+        self.max_input_tokens = max(self.max_input_tokens, usage.get("input_tokens", 0))
         self.output_tokens += usage.get("output_tokens", 0)
         self._write(
             run_id,

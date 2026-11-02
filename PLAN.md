@@ -3,7 +3,7 @@
 > **This is the main plan for the project.** It replaces `todo.md`; everything still useful from there is folded in below (see [Appendix: todo.md mapping](#appendix-todomd-mapping)).
 > Update the checkboxes and the **Status** block as work lands. Record decisions in the [Decision log](#decision-log).
 
-**Status:** Phase 1 done on `phase-1` (P1.1–P1.5). Measured on the Titanic reference run: wrong claims 7 → 0, unsupported 6 → 0, baseline findings absent 7 → 0, charts in the report 0 → 5 ([P1.5 check](docs/progress/p1.5/annotations.md)). The exit criteria were met on Claude Haiku 5.5 (9 min, $0.08 a run); not yet re-run on qwen3.5. Hosted providers (OpenRouter, Anthropic) and a cost report added. Phase 2 planned (eval harness; both versions on Haiku 5.5, Sonnet 5.5 as judge). P2.0 (central configuration, presets) and P2.1 (baseline on Haiku, `v0.1.1-baseline-hosted`) done; P2.2 (7 eval cases with known answers) done; P2.3 (runner) done; first suite, judged by hand: current 30/30 findings, baseline 16/30 ([first look](docs/eval/first-look.md)). Next: P2.4 deterministic graders · **Last updated:** 2026-11-02
+**Status:** Phase 1 done on `phase-1` (P1.1–P1.5). Measured on the Titanic reference run: wrong claims 7 → 0, unsupported 6 → 0, baseline findings absent 7 → 0, charts in the report 0 → 5 ([P1.5 check](docs/progress/p1.5/annotations.md)). The exit criteria were met on Claude Haiku 5.5 (9 min, $0.08 a run); not yet re-run on qwen3.5. Hosted providers (OpenRouter, Anthropic) and a cost report added. Phase 2 planned (eval harness; both versions on Haiku 5.5, Sonnet 5.5 as judge). P2.0 (central configuration, presets) and P2.1 (baseline on Haiku, `v0.1.1-baseline-hosted`) done; P2.2 (7 eval cases with known answers) done; P2.3 (runner) done; first suite, judged by hand: current 30/30 findings, baseline 16/30 ([first look](docs/eval/first-look.md)). P2.3a: task scripts no longer see API keys; Ollama prompts are checked against the context window. Next: P2.4 deterministic graders · **Last updated:** 2026-11-02
 
 ---
 
@@ -409,6 +409,12 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 - [x] Verify: a 1-case, 1-repeat suite end to end on both versions. *All 7 cases on both versions, judged by hand: [first look](docs/eval/first-look.md). Current 30/30 `must_find` items, baseline 16/30; the baseline loses findings to truncated output.*
 - Found on the way: the dataset file names gave the answers away (a baseline report cited "the file name, pure_noise"); cases now have neutral file names, and the first suite was discarded.
 
+**P2.3a Secrets and context guard** (S). Added 2026-11-02, after reviewing robustness: LLM-written analysis code ran with our whole environment, API keys included, and Ollama cuts over-long prompts silently.
+- [x] Task scripts get an allowlisted environment (`PATH`, `HOME`, `LANG`, `LC_ALL`, `TMPDIR`): no API keys or other secrets from `.env`. Test: a script prints its environment.
+- [x] Context check before every Ollama call (`agent/context.py`): a prompt that can't fit the window (even at 4.5 characters per token) stops the run with an error saying to raise `LLM_NUM_CTX`; one that may not fit (at 2.7) is logged and listed in `run_meta.json`. Hosted providers aren't checked: they reject oversized prompts.
+- [x] Prompt caps count their cuts; `run_meta.json` gets `context`: largest prompt, window warnings, cuts per cap.
+- Found: of the 62 writer prompts recorded on Haiku, at today's qwen settings (16k window, 4k output) 10 would stop and 38 be flagged. Before the next qwen run: a larger `LLM_NUM_CTX`, or a more compact writer input.
+
 **P2.4 Deterministic graders** (M)
 - [ ] From the run directory (both versions): run success, tasks completed / failed, wall time, LLM calls, tokens, cost (the `scripts/run_cost.py` functions).
 - [ ] From the report text (both versions): fact-in-text (each expected value appears, rounding-aware, on a line with one of its keywords; reuses `number_check`), caveat keywords.
@@ -446,7 +452,8 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 
 ### Phase 3: Hardening, guided by the eval (M)
 Goal: close the gaps the eval exposes.
-- [ ] Sandbox isolation: network blocked, environment scrubbed; optional Docker backend.
+- [ ] Sandbox isolation: network blocked, environment scrubbed; optional Docker backend. *Environment scrubbed in P2.3a. Next, and first in this phase: block network access for task scripts (network namespace or a container with `--network none`), then the Docker backend with only the task directory and a read-only dataset.*
+- [ ] Resume an interrupted run: a LangGraph checkpointer (SQLite in the run directory) and `run.py --resume <run dir>`. Matters for local runs (1–2 h); the stalls seen so far were the host sleeping.
 - [ ] If numbers in reports still drift: the writer cites `{{fact:…}}` references and a renderer fills in values.
 - [ ] If the judge finds false qualitative claims: an LLM claim check against facts, looping back to the writer.
 - [ ] Retry strategies targeted at the failure types the eval shows.
@@ -551,6 +558,9 @@ PLAN.md  README.md
 | 2026-11-02 | Eval judge: Claude Sonnet 5.5 | Owner's choice: a different, stronger model than the agent, at about half Opus's cost |
 | 2026-11-02 | No LLM record/replay cache in Phase 2; CI grades a committed eval run instead | Graders work on saved run directories, and hosted reruns are cheap; what's left of the cache's purpose (deterministic CI) is covered by stored runs and judge verdicts. Revisit if eval runs get expensive. |
 | 2026-11-02 | Fact accuracy is read from the report text (value + keyword on one line), not from recorded facts | Fact names are free-form, so expected facts can't be matched to them reliably; reading the report works for the baseline too |
+| 2026-11-02 | Task scripts get an allowlisted environment; no code blocklist; network isolation moves to the front of Phase 3 | They ran with our API keys and network access, and they're written by an LLM that reads user data (a prompt-injection path). A blocklist of "dangerous" calls is easy to get around (as decided in Phase 0); isolation is the boundary |
+| 2026-11-02 | Context check only for Ollama: certain overflow stops the run, possible overflow is flagged | Ollama cuts long prompts silently; a stop is better than a report written from a cut prompt. Without qwen's tokenizer the size is a range (2.7–4.5 chars/token), so only the certain case stops |
+| 2026-11-02 | No idle watchdog; resume via checkpoints instead (Phase 3) | Calls, scripts and eval runs already have timeouts; the stalls seen were the host sleeping, which only resuming helps with |
 | 2026-10-31 | Tracing: **LangSmith only**; MLflow removed | Built for agents; clearer traces. Tracing is opt-in via env, because when it's on, prompts and data samples leave the machine (relevant to the local-first pitch) |
 | 2026-10-31 | Delete untracked `todo.md`, `docs/`, `notebooks/`, and the `multi-specialist` branch | Confirmed by owner; superseded by this plan / `feature/new-flow` |
 | 2026-10-31 | New Phase 1 (agent quality) before the eval harness | The baseline review shows structural failures; the tagged baseline keeps the before/after story measurable |

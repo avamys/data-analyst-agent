@@ -155,3 +155,16 @@ def test_record_model_handles_pipelines_and_regressors(task_dir):
     assert scores["kind"] == "regressor"
     assert {"train_r2", "test_r2", "test_rmse", "baseline_rmse"} <= set(scores)
     assert set(scores["top_features"]) == {"fare", "target"}
+
+
+def test_scripts_dont_see_our_secrets(task_dir, monkeypatch):
+    # LLM-written code must not reach API keys loaded from .env
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-secret")
+    monkeypatch.setenv("LANGSMITH_API_KEY", "ls-secret")
+    result = _run(
+        task_dir,
+        "from agent.execution.runtime import df\nimport os\nprint(sorted(os.environ))",
+    )
+    [cell] = result.cells
+    assert cell.error is None
+    assert "API_KEY" not in cell.output and "PATH" in cell.output

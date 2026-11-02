@@ -9,6 +9,7 @@ from ollama import ResponseError
 from pydantic import ValidationError
 
 from agent.config import settings
+from agent.context import check_prompt
 from agent.core.llm_manager import LLMManager
 from agent.states import HierarchicalState
 
@@ -98,6 +99,7 @@ class BaseAgent:
         )
 
         try:
+            check_prompt(prompt, self.agent_type)
             response = self.llm.invoke([HumanMessage(content=prompt)], **kwargs)
             self.logger.debug(f"Received response from {self.agent_type}")
             return response

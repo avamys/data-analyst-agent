@@ -6,6 +6,7 @@ import traceback
 from importlib.metadata import version
 from pathlib import Path
 
+from agent import context
 from agent.checks import missing_outputs
 from agent.config import settings
 from agent.core.base_agent import BaseAgent
@@ -74,6 +75,7 @@ def format_facts(facts: dict, task_id: str | None = None) -> str:
         value = json.dumps(fact["value"])
         cap = settings.prompt_fact_chars
         if len(value) > cap and fact.get("kind") != "model":
+            context.record_cut("fact value")
             value = value[:cap] + "…"
         lines.append(f"- {prefix}{name} = {value}  # {fact['desc']}")
     return "\n".join(lines) or "(none)"
@@ -293,6 +295,8 @@ class SpecialistAgent(BaseAgent):
         limit = settings.max_cell_output_chars
         cell = result.cells[-1]
         if cell.error:
+            if len(cell.error) > limit:
+                context.record_cut("cell error")
             return (
                 f"Cell {index} failed. Your next cell replaces the failed cell completely,"
                 " so repeat everything it needed (imports, variables), not just the fix:\n"
@@ -300,6 +304,7 @@ class SpecialistAgent(BaseAgent):
             )
         output = cell.output or "(no output)"
         if len(output) > limit:
+            context.record_cut("cell output")
             output = output[:limit] + f"\n… ({len(output) - limit} more characters cut)"
         return f"Cell {index} output:\n{output}"
 
