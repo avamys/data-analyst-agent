@@ -3,7 +3,7 @@
 > **This is the main plan for the project.** It replaces `todo.md`; everything still useful from there is folded in below (see [Appendix: todo.md mapping](#appendix-todomd-mapping)).
 > Update the checkboxes and the **Status** block as work lands. Record decisions in the [Decision log](#decision-log).
 
-**Status:** Phase 1 in progress on `phase-1`: P1.1–P1.3 done (wrong claims 7 → 3, charts 0 → 9); P1.4 lead analyst done (baseline findings absent 7 → 2; wrong claims 5: method errors the review misses); next: P1.5 synthesis & report · **Last updated:** 2026-11-01
+**Status:** Phase 1 in progress on `phase-1`: P1.1–P1.3 done (wrong claims 7 → 3, charts 0 → 9); P1.4 lead analyst done (baseline findings absent 7 → 2; wrong claims 5: method errors the review misses). Hosted providers added (OpenRouter, Anthropic): the same agent on Claude Haiku 5.5 runs in 12.5 min for $0.12 with 0 wrong claims and all baseline findings ([check](docs/progress/models/haiku-5.5/annotations.md)); next: P1.5 synthesis & report · **Last updated:** 2026-11-02
 
 ---
 
@@ -318,6 +318,7 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 | P1.2 specialist loop | `20261101-112045` ([check](docs/progress/p1.2/annotations.md)) | 45 min | 4 | 7 | 6 (now *never computed*, not lost) | 6 |
 | P1.3 prompts & profile | `20261101-121244` ([check](docs/progress/p1.3/annotations.md)) | 54 min | 3 | 7 | 5 (no model trained this run) | 9 |
 | P1.4 lead analyst | `20261101-192628` ([check](docs/progress/p1.4/annotations.md)) | 120 min | 5 (imputed t-test, unscaled coefficients ranked) | 6 | 2 | 12 (not yet in the report) |
+| P1.4 on Claude Haiku 5.5 (same code, hosted) | `20261102-170201` ([check](docs/progress/models/haiku-5.5/annotations.md)) | 12.5 min, $0.12 | 0 | 3 (writer prose) | 0 | 1 (link broken) |
 
 #### Steps (in this order)
 
@@ -390,8 +391,9 @@ Goal: close the gaps the eval exposes.
 **Exit:** trap cases pass; clear improvement over the Phase 2 numbers.
 
 ### Phase 4: Models & providers (S–M)
-- [ ] Provider config: `ollama`, `anthropic`, `openai` via `init_chat_model` (add `langchain-anthropic`).
-- [ ] Per-role model config (planner / coder / writer / judge) in `settings` / `.env`.
+- [x] Provider config: `ollama`, `openrouter`, `anthropic` via `init_chat_model` (`MODEL_PROVIDER` / `--provider`, one model setting per provider). Done early, 2026-11-02, because local runs were the bottleneck. `openai` dropped: OpenRouter serves those models.
+- [ ] Per-role model config (planner / coder / writer / judge) in `settings` / `.env`. *(Partly there: `ANALYST_MODEL` / `CODER_MODEL` / `REPORTER_MODEL` override the provider's model; no judge yet.)*
+- [x] Token and cost report per run: `scripts/run_cost.py` (tokens per node; cost at OpenRouter list prices, also projected onto other models).
 - [ ] Eval matrix: ≥2 local models + ≥1 hosted (e.g., Claude Sonnet 5.5) → comparison table with cost/latency.
 - [ ] Choose and document the recommended default(s) based on the numbers.
 
@@ -473,6 +475,10 @@ PLAN.md  README.md
 | 2026-11-01 | Brief ids are assigned in code; `depends_on` may name an id or an output | qwen3.5 left every id empty and named outputs instead (first P1.4 run) |
 | 2026-11-01 | The lead takes numbers only from facts, the profile and accepted findings; the prompts define the trivial baseline | In the second P1.4 run, reviews made up per-class rates and enforced the plan's "mean survival rate" as the baseline accuracy |
 | 2026-11-01 | Keep 1 revision per task despite the 120-min run | 4 of 6 send-backs in the reference run fixed real errors; revisit if runs stay this long |
+| 2026-11-02 | OpenRouter as a second provider for dev runs (`MODEL_PROVIDER` / `--provider`, one model setting per provider), through `ChatOpenAI` and `langchain-openai<1`; structured output over function calling | Local runs take ~2 h; a 1-task run took 5 min on OpenRouter. `langchain-openrouter` needs LangChain 1.x. Free models often lack `response_format` |
+| 2026-11-02 | The smoke script fails a model whose structured output loses line breaks in code | `nemotron-3-ultra-550b-a55b:free` turns newlines in tool-call arguments into spaces (and double-escapes them in plain JSON), so every cell became one comment line and ran as a no-op; `nemotron-3.5-super-vl:free` keeps them |
+| 2026-11-02 | Anthropic as a third provider (`langchain-anthropic<1`); structured output through JSON outputs (`output_config.format`), no temperature sent | Forced tool calls let Haiku 5.5 drop required fields (a review without a verdict ended a run); JSON outputs are schema-valid by construction and work on Sonnet / Opus 5.5, which reject forced tool calls. Current Claude models reject sampling parameters. |
+| 2026-11-02 | Claim-check model runs like the P1.x steps (`docs/progress/models/<model>/`) | Same method, so model and design changes compare on one scale until Phase 2 |
 | 2026-10-31 | Tracing: **LangSmith only**; MLflow removed | Built for agents; clearer traces. Tracing is opt-in via env, because when it's on, prompts and data samples leave the machine (relevant to the local-first pitch) |
 | 2026-10-31 | Delete untracked `todo.md`, `docs/`, `notebooks/`, and the `multi-specialist` branch | Confirmed by owner; superseded by this plan / `feature/new-flow` |
 | 2026-10-31 | New Phase 1 (agent quality) before the eval harness | The baseline review shows structural failures; the tagged baseline keeps the before/after story measurable |
