@@ -3,7 +3,7 @@
 > **This is the main plan for the project.** It replaces `todo.md`; everything still useful from there is folded in below (see [Appendix: todo.md mapping](#appendix-todomd-mapping)).
 > Update the checkboxes and the **Status** block as work lands. Record decisions in the [Decision log](#decision-log).
 
-**Status:** Phase 1 done on `phase-1` (P1.1–P1.5). Measured on the Titanic reference run: wrong claims 7 → 0, unsupported 6 → 0, baseline findings absent 7 → 0, charts in the report 0 → 5 ([P1.5 check](docs/progress/p1.5/annotations.md)). The exit criteria were met on Claude Haiku 5.5 (9 min, $0.08 a run); not yet re-run on qwen3.5. Hosted providers (OpenRouter, Anthropic) and a cost report added. Phase 2 planned (eval harness; both versions on Haiku 5.5, Sonnet 5.5 as judge). Next: P2.0 central run configuration · **Last updated:** 2026-11-02
+**Status:** Phase 1 done on `phase-1` (P1.1–P1.5). Measured on the Titanic reference run: wrong claims 7 → 0, unsupported 6 → 0, baseline findings absent 7 → 0, charts in the report 0 → 5 ([P1.5 check](docs/progress/p1.5/annotations.md)). The exit criteria were met on Claude Haiku 5.5 (9 min, $0.08 a run); not yet re-run on qwen3.5. Hosted providers (OpenRouter, Anthropic) and a cost report added. Phase 2 planned (eval harness; both versions on Haiku 5.5, Sonnet 5.5 as judge). P2.0 (central configuration, presets) and P2.1 (baseline on Haiku, `v0.1.1-baseline-hosted`) done. Next: P2.2 eval cases · **Last updated:** 2026-11-02
 
 ---
 
@@ -391,9 +391,9 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 - Found on the way: role temperatures were read at import time, so no override reached them; now read when used. On a rewrite, the writer appended a list of its corrections to the report, quoting the old numbers; it is now told to return only the report (3 of 3 replays clean).
 
 **P2.1 Baseline on Haiku** (S)
-- [ ] Branch `baseline-hosted` from `v0.1.0-baseline`. Add the Anthropic provider with the same fixes Phase 1 needed: no temperature, JSON outputs for structured calls, `.text()` for block replies. Prompts, flow and the baseline's bugs stay as tagged.
-- [ ] One Titanic run on Haiku completes and writes a report. If it breaks, fix only what's needed to finish (as in P0.9), and note each fix.
-- [ ] Tag `v0.1.1-baseline-hosted`. The eval runs it from a git worktree.
+- [x] Branch `baseline-hosted` from `v0.1.0-baseline`. Add the Anthropic provider with the same fixes Phase 1 needed: no temperature, JSON outputs for structured calls, `.text()` for block replies. Prompts, flow and the baseline's bugs stay as tagged. (The model comes from the baseline's `--model` flag.)
+- [x] One Titanic run on Haiku completes and writes a report. If it breaks, fix only what's needed to finish (as in P0.9), and note each fix. *Run `20261102-194520`: 6/6 tasks, 3.7 min, 10 LLM calls, $0.02, no fixes needed. The report says key results "were truncated in the source material", the baseline's context loss, and leaves them out instead of estimating them, as qwen did.*
+- [x] Tag `v0.1.1-baseline-hosted`. The eval runs it from a git worktree.
 
 **P2.2 Cases and ground truth** (M)
 - [ ] `evals/cases/<name>/`: `generate.py` (seeded, writes `data.csv`) and `expected.yaml`. Titanic's data is gitignored today: commit the file if its licence allows, otherwise download it with a checksum.
