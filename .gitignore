@@ -179,3 +179,4 @@ cython_debug/
 # Eval datasets (generated or downloaded) and eval run directories
 evals/data/
 evals/runs/
+evals/worktrees/
