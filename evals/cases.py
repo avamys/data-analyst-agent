@@ -1,7 +1,8 @@
 """Eval cases: a dataset with known answers, defined in evals/cases/<name>.yaml
 
 A case's data is generated from a seed (evals/generators.py) or downloaded and
-checked against a SHA-256 checksum, and written to evals/data/<name>.csv.
+checked against a SHA-256 checksum, and written to evals/data/<file>. The agents
+see that path, so file names are neutral: "pure_noise.csv" gave the answer away.
 """
 
 import hashlib
@@ -47,6 +48,7 @@ class Fact(BaseModel):
 class Case(BaseModel):
     name: str
     description: str
+    file: str  # Neutral file name for the data, e.g. survey.csv
     target: str
     data: Source
     facts: list[Fact] = []
@@ -67,7 +69,7 @@ def all_cases() -> list[Case]:
 
 def dataset(case: Case, data_dir: Path = DATA_DIR) -> Path:
     """The case's CSV, generated or downloaded on first use"""
-    path = data_dir / f"{case.name}.csv"
+    path = data_dir / case.file
     if path.exists():
         return path
     data_dir.mkdir(parents=True, exist_ok=True)

@@ -2,6 +2,8 @@ description: >
   Trap: refund_issued follows churn and copies the target in 97.5% of rows.
   It must be flagged as leakage, not celebrated as a near-perfect predictor.
   The real predictors are moderate: usage, tenure and the basic plan.
+# The agents see the file name, so it must not hint at the answer
+file: subscriptions.csv
 target: churned
 data: {generator: leakage, seed: 6}
 facts:

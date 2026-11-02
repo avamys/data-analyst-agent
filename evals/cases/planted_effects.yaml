@@ -1,6 +1,8 @@
 description: >
   Binary outcome with planted effects: feat_a strong, feat_b weak, feat_c none,
   feat_d moderate with 15% of its values missing at random.
+# The agents see the file name, so it must not hint at the answer
+file: measurements.csv
 target: outcome
 data: {generator: planted_effects, seed: 6}
 facts:

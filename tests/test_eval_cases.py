@@ -40,6 +40,14 @@ def test_all_cases_load():
     }
 
 
+def test_file_names_dont_give_the_answer_away():
+    # The agents see the path: a report cited "the file name, pure_noise"
+    for case in all_cases():
+        if case.name != "titanic":  # a real dataset under its own name
+            assert not set(case.name.split("_")) & set(case.file[:-4].split("_"))
+    assert len({c.file for c in all_cases()}) == len(all_cases())
+
+
 @pytest.mark.parametrize("name", list(GENERATORS))
 def test_generated_data_is_reproducible_and_has_the_target(name):
     case = load_case(name)
@@ -171,6 +179,7 @@ def test_downloads_are_checked_against_their_checksum(monkeypatch, tmp_path):
     case = Case(
         name="dl",
         description="d",
+        file="x.csv",
         target="b",
         data=Source(
             url="https://example.org/x.csv", sha256=hashlib.sha256(content).hexdigest()
@@ -182,7 +191,7 @@ def test_downloads_are_checked_against_their_checksum(monkeypatch, tmp_path):
 
     monkeypatch.setattr(cases_module.httpx, "get", lambda *a, **k: Response(b"other"))
     with pytest.raises(ValueError, match="sha256"):
-        dataset(case.model_copy(update={"name": "dl2"}), tmp_path)
+        dataset(case.model_copy(update={"file": "y.csv"}), tmp_path)
 
 
 def test_a_case_needs_exactly_one_source():

@@ -1,6 +1,8 @@
 description: >
   The target is stored as "yes"/"no" strings. Monthly contracts, higher fees and
   more support calls raise churn; region has no effect.
+# The agents see the file name, so it must not hint at the answer
+file: customers.csv
 target: churned_flag
 data: {generator: string_target, seed: 6}
 facts:

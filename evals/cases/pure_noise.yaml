@@ -1,6 +1,8 @@
 description: >
   Trap: the binary outcome is independent of every feature. Nothing should be
   reported as a real effect, and no model should be praised.
+# The agents see the file name, so it must not hint at the answer
+file: survey.csv
 target: outcome
 data: {generator: pure_noise, seed: 6}
 facts:

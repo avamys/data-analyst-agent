@@ -1,6 +1,8 @@
 description: >
   Continuous, right-skewed target with 2% extreme outliers: size_sqm strong and
   positive, age_years negative, rating none.
+# The agents see the file name, so it must not hint at the answer
+file: properties.csv
 target: price
 data: {generator: regression_outliers, seed: 6}
 facts:

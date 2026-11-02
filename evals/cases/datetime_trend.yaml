@@ -2,6 +2,8 @@ description: >
   Two years of daily sales: an upward trend, higher sales on weekends and on
   promotion days. temperature follows the seasons but doesn't affect sales.
   Tracks whether the date is used at all; no time-series specialist exists yet.
+# The agents see the file name, so it must not hint at the answer
+file: daily_sales.csv
 target: sales
 data: {generator: datetime_trend, seed: 6}
 facts:

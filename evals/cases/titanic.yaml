@@ -1,6 +1,8 @@
 description: >
   Real data: 891 Titanic passengers. Ground truth from the claim-by-claim checks
   of the reference runs (docs/baseline/annotations.md, docs/progress/).
+# The agents see the file name, so it must not hint at the answer
+file: titanic.csv
 target: Survived
 data:
   # Same 891 rows as Kaggle's train.csv
