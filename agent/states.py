@@ -162,8 +162,6 @@ class HierarchicalState(BaseModel):
     completed_tasks: list[TaskResult] = Field(default_factory=list)
     failed_tasks: list[TaskResult] = Field(default_factory=list)
 
-    # Synthesis layer
-    synthesis: str = ""
-
     # Output
     report: str = ""
+    unverified_numbers: list[str] = Field(default_factory=list)  # Match no fact

@@ -13,8 +13,7 @@ def test_graph_compiles():
         "plan",
         "run_task",
         "review",
-        "synthesizer",
-        "reporter",
+        "report",
     } <= set(graph.get_graph().nodes)
 
 

@@ -38,10 +38,10 @@ def revise(feedback: str) -> Review:
 
 @pytest.fixture
 def analyse(monkeypatch, tmp_path, small_csv):
-    """Run the whole graph; the plan and the writers' texts are added around"""
+    """Run the whole graph; the plan and the report's text are added around"""
 
     def _analyse(plan: LeadPlan, *responses):
-        llm = ScriptedLLM([plan, *responses, "synthesis", "the report"])
+        llm = ScriptedLLM([plan, *responses, "the report"])
         monkeypatch.setattr(LLMManager, "get_llm", lambda **_: llm)
         state = build_hierarchical_graph().invoke(
             {"dataset_info": "", "dataset_path": small_csv, "run_dir": str(tmp_path)},
@@ -153,7 +153,7 @@ def test_revisions_are_capped_and_the_last_objection_is_kept(analyse, monkeypatc
     )
     (result,) = state["completed_tasks"]
     assert result.revisions == 1
-    second_review = llm.prompts[-3]
+    second_review = llm.prompts[-2]  # before the report's
     assert "can't be redone" in second_review
     # P1.4 run: shown its own earlier objection, the lead argued with it
     assert "Wrong formula" not in second_review
@@ -178,7 +178,7 @@ def test_follow_ups_are_added_within_budget_with_unique_ids(analyse, monkeypatch
     follow_up = state["completed_tasks"][1].brief
     assert follow_up.depends_on == ["eda_1"]
     assert state["follow_ups_added"] == 1
-    assert "follow-up tasks is spent" in llm.prompts[-3]
+    assert "follow-up tasks is spent" in llm.prompts[-2]
 
 
 def test_a_failed_task_is_recorded_and_the_run_continues(analyse):
@@ -250,7 +250,6 @@ def test_writers_read_text_from_block_replies(monkeypatch, tmp_path, small_csv):
             _plan(_brief("eda_1")),
             finish(),
             accept(),
-            blocks("synthesis"),
             blocks("report"),
         ]
     )
@@ -259,4 +258,4 @@ def test_writers_read_text_from_block_replies(monkeypatch, tmp_path, small_csv):
         {"dataset_info": "", "dataset_path": small_csv, "run_dir": str(tmp_path)},
         config={"recursion_limit": 100},
     )
-    assert (state["synthesis"], state["report"]) == ("synthesis", "report")
+    assert state["report"] == "report"

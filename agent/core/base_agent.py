@@ -23,7 +23,7 @@ class BaseAgent:
 
     Usage:
         # Direct use (simple cases)
-        agent = BaseAgent(agent_type="synthesizer")
+        agent = BaseAgent(agent_type="reporter")
         result = agent.invoke(prompt)
 
         # Subclass (complex logic)

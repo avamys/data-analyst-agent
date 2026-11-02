@@ -1,7 +1,7 @@
 """Lead analyst: plans a backlog of briefs, hands each to a specialist, reviews it
 
 Nodes return partial state updates; `next_step` routes the loop:
-plan → run_task → review → run_task (sent back, or next brief) … → synthesizer
+plan → run_task → review → run_task (sent back, or next brief) … → report
 """
 
 import logging
@@ -123,7 +123,7 @@ def next_step(state: HierarchicalState) -> str:
     """After planning or a review: a task sent back, the next brief, or writing"""
     if state.under_review is not None or state.backlog:
         return "run_task"
-    return "synthesizer"
+    return "report"
 
 
 def admit_follow_ups(

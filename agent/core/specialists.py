@@ -79,7 +79,7 @@ def format_facts(facts: dict, task_id: str | None = None) -> str:
 
 
 def format_task_report(result: TaskResult) -> str:
-    """A task's report with its full fact table, for the lead, synthesizer and reporter"""
+    """A task's report with its full fact table, for the lead's review"""
     report = result.report or TaskReport(status="failed")
     lines = [f"[{result.task_id}] {result.description} (status: {report.status})"]
     lines.append("Findings:")

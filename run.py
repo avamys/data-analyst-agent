@@ -147,6 +147,7 @@ def main():
             output_tokens=recorder.output_tokens,
             tasks_completed=len(result.get("completed_tasks", [])),
             tasks_failed=len(result.get("failed_tasks", [])),
+            unverified_numbers=result.get("unverified_numbers"),
             trace_url=trace_url(run_id),
         )
         store.write_json("run_meta.json", meta)

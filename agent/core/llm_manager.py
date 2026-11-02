@@ -44,10 +44,6 @@ class LLMManager:
             "model": "coder_model",
             "temperature": 0.1,
         },
-        "synthesizer": {
-            "model": "analyst_model",
-            "temperature": 0.3,
-        },
         "reporter": {
             "model": "reporter_model",
             "temperature": settings.reporter_temperature,
