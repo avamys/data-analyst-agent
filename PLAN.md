@@ -3,7 +3,7 @@
 > **This is the main plan for the project.** It replaces `todo.md`; everything still useful from there is folded in below (see [Appendix: todo.md mapping](#appendix-todomd-mapping)).
 > Update the checkboxes and the **Status** block as work lands. Record decisions in the [Decision log](#decision-log).
 
-**Status:** Phase 1 done on `phase-1` (P1.1–P1.5). Measured on the Titanic reference run: wrong claims 7 → 0, unsupported 6 → 0, baseline findings absent 7 → 0, charts in the report 0 → 5 ([P1.5 check](docs/progress/p1.5/annotations.md)). The exit criteria were met on Claude Haiku 5.5 (9 min, $0.08 a run); not yet re-run on qwen3.5. Hosted providers (OpenRouter, Anthropic) and a cost report added. Next: plan Phase 2 (eval harness) · **Last updated:** 2026-11-02
+**Status:** Phase 1 done on `phase-1` (P1.1–P1.5). Measured on the Titanic reference run: wrong claims 7 → 0, unsupported 6 → 0, baseline findings absent 7 → 0, charts in the report 0 → 5 ([P1.5 check](docs/progress/p1.5/annotations.md)). The exit criteria were met on Claude Haiku 5.5 (9 min, $0.08 a run); not yet re-run on qwen3.5. Hosted providers (OpenRouter, Anthropic) and a cost report added. Phase 2 planned (eval harness; both versions on Haiku 5.5, Sonnet 5.5 as judge). Next: P2.0 central run configuration · **Last updated:** 2026-11-02
 
 ---
 
@@ -34,7 +34,7 @@ The story this project tells:
 - [ ] Every numeric claim in the report resolves to a recorded fact from executed code; the report includes charts.
 - [ ] The eval suite (≥6 cases, including adversarial "trap" datasets) runs with one command and produces a comparison table.
 - [ ] README shows the before/after eval table, a local vs. hosted model comparison, an architecture diagram, and a demo GIF.
-- [ ] CI runs lint, unit tests, and a deterministic eval smoke test (replayed LLM responses) on every push.
+- [ ] CI runs lint, unit tests, and a deterministic eval smoke test (graders over a committed eval run) on every push.
 - [ ] A short UI (upload CSV → watch progress → read report) exists and is shown in the demo.
 - [ ] Tagged `v1.0.0`. Optional write-up / blog post.
 
@@ -119,8 +119,8 @@ Each case is `evals/cases/<name>/` with `data.csv` (or a seeded generator) and `
 ```yaml
 target: Survived
 facts:                       # checked against recorded facts / report values
-  survival_rate: {value: 0.3838, tol: 0.005}
-  missing.Age: {value: 177}
+  survival_rate: {value: 0.3838, tol: 0.005, near: [surviv]}   # value on a line with a keyword
+  missing.Age: {value: 177, near: [Age, missing]}
 must_find:                   # planted findings (judge + keywords)
   - "Sex strongly associated with survival (women higher)"
 must_not_claim:              # traps / known false statements
@@ -133,8 +133,8 @@ caveats_required: [overfitting]   # when applicable
 |---|---|---|
 | **Run success** | Pipeline finished, report produced | deterministic |
 | **Task success rate** / avg retries | From run store | deterministic |
-| **Fact accuracy** | Recorded facts vs `expected.facts` within tolerance | deterministic |
-| **Grounded-number rate** | % of numbers in the report that resolve to a fact | deterministic |
+| **Fact accuracy** | Each `expected.facts` value appears in the report (rounding-aware) on a line with one of its keywords. Read from the report, so it works for both versions; recorded fact names are free-form | deterministic |
+| **Grounded-number rate** | Phase 1 agent: numbers the number check left unverified | deterministic |
 | **Finding recall** | `must_find` items present | LLM judge with rubric |
 | **False claims** | `must_not_claim` violated; significance claimed on `pure_noise` | LLM judge + rules |
 | **Caveat coverage** | Required caveats present (overfit, leakage) | deterministic + judge |
@@ -142,13 +142,13 @@ caveats_required: [overfitting]   # when applicable
 
 - **Report-level graders must also work on v1** (no facts needed: they read the report text) so the baseline is real.
 - **Repeats:** default `--repeats 3`; report mean and min–max. LLM output varies; one run proves nothing.
-- **Judge calibration:** hand-label ~10 reports; check judge agreement before trusting it. Judge model fixed and recorded.
+- **Judge calibration:** hand-label ~10 reports; check judge agreement before trusting it. Judge: Claude Sonnet 5.5, fixed and recorded with its prompt version.
 
 ### Harness features
-- `uv run python -m evals run --suite core --model ollama:<model> --repeats 3` → `evals/results/<timestamp>_<model>.jsonl`
+- `uv run python -m evals run --suite core --version current|baseline --preset hosted --repeats 3` → `evals/results/<timestamp>_<version>_<model>.jsonl`
 - `uv run python -m evals report [run ...]` → Markdown table (also feeds the README).
 - `uv run python -m evals compare A B` → per-metric deltas, per-case regressions.
-- **LLM record/replay cache** (keyed by model + prompt hash): makes re-runs free and deterministic, lets graders be developed offline, powers the CI smoke test.
+- **CI smoke test:** graders run over a committed eval run (run directory + stored judge verdicts): deterministic, no LLM calls. ~~LLM record/replay cache~~: deferred (decision log, 2026-11-02).
 - Results are committed (small JSONL) so history is visible in git.
 - **LangSmith:** every eval run is traced and tagged with its case and repeat, so a failing case can be opened straight from the results table. Optionally, results are also pushed as LangSmith experiments for side-by-side comparison. The local JSONL stays the source of truth: it works offline, is committed to git, and feeds the README.
 
@@ -369,18 +369,77 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 | Runs get longer (more LLM calls) | Accepted for local testing (~45–60 min); budgets; hosted models later (Phase 4) |
 | 8k context fills up (lead sees many findings) | Capped observations; compact accepted-findings summaries; facts referenced by name |
 
-### Phase 2: Eval harness + before/after numbers (M–L)
-Goal: measure the tagged baseline and the Phase 1 agent on the same suite.
-- [ ] **Central run configuration** (first, because eval runs vary and record these). Move the behaviour knobs that are hard-coded today into `Settings`, grouped and documented: review script cap, fact value cap, planning description cap, sanity-check thresholds, profiling thresholds, per-role temperatures, retries, report rewrites, number-check exemptions. Add named presets (e.g. `local`: today's budgets for qwen; `hosted`: larger budgets), selected with `--preset` / `PRESET`, with `.env` and CLI overrides on top. `run_meta.json` records the resolved values (it already dumps `Settings`).
-- [ ] `evals/` package skeleton: case loader, runner, results JSONL, report table.
-- [ ] Dataset generators (seeded) for the synthetic cases + reference script for Titanic ground truth.
-- [ ] Report-level graders (work on both versions): fact-in-text check, must_find / must_not_claim judge, caveat check, run/task success, timing.
-- [ ] Run-store graders for the new agent: recorded facts vs ground truth, review decisions, follow-ups.
-- [ ] LLM record/replay cache.
-- [ ] Judge calibration on ~10 hand-labeled reports (start from [annotations.md](docs/baseline/annotations.md)).
-- [ ] Run `v0.1.0-baseline` and the Phase 1 agent on the suite; commit results.
+### Phase 2: Eval harness + before/after numbers (M–L), detailed
 
-**Exit:** a committed before/after table.
+**Goal:** measure the tagged baseline and the Phase 1 agent on the same suite of cases with known answers, including trap datasets, and commit a before/after table.
+
+**Decided 2026-11-02:** both versions run on **Claude Haiku 5.5**: the baseline gets the hosted provider on a branch and nothing else. The judge is **Claude Sonnet 5.5**. The local vs hosted comparison is Phase 4's.
+
+**Exit criteria**
+- [ ] `uv run python -m evals run --suite core --version current --repeats 3` works from a clean clone with an API key, and `evals report` turns the results into a table
+- [ ] ≥ 6 cases, including the `pure_noise` and `leakage` traps, each with seeded data (or a downloaded, checksummed file) and an `expected.yaml`
+- [ ] The judge agrees with hand labels on ≥ 90% of items across ≥ 10 reports; judge model and prompt version are recorded with every result
+- [ ] CI grades a committed eval run: no LLM calls, no API keys
+- [ ] Committed before/after table: baseline vs Phase 1 on Haiku 5.5, 3 repeats, mean and min–max per metric
+
+#### Steps (in this order)
+
+**P2.0 Central run configuration** (S–M). First, because eval runs vary and record these.
+- [ ] Move the behaviour knobs that are hard-coded today into `Settings`, grouped and documented: review script cap, fact value cap, planning description cap, sanity-check thresholds, profiling thresholds, per-role temperatures, retries, report rewrites, number-check exemptions.
+- [ ] Named presets, e.g. `local` (today's budgets, for qwen) and `hosted` (5 follow-ups, 2 revisions), selected with `--preset` / `PRESET`. Precedence: defaults < preset < `.env` / environment < CLI.
+- [ ] Tests for the precedence; `run_meta.json` records the resolved values (it already dumps `Settings`).
+
+**P2.1 Baseline on Haiku** (S)
+- [ ] Branch `baseline-hosted` from `v0.1.0-baseline`. Add the Anthropic provider with the same fixes Phase 1 needed: no temperature, JSON outputs for structured calls, `.text()` for block replies. Prompts, flow and the baseline's bugs stay as tagged.
+- [ ] One Titanic run on Haiku completes and writes a report. If it breaks, fix only what's needed to finish (as in P0.9), and note each fix.
+- [ ] Tag `v0.1.1-baseline-hosted`. The eval runs it from a git worktree.
+
+**P2.2 Cases and ground truth** (M)
+- [ ] `evals/cases/<name>/`: `generate.py` (seeded, writes `data.csv`) and `expected.yaml`. Titanic's data is gitignored today: commit the file if its licence allows, otherwise download it with a checksum.
+- [ ] Start with `titanic`, `planted_effects`, `pure_noise`, `leakage`; then `regression_outliers`, `string_target`, `datetime_trend` (see [section 3](#3-eval-harness-centerpiece)).
+- [ ] Ground truth is computed by code: Titanic from a reference script (the values used in the claim checks), synthetic cases from the generator's parameters.
+- [ ] Tests: generators are deterministic (same seed, same file); a plain test recovers each planted effect, and finds nothing on `pure_noise`, at the chosen seed.
+
+**P2.3 Runner** (M)
+- [ ] `python -m evals run --suite core --version current|baseline --preset … --repeats 3 --jobs 4`: one `run.py` subprocess per case × repeat (the baseline from its worktree), each with its own runs directory under `evals/runs/` (gitignored), tagged with case, repeat and version for LangSmith.
+- [ ] One JSONL line per run in `evals/results/<timestamp>_<version>_<model>.jsonl` (committed): case, repeat, version, model, preset, commit, run directory, grader outputs.
+- [ ] A failed or timed-out run is a result (run success = false), not a crash of the suite.
+- [ ] Verify: a 1-case, 1-repeat suite end to end on both versions.
+
+**P2.4 Deterministic graders** (M)
+- [ ] From the run directory (both versions): run success, tasks completed / failed, wall time, LLM calls, tokens, cost (the `scripts/run_cost.py` functions).
+- [ ] From the report text (both versions): fact-in-text (each expected value appears, rounding-aware, on a line with one of its keywords; reuses `number_check`), caveat keywords.
+- [ ] Phase 1 agent only: numbers left unverified, review verdicts and revisions, follow-ups used.
+- [ ] Unit tests on small fixture reports and run directories.
+
+**P2.5 LLM judge** (M)
+- [ ] Claude Sonnet 5.5 through the Anthropic provider, with its own settings, independent of the agent's provider and model.
+- [ ] One call per report, JSON output: each `must_find` item present or absent, each `must_not_claim` item violated or not, each required caveat present; every verdict with the quote it rests on.
+- [ ] Verdicts are stored with the results, so scores can be recomputed without calling the judge again.
+
+**P2.6 Judge calibration** (S–M)
+- [ ] Labels: the 6 Titanic reports already checked claim by claim (baseline, P1.2, P1.3, P1.4, P1.4 on Haiku, P1.5), plus ≥ 4 reports from synthetic cases, labelled by hand and spot-checked by the owner.
+- [ ] ≥ 90% agreement per item. Disagreements are fixed in the rubric, not by relabelling. The judge prompt is versioned (hash recorded).
+
+**P2.7 Report, compare, CI** (S)
+- [ ] `python -m evals report <results…>`: Markdown table per version, mean and min–max over repeats, per case and overall.
+- [ ] `python -m evals compare A B`: per-metric deltas and per-case regressions.
+- [ ] CI grades a committed eval run (run directory + stored judge verdicts) and checks the scores; no LLM calls.
+
+**P2.8 Before/after** (S, mostly waiting)
+- [ ] Suite × 3 repeats on Haiku 5.5 for: the baseline, the Phase 1 agent with today's budgets, and the Phase 1 agent with the `hosted` preset (which also answers Phase 3's budget question).
+- [ ] Commit the results and the table (`docs/eval/`); update the Status block.
+- Estimate: 63 runs, about $8–10 of agent calls plus about $2 for the judge; 1–2 h of wall time with `--jobs 4`.
+
+#### Phase 2 risks
+| Risk | Mitigation |
+|---|---|
+| The baseline breaks on Haiku beyond the provider patch | Fix only what's needed to finish, noted (as in P0.9); its design and prompts stay |
+| An expected value matches the report text by coincidence | Keywords on the same line; tight tolerances |
+| Judge bias or drift | A different, stronger model than the agent; calibration; model and prompt hash recorded; stored verdicts |
+| Synthetic cases too easy or too artificial | Effect sizes a plain test finds with margin (tested); traps mirror failures seen in the claim checks (leakage celebrated, noise called significant) |
+| Large variance across 3 repeats | Report min–max; add repeats for cases that swing |
+| Rate limits with parallel runs | `--jobs`; the SDKs retry 429s |
 
 ### Phase 3: Hardening, guided by the eval (M)
 Goal: close the gaps the eval exposes.
@@ -446,7 +505,7 @@ agent/                # package (rename TBD, see open decisions)
 app/                  # Streamlit UI
 evals/
   cases/<name>/{expected.yaml, data.csv | generate.py}
-  graders/  runner.py  report.py  cache/  results/
+  graders/  runner.py  report.py  results/
 tests/
 examples/
 PLAN.md  README.md
@@ -485,6 +544,10 @@ PLAN.md  README.md
 | 2026-11-02 | Claim-check model runs like the P1.x steps (`docs/progress/models/<model>/`) | Same method, so model and design changes compare on one scale until Phase 2 |
 | 2026-11-02 | Number check: a number passes if a recorded value rounds to it (shares may be written as percentages, sign not compared). Recorded = cited facts (values and names), the profile, number literals in task code. Plain integers ≤ 10, thresholds (`p < 0.001`) and confidence levels are not checked | On the earlier Haiku report it flagged exactly the 7 untraced numbers among hundreds. Small integers are mostly labels (class 3, df 2); code literals are parameters (`test_size=0.25`) |
 | 2026-11-02 | The report has Summary, Data, Findings, Limitations, Open questions; no "Recommendations" | The old Recommendations / Future analysis sections were where writers speculated beyond the findings |
+| 2026-11-02 | Before/after on Claude Haiku 5.5 for both versions; the baseline gets only the hosted provider, on a branch (`v0.1.1-baseline-hosted`) | Owner's choice. The same model on both sides isolates the design change; ~$10 and 1–2 h per suite instead of days on qwen. Local vs hosted is Phase 4. |
+| 2026-11-02 | Eval judge: Claude Sonnet 5.5 | Owner's choice: a different, stronger model than the agent, at about half Opus's cost |
+| 2026-11-02 | No LLM record/replay cache in Phase 2; CI grades a committed eval run instead | Graders work on saved run directories, and hosted reruns are cheap; what's left of the cache's purpose (deterministic CI) is covered by stored runs and judge verdicts. Revisit if eval runs get expensive. |
+| 2026-11-02 | Fact accuracy is read from the report text (value + keyword on one line), not from recorded facts | Fact names are free-form, so expected facts can't be matched to them reliably; reading the report works for the baseline too |
 | 2026-10-31 | Tracing: **LangSmith only**; MLflow removed | Built for agents; clearer traces. Tracing is opt-in via env, because when it's on, prompts and data samples leave the machine (relevant to the local-first pitch) |
 | 2026-10-31 | Delete untracked `todo.md`, `docs/`, `notebooks/`, and the `multi-specialist` branch | Confirmed by owner; superseded by this plan / `feature/new-flow` |
 | 2026-10-31 | New Phase 1 (agent quality) before the eval harness | The baseline review shows structural failures; the tagged baseline keeps the before/after story measurable |
