@@ -371,6 +371,7 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 
 ### Phase 2: Eval harness + before/after numbers (M–L)
 Goal: measure the tagged baseline and the Phase 1 agent on the same suite.
+- [ ] **Central run configuration** (first, because eval runs vary and record these). Move the behaviour knobs that are hard-coded today into `Settings`, grouped and documented: review script cap, fact value cap, planning description cap, sanity-check thresholds, profiling thresholds, per-role temperatures, retries, report rewrites, number-check exemptions. Add named presets (e.g. `local`: today's budgets for qwen; `hosted`: larger budgets), selected with `--preset` / `PRESET`, with `.env` and CLI overrides on top. `run_meta.json` records the resolved values (it already dumps `Settings`).
 - [ ] `evals/` package skeleton: case loader, runner, results JSONL, report table.
 - [ ] Dataset generators (seeded) for the synthetic cases + reference script for Titanic ground truth.
 - [ ] Report-level graders (work on both versions): fact-in-text check, must_find / must_not_claim judge, caveat check, run/task success, timing.
@@ -388,6 +389,7 @@ Goal: close the gaps the eval exposes.
 - [ ] If the judge finds false qualitative claims: an LLM claim check against facts, looping back to the writer.
 - [ ] Retry strategies targeted at the failure types the eval shows.
 - [ ] Parallel task execution (`Send`, `max_concurrency`) for hosted models.
+- [ ] **Depth: fewer open questions.** The P1.5 report left 10 open questions; 9 were answerable with this data, and 1 was a review objection that ran out of revisions. Measure on the eval: (a) larger budgets in the `hosted` preset (`max_follow_ups` 2 → 5, `max_revisions` 1 → 2); (b) a closing review: when the backlog is empty and follow-up budget is left, the lead ranks every open question (suggested follow-ups and unresolved objections across tasks) and briefs the most important, instead of choosing only at each task's review; (c) the report keeps only the open questions the lead judges important. Keep a change only if finding recall goes up and false claims don't.
 - [ ] Re-run the eval; compare with Phase 2.
 
 **Exit:** trap cases pass; clear improvement over the Phase 2 numbers.
