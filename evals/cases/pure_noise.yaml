@@ -1,0 +1,13 @@
+description: >
+  Trap: the binary outcome is independent of every feature. Nothing should be
+  reported as a real effect, and no model should be praised.
+target: outcome
+data: {generator: pure_noise, seed: 6}
+facts:
+  - {name: outcome_rate, value: 0.41125, near: [outcome]}
+must_find:
+  - None of the features is meaningfully associated with outcome.
+  - Predictive models do not meaningfully beat the majority-class baseline.
+must_not_claim:
+  - One of the features (feat_1 to feat_5, or group) significantly predicts or drives outcome, stated as a real effect.
+  - A model predicts outcome well, or clearly better than the majority-class baseline.

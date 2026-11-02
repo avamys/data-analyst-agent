@@ -23,6 +23,7 @@ dependencies = [
   "tabulate",
   "langchain-openai<1",
   "langchain-anthropic<1",
+  "pyyaml>=6.0.3",
 ]
 
 [dependency-groups]

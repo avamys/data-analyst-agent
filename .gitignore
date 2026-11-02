@@ -176,3 +176,6 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+# Eval datasets (generated or downloaded) and eval run directories
+evals/data/
+evals/runs/

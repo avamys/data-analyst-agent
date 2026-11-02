@@ -1,0 +1,17 @@
+description: >
+  Two years of daily sales: an upward trend, higher sales on weekends and on
+  promotion days. temperature follows the seasons but doesn't affect sales.
+  Tracks whether the date is used at all; no time-series specialist exists yet.
+target: sales
+data: {generator: datetime_trend, seed: 6}
+facts:
+  - {name: mean_sales, value: 270.8415, near: [sales, mean, average]}
+  - {name: weekend_sales, value: 298.7043, near: [weekend]}
+  - {name: weekday_sales, value: 259.6643, near: [weekday]}
+must_find:
+  - sales rise over time (an upward trend across the two years).
+  - sales are higher on weekends than on weekdays.
+  - Promotion days have higher sales than other days.
+must_not_claim:
+  - sales decline over time.
+  - temperature is a significant driver of sales.

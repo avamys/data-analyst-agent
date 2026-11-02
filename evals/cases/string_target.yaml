@@ -1,0 +1,17 @@
+description: >
+  The target is stored as "yes"/"no" strings. Monthly contracts, higher fees and
+  more support calls raise churn; region has no effect.
+target: churned_flag
+data: {generator: string_target, seed: 6}
+facts:
+  - {name: churn_rate, value: 0.3125, near: [churn, "yes"]}
+  - {name: monthly_churn, value: 0.373494, near: [monthly]}
+  - {name: annual_churn, value: 0.211921, near: [annual]}
+must_find:
+  - Customers on monthly contracts churn more often than those on annual contracts.
+  - Higher monthly_fee is associated with more churn.
+  - More support_calls are associated with more churn.
+  - region shows no meaningful association with churn.
+must_not_claim:
+  - region is a significant or important predictor of churn.
+  - Annual-contract customers churn more often than monthly-contract customers.

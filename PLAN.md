@@ -3,7 +3,7 @@
 > **This is the main plan for the project.** It replaces `todo.md`; everything still useful from there is folded in below (see [Appendix: todo.md mapping](#appendix-todomd-mapping)).
 > Update the checkboxes and the **Status** block as work lands. Record decisions in the [Decision log](#decision-log).
 
-**Status:** Phase 1 done on `phase-1` (P1.1–P1.5). Measured on the Titanic reference run: wrong claims 7 → 0, unsupported 6 → 0, baseline findings absent 7 → 0, charts in the report 0 → 5 ([P1.5 check](docs/progress/p1.5/annotations.md)). The exit criteria were met on Claude Haiku 5.5 (9 min, $0.08 a run); not yet re-run on qwen3.5. Hosted providers (OpenRouter, Anthropic) and a cost report added. Phase 2 planned (eval harness; both versions on Haiku 5.5, Sonnet 5.5 as judge). P2.0 (central configuration, presets) and P2.1 (baseline on Haiku, `v0.1.1-baseline-hosted`) done. Next: P2.2 eval cases · **Last updated:** 2026-11-02
+**Status:** Phase 1 done on `phase-1` (P1.1–P1.5). Measured on the Titanic reference run: wrong claims 7 → 0, unsupported 6 → 0, baseline findings absent 7 → 0, charts in the report 0 → 5 ([P1.5 check](docs/progress/p1.5/annotations.md)). The exit criteria were met on Claude Haiku 5.5 (9 min, $0.08 a run); not yet re-run on qwen3.5. Hosted providers (OpenRouter, Anthropic) and a cost report added. Phase 2 planned (eval harness; both versions on Haiku 5.5, Sonnet 5.5 as judge). P2.0 (central configuration, presets) and P2.1 (baseline on Haiku, `v0.1.1-baseline-hosted`) done; P2.2 (7 eval cases with known answers) done. Next: P2.3 runner · **Last updated:** 2026-11-02
 
 ---
 
@@ -396,10 +396,11 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 - [x] Tag `v0.1.1-baseline-hosted`. The eval runs it from a git worktree.
 
 **P2.2 Cases and ground truth** (M)
-- [ ] `evals/cases/<name>/`: `generate.py` (seeded, writes `data.csv`) and `expected.yaml`. Titanic's data is gitignored today: commit the file if its licence allows, otherwise download it with a checksum.
-- [ ] Start with `titanic`, `planted_effects`, `pure_noise`, `leakage`; then `regression_outliers`, `string_target`, `datetime_trend` (see [section 3](#3-eval-harness-centerpiece)).
-- [ ] Ground truth is computed by code: Titanic from a reference script (the values used in the claim checks), synthetic cases from the generator's parameters.
-- [ ] Tests: generators are deterministic (same seed, same file); a plain test recovers each planted effect, and finds nothing on `pure_noise`, at the chosen seed.
+- [x] `evals/cases/<name>/`: `generate.py` (seeded, writes `data.csv`) and `expected.yaml`. Titanic's data is gitignored today: commit the file if its licence allows, otherwise download it with a checksum. *Simpler layout: one `evals/cases/<name>.yaml` per case and all generators in `evals/generators.py`; `evals.cases.dataset()` writes `evals/data/<name>.csv` (gitignored). Titanic is downloaded at eval time from a public mirror (same 891 rows as our copy), pinned by SHA-256.*
+- [x] Start with `titanic`, `planted_effects`, `pure_noise`, `leakage`; then `regression_outliers`, `string_target`, `datetime_trend` (see [section 3](#3-eval-harness-centerpiece)). *All 7, seed 6 for the synthetic ones.*
+- [x] Ground truth is computed by code: Titanic from a reference script (the values used in the claim checks), synthetic cases from the generator's parameters. *Fact values are stored unrounded, because a report's value passes if the true value rounds to it.*
+- [x] Tests: generators are deterministic (same seed, same file); a plain test recovers each planted effect, and finds nothing on `pure_noise`, at the chosen seed. *Also: every stored fact matches its data; the profile flags `refund_issued` in `leakage`; downloads are checked against their checksum.*
+- Notes: the eval always passes the target, so target detection is covered by the profiler's tests, not the eval. In `datetime_trend` the profile classifies `date` as an id column, so the time pattern is likely missed: the gap this case tracks.
 
 **P2.3 Runner** (M)
 - [ ] `python -m evals run --suite core --version current|baseline --preset … --repeats 3 --jobs 4`: one `run.py` subprocess per case × repeat (the baseline from its worktree), each with its own runs directory under `evals/runs/` (gitignored), tagged with case, repeat and version for LangSmith.

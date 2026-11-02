@@ -1,0 +1,18 @@
+description: >
+  Continuous, right-skewed target with 2% extreme outliers: size_sqm strong and
+  positive, age_years negative, rating none.
+target: price
+data: {generator: regression_outliers, seed: 6}
+facts:
+  - {name: median_price, value: 217450, near: [median]}
+  - {name: mean_price, value: 289164, near: [mean, average]}
+must_find:
+  - price is strongly right-skewed and has extreme outliers.
+  - size_sqm has a strong positive association with price.
+  - age_years has a negative association with price.
+  - rating shows no meaningful association with price.
+must_not_claim:
+  - rating is a significant or important predictor of price.
+  - price is treated as a classification target (accuracy, precision or recall reported for it).
+caveats:
+  outliers: [outlier]
