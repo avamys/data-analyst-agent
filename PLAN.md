@@ -3,7 +3,7 @@
 > **This is the main plan for the project.** It replaces `todo.md`; everything still useful from there is folded in below (see [Appendix: todo.md mapping](#appendix-todomd-mapping)).
 > Update the checkboxes and the **Status** block as work lands. Record decisions in the [Decision log](#decision-log).
 
-**Status:** Phase 1 in progress on `phase-1`: P1.1–P1.3 done (wrong claims 7 → 3, charts 0 → 9); P1.4 lead analyst done (baseline findings absent 7 → 2; wrong claims 5: method errors the review misses). Hosted providers added (OpenRouter, Anthropic): the same agent on Claude Haiku 5.5 runs in 12.5 min for $0.12 with 0 wrong claims and all baseline findings ([check](docs/progress/models/haiku-5.5/annotations.md)); next: P1.5 synthesis & report · **Last updated:** 2026-11-02
+**Status:** Phase 1 done on `phase-1` (P1.1–P1.5). Measured on the Titanic reference run: wrong claims 7 → 0, unsupported 6 → 0, baseline findings absent 7 → 0, charts in the report 0 → 5 ([P1.5 check](docs/progress/p1.5/annotations.md)). The exit criteria were met on Claude Haiku 5.5 (9 min, $0.08 a run); not yet re-run on qwen3.5. Hosted providers (OpenRouter, Anthropic) and a cost report added. Next: plan Phase 2 (eval harness) · **Last updated:** 2026-11-02
 
 ---
 
@@ -305,11 +305,11 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 **Measuring progress until Phase 2:** after each step, re-run the reference run (`run.py data/titanic.csv --target Survived`) and repeat the claim check from [annotations.md](docs/baseline/annotations.md). Log the counts below.
 
 **Exit criteria**
-- [ ] Specialists see their output and iterate; each task's code is a runnable `.py` cell script in the run directory
-- [ ] The lead reviews every task result (accept / revise / follow-up) within budgets
-- [ ] The report is written from accepted findings, facts, and charts; every number in it matches a recorded fact (automatic check)
-- [ ] Reference run: 0 wrong claims, ≤ 2 unsupported, every "computed but missing" baseline finding present, ≥ 2 charts
-- [ ] No dataset-specific text and no example pipelines in prompts
+- [x] Specialists see their output and iterate; each task's code is a runnable `.py` cell script in the run directory
+- [x] The lead reviews every task result (accept / revise / follow-up) within budgets
+- [x] The report is written from accepted findings, facts, and charts; every number in it matches a recorded fact (automatic check)
+- [x] Reference run: 0 wrong claims, ≤ 2 unsupported, every "computed but missing" baseline finding present, ≥ 2 charts. *(Met on Claude Haiku 5.5, 2026-11-02: 0 / 0 / 7 of 7 / 5. Not yet run on qwen3.5.)*
+- [x] No dataset-specific text and no example pipelines in prompts
 
 #### Progress log
 | Step | Run | Time | Wrong | Unsupported | Missing findings | Charts |
@@ -319,6 +319,7 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 | P1.3 prompts & profile | `20261101-121244` ([check](docs/progress/p1.3/annotations.md)) | 54 min | 3 | 7 | 5 (no model trained this run) | 9 |
 | P1.4 lead analyst | `20261101-192628` ([check](docs/progress/p1.4/annotations.md)) | 120 min | 5 (imputed t-test, unscaled coefficients ranked) | 6 | 2 | 12 (not yet in the report) |
 | P1.4 on Claude Haiku 5.5 (same code, hosted) | `20261102-170201` ([check](docs/progress/models/haiku-5.5/annotations.md)) | 12.5 min, $0.12 | 0 | 3 (writer prose) | 0 | 1 (link broken) |
+| P1.5 synthesis & report (Haiku 5.5) | `20261102-181146` ([check](docs/progress/p1.5/annotations.md)) | 9.3 min, $0.08 | 0 | 0 | 0 | 5 (all in the report) |
 
 #### Steps (in this order)
 
@@ -355,10 +356,11 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 - [x] Reference run + annotation → progress log. Two runs failed first (empty brief ids; an Ollama stream with no data), and the second showed reviews introducing errors; fixed before the third. See [check](docs/progress/p1.4/annotations.md).
 
 **P1.5 Synthesis & report** (M)
-- [ ] The lead writes the report from accepted findings, the fact table, and charts (replaces synthesizer + reporter).
-- [ ] Number check: every number in the report must match a recorded fact (allowing rounding and percent formatting); mismatches go back to the writer once, any left are listed in the report's limitations.
-- [ ] Charts embedded in `report.md`.
-- [ ] Reference run + annotation → progress log; exit criteria checked.
+- [x] The lead writes the report from accepted findings, the fact table, and charts (replaces synthesizer + reporter). It sees each finding with only the facts it cites, so stale facts from failed attempts are out.
+- [x] Number check: every number in the report must match a recorded fact (allowing rounding and percent formatting); mismatches go back to the writer once, any left are listed in the report's limitations. (`agent/number_check.py`)
+- [x] Charts embedded in `report.md`; images whose file doesn't exist are removed.
+- [x] Reference run + annotation → progress log; exit criteria checked.
+- Found on the way: Haiku saved 1 chart per run under "save a chart when it shows a finding better than numbers", so specialists are now asked for a chart of each main finding about distributions, groups or models (5 charts in the reference run). The check's first version missed numbers recorded inside strings and fact names (interval labels); it now reads both.
 
 #### Phase 1 risks
 | Risk | Mitigation |
@@ -479,6 +481,8 @@ PLAN.md  README.md
 | 2026-11-02 | The smoke script fails a model whose structured output loses line breaks in code | `nemotron-3-ultra-550b-a55b:free` turns newlines in tool-call arguments into spaces (and double-escapes them in plain JSON), so every cell became one comment line and ran as a no-op; `nemotron-3.5-super-vl:free` keeps them |
 | 2026-11-02 | Anthropic as a third provider (`langchain-anthropic<1`); structured output through JSON outputs (`output_config.format`), no temperature sent | Forced tool calls let Haiku 5.5 drop required fields (a review without a verdict ended a run); JSON outputs are schema-valid by construction and work on Sonnet / Opus 5.5, which reject forced tool calls. Current Claude models reject sampling parameters. |
 | 2026-11-02 | Claim-check model runs like the P1.x steps (`docs/progress/models/<model>/`) | Same method, so model and design changes compare on one scale until Phase 2 |
+| 2026-11-02 | Number check: a number passes if a recorded value rounds to it (shares may be written as percentages, sign not compared). Recorded = cited facts (values and names), the profile, number literals in task code. Plain integers ≤ 10, thresholds (`p < 0.001`) and confidence levels are not checked | On the earlier Haiku report it flagged exactly the 7 untraced numbers among hundreds. Small integers are mostly labels (class 3, df 2); code literals are parameters (`test_size=0.25`) |
+| 2026-11-02 | The report has Summary, Data, Findings, Limitations, Open questions; no "Recommendations" | The old Recommendations / Future analysis sections were where writers speculated beyond the findings |
 | 2026-10-31 | Tracing: **LangSmith only**; MLflow removed | Built for agents; clearer traces. Tracing is opt-in via env, because when it's on, prompts and data samples leave the machine (relevant to the local-first pitch) |
 | 2026-10-31 | Delete untracked `todo.md`, `docs/`, `notebooks/`, and the `multi-specialist` branch | Confirmed by owner; superseded by this plan / `feature/new-flow` |
 | 2026-10-31 | New Phase 1 (agent quality) before the eval harness | The baseline review shows structural failures; the tagged baseline keeps the before/after story measurable |
