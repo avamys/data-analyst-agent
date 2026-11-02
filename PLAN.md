@@ -385,9 +385,10 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 #### Steps (in this order)
 
 **P2.0 Central run configuration** (S–M). First, because eval runs vary and record these.
-- [ ] Move the behaviour knobs that are hard-coded today into `Settings`, grouped and documented: review script cap, fact value cap, planning description cap, sanity-check thresholds, profiling thresholds, per-role temperatures, retries, report rewrites, number-check exemptions.
-- [ ] Named presets, e.g. `local` (today's budgets, for qwen) and `hosted` (5 follow-ups, 2 revisions), selected with `--preset` / `PRESET`. Precedence: defaults < preset < `.env` / environment < CLI.
-- [ ] Tests for the precedence; `run_meta.json` records the resolved values (it already dumps `Settings`).
+- [x] Move the behaviour knobs that are hard-coded today into `Settings`, grouped and documented: review script cap, fact value cap, planning description cap, sanity-check thresholds, profiling thresholds, per-role temperatures, retries, report rewrites, number-check exemptions (plus the Anthropic output cap). Left in code: the id/text column heuristics (detection rules, not run knobs) and the top-10 features in `record_model` (it runs in the task subprocess).
+- [x] Named presets, e.g. `local` (today's budgets, for qwen) and `hosted` (5 follow-ups, 2 revisions), selected with `--preset` / `PRESET`. Precedence: defaults < preset < `.env` / environment < CLI.
+- [x] Tests for the precedence; `run_meta.json` records the resolved values (it already dumps `Settings`). Checked in a 1-task Haiku run with `--preset hosted`, `MAX_FOLLOW_UPS=0` and `--max-tasks 1`: 2 revisions, 0 follow-ups, 1 task.
+- Found on the way: role temperatures were read at import time, so no override reached them; now read when used. On a rewrite, the writer appended a list of its corrections to the report, quoting the old numbers; it is now told to return only the report (3 of 3 replays clean).
 
 **P2.1 Baseline on Haiku** (S)
 - [ ] Branch `baseline-hosted` from `v0.1.0-baseline`. Add the Anthropic provider with the same fixes Phase 1 needed: no temperature, JSON outputs for structured calls, `.text()` for block replies. Prompts, flow and the baseline's bugs stay as tagged.

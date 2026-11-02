@@ -17,6 +17,8 @@ uv run python run.py data/titanic.csv --target Survived
 
 Each run writes a directory under `runs/` with the full log, every LLM call, the state after each step, every code attempt, and `report.md`. See [docs/baseline/run/](docs/baseline/run/) for an example.
 
+All settings that change a run (provider and model, budgets, prompt caps, check thresholds) are in [agent/config.py](agent/config.py), overridable in `.env` or per run; `--preset hosted` gives hosted models a larger budget (more follow-up tasks and revisions).
+
 To see a run's token usage per step and its cost at OpenRouter prices, also projected onto other models: `uv run python scripts/run_cost.py runs/latest --price-as anthropic/claude-haiku-5.5`.
 
 ## Development

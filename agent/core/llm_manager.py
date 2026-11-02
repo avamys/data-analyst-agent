@@ -26,28 +26,17 @@ class LLMManager:
 
     _llm_cache: dict[str, Any] = {}
 
-    # Default configuration per agent type; "model" names the settings field
+    # Settings fields per agent type, read at call time so presets and CLI flags
+    # apply
     AGENT_CONFIGS = {
-        "lead": {
-            "model": "analyst_model",
-            "temperature": 0.2,
-        },
-        "eda": {
-            "model": "coder_model",
-            "temperature": 0.3,
-        },
+        "lead": {"model": "analyst_model", "temperature": "lead_temperature"},
+        "eda": {"model": "coder_model", "temperature": "eda_temperature"},
         "statistical": {
             "model": "coder_model",
-            "temperature": 0.2,
+            "temperature": "statistical_temperature",
         },
-        "ml": {
-            "model": "coder_model",
-            "temperature": 0.1,
-        },
-        "reporter": {
-            "model": "reporter_model",
-            "temperature": settings.reporter_temperature,
-        },
+        "ml": {"model": "coder_model", "temperature": "ml_temperature"},
+        "reporter": {"model": "reporter_model", "temperature": "reporter_temperature"},
     }
 
     @classmethod
@@ -116,7 +105,9 @@ class LLMManager:
         config = cls.AGENT_CONFIGS[agent_type]
         return (
             model_name or getattr(settings, config["model"]) or settings.model,
-            temperature if temperature is not None else config["temperature"],
+            temperature
+            if temperature is not None
+            else getattr(settings, config["temperature"]),
         )
 
     @staticmethod
@@ -173,8 +164,7 @@ class LLMManager:
                 "api_key": settings.anthropic_api_key,
                 # Current Claude models reject sampling parameters
                 "temperature": None,
-                # Thinking counts against the cap, and an unused cap costs nothing
-                "max_tokens": 16000,
+                "max_tokens": settings.anthropic_max_tokens,
                 "timeout": settings.llm_timeout_s,
             }
         return {

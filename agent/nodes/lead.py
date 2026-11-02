@@ -18,9 +18,6 @@ from agent.states import Brief, HierarchicalState, LeadPlan, Review
 
 logger = logging.getLogger(__name__)
 
-# The lead sees at most this much of a task's script when reviewing it
-MAX_SCRIPT_CHARS = 8000
-
 ID_PREFIX = {"eda": "eda", "statistical": "stat", "ml": "ml"}
 
 
@@ -36,7 +33,7 @@ def plan_node(state: HierarchicalState) -> dict:
     prompt = prompt_templates.render(
         "lead/plan.jinja2",
         profile=profile_summary(state.dataset_profile),
-        dataset_info=state.dataset_info[:1000],
+        dataset_info=state.dataset_info[: settings.plan_description_chars],
         has_target=state.dataset_profile.target_column is not None,
         max_tasks=settings.max_tasks,
     )
@@ -75,8 +72,8 @@ def review_node(state: HierarchicalState) -> dict:
     can_revise = result.revisions < settings.max_revisions
     follow_ups_left = settings.max_follow_ups - state.follow_ups_added
     script = result.code
-    if len(script) > MAX_SCRIPT_CHARS:
-        script = "# … (earlier cells cut)\n" + script[-MAX_SCRIPT_CHARS:]
+    if len(script) > settings.review_script_chars:
+        script = "# … (earlier cells cut)\n" + script[-settings.review_script_chars :]
     prompt = prompt_templates.render(
         "lead/review.jinja2",
         profile=profile_summary(state.dataset_profile),

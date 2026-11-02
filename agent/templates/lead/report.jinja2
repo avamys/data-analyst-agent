@@ -32,6 +32,8 @@ One subsection per topic: the findings with their numbers, test results, model s
 Data problems, caveats stated in the findings, unresolved review issues and failed tasks.
 ## Open questions
 Questions the tasks raised and did not answer.
+
+Return only the report itself.
 {% if draft %}
 
 YOUR DRAFT:
@@ -39,5 +41,5 @@ YOUR DRAFT:
 
 The automatic check found these numbers in your draft, which match no fact:
 {{ unmatched }}
-Write the whole report again. Replace each of these numbers with the value of the fact it should come from, or remove the statement if no fact gives it. Keep everything else as it is.
+Write the whole report again. Replace each of these numbers with the value of the fact it should come from, or remove the statement if no fact gives it. Keep everything else as it is. Return only the corrected report: no notes about what you changed, since the reader never saw the draft.
 {% endif %}

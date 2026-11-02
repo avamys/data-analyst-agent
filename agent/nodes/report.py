@@ -12,6 +12,7 @@ import logging
 import re
 from pathlib import Path
 
+from agent.config import settings
 from agent.core.base_agent import BaseAgent
 from agent.core.template_manager import prompt_templates
 from agent.number_check import code_literals, recorded_values, unmatched_numbers
@@ -50,7 +51,9 @@ def write_report_node(state: HierarchicalState) -> dict:
     # text(): with thinking on (Claude), content is a list of blocks
     report = writer.invoke(prompt()).text().strip()
     unmatched = unmatched_numbers(report, values)
-    if unmatched:
+    for _ in range(settings.max_report_rewrites):
+        if not unmatched:
+            break
         logger.warning(f"Numbers matching no fact, sent back: {unmatched}")
         listed = "\n".join(f'- {n} in: "{line}"' for n, line in unmatched)
         report = writer.invoke(prompt(draft=report, unmatched=listed)).text().strip()

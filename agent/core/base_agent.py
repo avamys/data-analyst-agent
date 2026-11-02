@@ -8,6 +8,7 @@ from langchain_core.messages import HumanMessage
 from ollama import ResponseError
 from pydantic import ValidationError
 
+from agent.config import settings
 from agent.core.llm_manager import LLMManager
 from agent.states import HierarchicalState
 
@@ -78,7 +79,7 @@ class BaseAgent:
                 ValidationError,
                 ValueError,
             ),
-            stop_after_attempt=2,
+            stop_after_attempt=1 + settings.llm_retries,
         )
 
     def invoke(self, prompt: str, **kwargs) -> Any:

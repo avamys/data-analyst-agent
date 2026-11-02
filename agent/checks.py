@@ -1,13 +1,7 @@
 """Deterministic sanity checks on a task result, shown to the lead during review"""
 
+from agent.config import settings
 from agent.states import Brief, DatasetProfile, TaskResult
-
-# Train score above test score by more than this suggests overfitting
-OVERFIT_GAP = 0.1
-# A test score at or above this is suspicious: leakage more often than skill
-NEAR_PERFECT = 0.99
-# Test accuracy within this of the majority-class baseline adds nothing
-BASELINE_MARGIN = 0.02
 
 
 def missing_outputs(brief: Brief, published: list[str]) -> list[str]:
@@ -34,19 +28,19 @@ def sanity_checks(
         scores = fact["value"]
         metric = "accuracy" if scores["kind"] == "classifier" else "r2"
         train, test = scores[f"train_{metric}"], scores[f"test_{metric}"]
-        if train - test > OVERFIT_GAP:
+        if train - test > settings.overfit_gap:
             problems.append(
                 f"Model {name}: train {metric} {train} vs test {test}, a gap of "
                 f"{train - test:.2f}: overfitting. The report must say so."
             )
-        if test >= NEAR_PERFECT:
+        if test >= settings.near_perfect_score:
             problems.append(
                 f"Model {name}: test {metric} {test} is near-perfect, which usually "
                 "means a feature leaks the target. It must be investigated, not praised."
             )
         if scores["kind"] == "classifier":
             baseline = scores["baseline_accuracy"]
-            if test - baseline < BASELINE_MARGIN:
+            if test - baseline < settings.baseline_margin:
                 problems.append(
                     f"Model {name}: test accuracy {test} is no better than always "
                     f"predicting the most frequent class ({baseline})."

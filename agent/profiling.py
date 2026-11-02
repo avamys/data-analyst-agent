@@ -4,6 +4,7 @@ import logging
 
 import pandas as pd
 
+from agent.config import settings
 from agent.states import DatasetProfile, TargetType
 
 logger = logging.getLogger(__name__)
@@ -11,11 +12,6 @@ logger = logging.getLogger(__name__)
 
 # Column names treated as the target when none is given explicitly
 TARGET_NAMES = ["target", "label", "class", "outcome", "y"]
-
-# A column is a leakage suspect when on its own it removes this share of the
-# errors of always predicting the most frequent class, or (regression) when its
-# |correlation| with the target reaches it
-LEAKAGE_SCORE = 0.9
 
 
 def detect_target(
@@ -107,7 +103,7 @@ def auto_profile_dataset(
     if target_column and target_type in ["binary", "multiclass"]:
         class_counts = df[target_column].value_counts()
         ratio = class_counts.max() / class_counts.min() if len(class_counts) > 1 else 1
-        has_imbalance = ratio > 2.0
+        has_imbalance = ratio > settings.imbalance_ratio
 
     # Has temporal data
     has_temporal = len(datetime_features) > 0
@@ -174,7 +170,7 @@ def _leakage_suspects(
             if kind != "numeric":
                 continue
             score = abs(x.corr(y))
-            suspect = score >= LEAKAGE_SCORE
+            suspect = score >= settings.leakage_score
         else:
             if kind == "numeric" and x.nunique() > 10:
                 x = pd.qcut(x, 10, duplicates="drop")
@@ -182,7 +178,8 @@ def _leakage_suspects(
             hits = y.groupby(groups).agg(lambda s: s.value_counts().max()).sum()
             score = hits / y.notna().sum()
             suspect = (
-                baseline < 1 and (score - baseline) / (1 - baseline) >= LEAKAGE_SCORE
+                baseline < 1
+                and (score - baseline) / (1 - baseline) >= settings.leakage_score
             )
         if suspect:
             suspects[col] = round(float(score), 3)

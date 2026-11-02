@@ -65,15 +65,16 @@ def clean_code(code: str) -> str:
 
 def format_facts(facts: dict, task_id: str | None = None) -> str:
     """
-    One line per fact: name = value  # description. Values are capped at 200
-    chars, except model scores, which the lead needs whole
+    One line per fact: name = value  # description. Values are capped
+    (settings.prompt_fact_chars), except model scores, which the lead needs whole
     """
     prefix = f"{task_id}." if task_id else ""
     lines = []
     for name, fact in facts.items():
         value = json.dumps(fact["value"])
-        if len(value) > 200 and fact.get("kind") != "model":
-            value = value[:200] + "…"
+        cap = settings.prompt_fact_chars
+        if len(value) > cap and fact.get("kind") != "model":
+            value = value[:cap] + "…"
         lines.append(f"- {prefix}{name} = {value}  # {fact['desc']}")
     return "\n".join(lines) or "(none)"
 

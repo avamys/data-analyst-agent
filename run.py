@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 # Load before anything reads LangSmith env vars
 load_dotenv(".env")
 
-from agent.config import settings  # noqa: E402
+from agent.config import PRESETS, settings  # noqa: E402
 from agent.core.llm_manager import LLMManager  # noqa: E402
 from agent.data_loader import generate_dataset_info, load_dataset  # noqa: E402
 from agent.graph import build_hierarchical_graph  # noqa: E402
@@ -40,11 +40,17 @@ def main():
         choices=["ollama", "openrouter", "anthropic"],
         help="Overrides MODEL_PROVIDER",
     )
+    parser.add_argument(
+        "--preset", choices=list(PRESETS), help="Named settings (overrides PRESET)"
+    )
     parser.add_argument("--model", help="Model for all agents (overrides settings)")
     args = parser.parse_args()
 
     if not args.csv_path.exists():
         parser.error(f"Dataset not found: {args.csv_path}")
+    # The preset first, so explicit flags below override it
+    if args.preset:
+        settings.use_preset(args.preset)
     if args.max_tasks is not None:
         settings.max_tasks = args.max_tasks
     if args.provider:
@@ -77,7 +83,7 @@ def main():
     config = {
         "run_id": run_id,
         "run_name": f"analysis:{dataset}",
-        "tags": [dataset, settings.model_provider, model],
+        "tags": [dataset, settings.model_provider, model, settings.preset],
         "metadata": {"commit": commit, "run_dir": store.path.name},
         "callbacks": [recorder],
         # Each task is a run_task + review step, once more per revision

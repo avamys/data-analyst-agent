@@ -1,16 +1,34 @@
+"""Every setting that changes how a run behaves, in one place
+
+Precedence, lowest first: the defaults below < the preset (PRESET or --preset)
+< .env and environment variables (e.g. MAX_FOLLOW_UPS=4) < command-line flags.
+run_meta.json records the resolved values of every run.
+"""
+
 from typing import Literal
 
-from pydantic import SecretStr
+from pydantic import PrivateAttr, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Named sets of values; a preset replaces defaults, never explicit settings
+PRESETS: dict[str, dict] = {
+    # The defaults: sized for qwen3.5 on a 4 GB GPU, ~1-2 h per run
+    "local": {},
+    # Hosted models: ~2x the time and cost of the defaults (Haiku 5.5, 2026-11-02:
+    # 18.7 min, $0.18), and no review objection left unresolved
+    "hosted": {"max_follow_ups": 5, "max_revisions": 2},
+}
 
 
 class Settings(BaseSettings):
-    # Read overrides from .env (e.g. ANALYST_MODEL=...); unrelated keys and
-    # empty values are ignored
+    # Unrelated keys in .env and empty values are ignored
     model_config = SettingsConfigDict(
         env_file=".env", extra="ignore", env_ignore_empty=True
     )
 
+    preset: Literal["local", "hosted"] = "local"
+
+    # --- Provider and models ---
     # Where models run: local Ollama, or hosted OpenRouter / Anthropic. Each provider
     # keeps its own model, so switching is one setting (MODEL_PROVIDER or --provider).
     model_provider: Literal["ollama", "openrouter", "anthropic"] = "ollama"
@@ -44,32 +62,76 @@ class Settings(BaseSettings):
             "anthropic": self.anthropic_model,
         }[self.model_provider]
 
-    # Generation limits. Thinking mode and the 4k default context make local
-    # Ollama runs hang or silently truncate prompts, so both are set explicitly.
+    # --- Generation ---
+    # Thinking mode and the 4k default context make local Ollama runs hang or
+    # silently truncate prompts, so both are set explicitly.
     llm_reasoning: bool = False  # Ollama only; OpenRouter uses openrouter_reasoning
     llm_num_ctx: int = 16384  # 8k cut off reports once task reports got complete
     llm_max_tokens: int = 4096
+    # Thinking counts against the cap, and an unused cap costs nothing
+    anthropic_max_tokens: int = 16000
     llm_timeout_s: int = 900
     # Layers to put on the GPU; None lets Ollama decide. Ollama's estimate can be
     # very conservative on small GPUs, so this is a per-machine setting for .env.
     llm_num_gpu: int | None = None
+    # Extra attempts after a parse failure or a crashed Ollama runner
+    llm_retries: int = 1
 
-    # Temperature settings
+    # Temperature per role (not sent to current Claude models, which reject it)
+    lead_temperature: float = 0.2
+    eda_temperature: float = 0.3
+    statistical_temperature: float = 0.2
+    ml_temperature: float = 0.1
     reporter_temperature: float = 0.3
 
-    # Workflow control
-    max_specialist_steps: int = 5  # LLM steps per task (each runs a cell or finishes)
-    max_cell_output_chars: int = 3000  # Output of a cell shown to the specialist
-    max_tasks: int = 6  # Upper bound on planned tasks (keeps local runs tractable)
-    max_follow_ups: int = 2  # Tasks the lead may add during reviews
+    # --- Budgets: how much work a run does ---
+    max_tasks: int = 6  # Upper bound on planned tasks
+    max_follow_ups: int = 2  # Tasks the lead may add during reviews, per run
     max_revisions: int = 1  # Times the lead may send one task back
+    max_specialist_steps: int = 5  # LLM steps per attempt (run a cell or finish)
+    max_report_rewrites: int = 1  # Times numbers matching no fact go back to the writer
     code_timeout_s: int = 300  # Per run of a task script
 
-    # Paths
-    runs_directory: str = "runs"  # One subdirectory per run (see agent/run_store.py)
+    # --- What agents see: caps on prompt content ---
+    max_cell_output_chars: int = 3000  # Latest cell output shown to the specialist
+    prompt_fact_chars: int = 200  # Fact value shown in prompts (model scores: whole)
+    review_script_chars: int = 8000  # End of a task's script the lead reviews
+    plan_description_chars: int = 1000  # Dataset description the lead plans from
 
-    # Logging
+    # --- Sanity checks shown to the lead during review ---
+    overfit_gap: float = 0.1  # Train score above test score by more than this
+    near_perfect_score: float = 0.99  # Test score suspicious at or above this
+    baseline_margin: float = 0.02  # Accuracy within this of the baseline adds nothing
+
+    # --- Profiling ---
+    # A column is a leakage suspect when on its own it removes this share of the
+    # errors of always predicting the most frequent class, or (regression) when its
+    # |correlation| with the target reaches it
+    leakage_score: float = 0.9
+    imbalance_ratio: float = 2.0  # Largest / smallest class above this: imbalanced
+
+    # --- Number check of the report ---
+    number_check_max_label: int = 10  # Plain integers up to this aren't checked
+    number_check_conventions: list[float] = [0.05]  # Conventions, not results
+
+    # --- Paths and logging ---
+    runs_directory: str = "runs"  # One subdirectory per run (see agent/run_store.py)
     log_level: str = "INFO"
+
+    # Fields set explicitly (arguments, environment, .env): presets leave them
+    _explicit: set[str] = PrivateAttr(default_factory=set)
+
+    def model_post_init(self, context) -> None:
+        self._explicit = set(self.model_fields_set) - {"preset"}
+        self.use_preset(self.preset)
+
+    def use_preset(self, name: str) -> None:
+        """Switch to a preset: its values replace defaults, not explicit settings"""
+        self.preset = name
+        for key in {key for values in PRESETS.values() for key in values}:
+            if key not in self._explicit:
+                default = type(self).model_fields[key].default
+                setattr(self, key, PRESETS[name].get(key, default))
 
 
 settings = Settings()

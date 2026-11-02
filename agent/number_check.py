@@ -2,13 +2,15 @@
 
 A number in the text passes if some recorded value rounds to it at the precision
 shown (a share may be written as a percentage; the sign is not compared). Plain
-integers up to 10 are not checked: they are mostly category labels, degrees of
-freedom and counts of tasks.
+integers up to settings.number_check_max_label are not checked: they are mostly
+category labels, degrees of freedom and counts of tasks.
 """
 
 import re
 from collections.abc import Iterable
 from typing import Any
+
+from agent.config import settings
 
 SUPERSCRIPTS = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻", "0123456789-")
 
@@ -18,8 +20,6 @@ NUMBER = re.compile(
     r"(?:[eE](?P<exp>[-−+]?\d+)|\s*[×x]\s*10\^?(?P<sup>[-−⁻]?[\d⁰¹²³⁴⁵⁶⁷⁸⁹]+))?"
     r"(?P<pct>\s*%)?"
 )
-# Conventions rather than results
-CONVENTIONAL = {0.05}
 # A number inside a recorded string or key, e.g. an interval label "(7.91, 14.454]"
 LITERAL = re.compile(r"(?<![\w.])\d+(?:\.\d+)?(?:[eE]-?\d+)?")
 # Removed before scanning: inline code, link and image targets, list markers
@@ -39,10 +39,11 @@ def numbers_in(text: str) -> list[tuple[str, float, float, str]]:
             digits = m["int"].replace(",", "") + (m["frac"] or "")
             exp = m["exp"] or m["sup"]
             exp = int(exp.translate(SUPERSCRIPTS).replace("−", "-")) if exp else 0
-            if not m["frac"] and not exp and not m["pct"] and int(digits) <= 10:
+            plain = not m["frac"] and not exp and not m["pct"]
+            if plain and int(digits) <= settings.number_check_max_label:
                 continue
             value = float(digits) * 10.0**exp
-            if value in CONVENTIONAL:
+            if value in settings.number_check_conventions:
                 continue
             decimals = len(m["frac"]) - 1 if m["frac"] else 0
             found.append((m[0].strip(), value, 0.5 * 10.0 ** (exp - decimals), line))
