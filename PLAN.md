@@ -3,7 +3,7 @@
 > **This is the main plan for the project.** It replaces `todo.md`; everything still useful from there is folded in below (see [Appendix: todo.md mapping](#appendix-todomd-mapping)).
 > Update the checkboxes and the **Status** block as work lands. Record decisions in the [Decision log](#decision-log).
 
-**Status:** Phase 1 done on `phase-1` (P1.1–P1.5). Measured on the Titanic reference run: wrong claims 7 → 0, unsupported 6 → 0, baseline findings absent 7 → 0, charts in the report 0 → 5 ([P1.5 check](docs/progress/p1.5/annotations.md)). The exit criteria were met on Claude Haiku 5.5 (9 min, $0.08 a run); not yet re-run on qwen3.5. Hosted providers (OpenRouter, Anthropic) and a cost report added. Phase 2 planned (eval harness; both versions on Haiku 5.5, Sonnet 5.5 as judge). P2.0 (central configuration, presets) and P2.1 (baseline on Haiku, `v0.1.1-baseline-hosted`) done; P2.2 (7 eval cases with known answers) done. Next: P2.3 runner · **Last updated:** 2026-11-02
+**Status:** Phase 1 done on `phase-1` (P1.1–P1.5). Measured on the Titanic reference run: wrong claims 7 → 0, unsupported 6 → 0, baseline findings absent 7 → 0, charts in the report 0 → 5 ([P1.5 check](docs/progress/p1.5/annotations.md)). The exit criteria were met on Claude Haiku 5.5 (9 min, $0.08 a run); not yet re-run on qwen3.5. Hosted providers (OpenRouter, Anthropic) and a cost report added. Phase 2 planned (eval harness; both versions on Haiku 5.5, Sonnet 5.5 as judge). P2.0 (central configuration, presets) and P2.1 (baseline on Haiku, `v0.1.1-baseline-hosted`) done; P2.2 (7 eval cases with known answers) done; P2.3 (runner) done; first suite, judged by hand: current 30/30 findings, baseline 16/30 ([first look](docs/eval/first-look.md)). Next: P2.4 deterministic graders · **Last updated:** 2026-11-02
 
 ---
 
@@ -403,10 +403,11 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 - Notes: the eval always passes the target, so target detection is covered by the profiler's tests, not the eval. In `datetime_trend` the profile classifies `date` as an id column, so the time pattern is likely missed: the gap this case tracks.
 
 **P2.3 Runner** (M)
-- [ ] `python -m evals run --suite core --version current|baseline --preset … --repeats 3 --jobs 4`: one `run.py` subprocess per case × repeat (the baseline from its worktree), each with its own runs directory under `evals/runs/` (gitignored), tagged with case, repeat and version for LangSmith.
-- [ ] One JSONL line per run in `evals/results/<timestamp>_<version>_<model>.jsonl` (committed): case, repeat, version, model, preset, commit, run directory, grader outputs.
-- [ ] A failed or timed-out run is a result (run success = false), not a crash of the suite.
-- [ ] Verify: a 1-case, 1-repeat suite end to end on both versions.
+- [x] `python -m evals run --suite core --version current|baseline --preset … --repeats 3 --jobs 4`: one `run.py` subprocess per case × repeat (the baseline from its worktree), each with its own runs directory under `evals/runs/` (gitignored), tagged with case, repeat and version for LangSmith. *`--cases` instead of `--suite`; each suite traces to its own LangSmith project (`evals-<suite id>`), so the tagged baseline needs no change.*
+- [x] One JSONL line per run in `evals/results/<timestamp>_<version>_<model>.jsonl` (committed): case, repeat, version, model, preset, commit, run directory, grader outputs. *Grader outputs come with P2.4.*
+- [x] A failed or timed-out run is a result (run success = false), not a crash of the suite.
+- [x] Verify: a 1-case, 1-repeat suite end to end on both versions. *All 7 cases on both versions, judged by hand: [first look](docs/eval/first-look.md). Current 30/30 `must_find` items, baseline 16/30; the baseline loses findings to truncated output.*
+- Found on the way: the dataset file names gave the answers away (a baseline report cited "the file name, pure_noise"); cases now have neutral file names, and the first suite was discarded.
 
 **P2.4 Deterministic graders** (M)
 - [ ] From the run directory (both versions): run success, tasks completed / failed, wall time, LLM calls, tokens, cost (the `scripts/run_cost.py` functions).
