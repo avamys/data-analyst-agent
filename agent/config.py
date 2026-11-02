@@ -114,6 +114,10 @@ class Settings(BaseSettings):
     number_check_max_label: int = 10  # Plain integers up to this aren't checked
     number_check_conventions: list[float] = [0.05]  # Conventions, not results
 
+    # --- Eval judge (evals/judge.py); called through the Anthropic API whatever
+    # the agent's provider, with anthropic_api_key ---
+    judge_model: str = "claude-sonnet-5-5"
+
     # --- Paths and logging ---
     runs_directory: str = "runs"  # One subdirectory per run (see agent/run_store.py)
     log_level: str = "INFO"
