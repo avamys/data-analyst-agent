@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 load_dotenv(".env")
 
 from agent.config import settings  # noqa: E402
+from agent.core.llm_manager import LLMManager  # noqa: E402
 from agent.data_loader import generate_dataset_info, load_dataset  # noqa: E402
 from agent.graph import build_hierarchical_graph  # noqa: E402
 from agent.logging_config import setup_logging  # noqa: E402
@@ -34,6 +35,11 @@ def main():
     parser.add_argument("csv_path", type=Path, help="Path to the CSV dataset")
     parser.add_argument("--target", help="Target column (detected when omitted)")
     parser.add_argument("--max-tasks", type=int, help="Upper bound on planned tasks")
+    parser.add_argument(
+        "--provider",
+        choices=["ollama", "openrouter", "anthropic"],
+        help="Overrides MODEL_PROVIDER",
+    )
     parser.add_argument("--model", help="Model for all agents (overrides settings)")
     args = parser.parse_args()
 
@@ -41,13 +47,16 @@ def main():
         parser.error(f"Dataset not found: {args.csv_path}")
     if args.max_tasks is not None:
         settings.max_tasks = args.max_tasks
+    if args.provider:
+        settings.model_provider = args.provider
     if args.model:
         settings.analyst_model = settings.coder_model = settings.reporter_model = (
             args.model
         )
 
     dataset = args.csv_path.stem
-    store = RunStore(settings.runs_directory, dataset, settings.analyst_model)
+    model = LLMManager.resolve_config("lead")[0]
+    store = RunStore(settings.runs_directory, dataset, model)
     setup_logging(settings.log_level, log_file=store.path / "run.log")
     logger.info(f"Run directory: {store.path}")
 
@@ -68,7 +77,7 @@ def main():
     config = {
         "run_id": run_id,
         "run_name": f"analysis:{dataset}",
-        "tags": [dataset, settings.analyst_model],
+        "tags": [dataset, settings.model_provider, model],
         "metadata": {"commit": commit, "run_dir": store.path.name},
         "callbacks": [recorder],
         # Each task is a run_task + review step, once more per revision
@@ -83,7 +92,9 @@ def main():
         "command": sys.argv,
         "commit": commit,
         "dirty": bool(_git("status", "--porcelain", "--untracked-files=no")),
-        "settings": settings.model_dump(exclude={"openai_api_key"}),
+        "settings": settings.model_dump(
+            exclude={"openrouter_api_key", "anthropic_api_key"}
+        ),
         "nodes": [],
     }
     store.write_json("run_meta.json", meta)

@@ -1,8 +1,8 @@
 """Check the configured LLM setup before a long run.
 
-Verifies Ollama is reachable, the configured models are pulled, and one
-structured-output call parses. Reports speed, GPU offload and the LangSmith
-trace URL when tracing is enabled.
+Verifies the provider is reachable (Ollama: models pulled; OpenRouter: key valid,
+free requests left today) and one structured-output call parses. Reports speed,
+GPU offload and the LangSmith trace URL when tracing is enabled.
 
 Usage: uv run python scripts/llm_smoke.py
 """
@@ -13,7 +13,7 @@ from uuid import uuid4
 
 import httpx
 from dotenv import load_dotenv
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 load_dotenv(".env")
 
@@ -25,18 +25,25 @@ from agent.tracing import trace_url, tracing_enabled  # noqa: E402
 class Answer(BaseModel):
     test_name: str
     used_for: str
+    code: str = Field(description="Python code, several lines, running it with scipy")
 
 
 def main() -> int:
     models = sorted(
-        {settings.analyst_model, settings.coder_model, settings.reporter_model}
+        {LLMManager.resolve_config(t)[0] for t in ("lead", "ml", "reporter")}
     )
     print(f"Provider: {settings.model_provider} | models: {models}")
-    print(
-        f"reasoning={settings.llm_reasoning} num_ctx={settings.llm_num_ctx} "
-        f"max_tokens={settings.llm_max_tokens} timeout={settings.llm_timeout_s}s "
-        f"num_gpu={settings.llm_num_gpu or 'auto'}"
-    )
+    if settings.model_provider == "openrouter":
+        print(
+            f"reasoning={settings.openrouter_reasoning} "
+            f"max_tokens={settings.llm_max_tokens} timeout={settings.llm_timeout_s}s"
+        )
+    elif settings.model_provider == "ollama":
+        print(
+            f"reasoning={settings.llm_reasoning} num_ctx={settings.llm_num_ctx} "
+            f"max_tokens={settings.llm_max_tokens} timeout={settings.llm_timeout_s}s "
+            f"num_gpu={settings.llm_num_gpu or 'auto'}"
+        )
     print(f"LangSmith tracing: {'on' if tracing_enabled() else 'off'}")
 
     if settings.model_provider == "ollama":
@@ -52,16 +59,41 @@ def main() -> int:
             return 1
         print("OK: Ollama reachable, models pulled")
 
-    llm = LLMManager.get_llm("lead").with_structured_output(Answer, include_raw=True)
+    if settings.model_provider == "openrouter":
+        if settings.openrouter_api_key is None:
+            print("FAIL: OPENROUTER_API_KEY is not set")
+            return 1
+        key = settings.openrouter_api_key.get_secret_value()
+        resp = httpx.get(
+            f"{settings.openrouter_base_url}/key",
+            headers={"Authorization": f"Bearer {key}"},
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            print(f"FAIL: OpenRouter key check: HTTP {resp.status_code} {resp.text}")
+            return 1
+        # A reference run makes ~60 calls; free models are capped per UTC day
+        free = resp.json()["data"].get("free_model_daily_requests")
+        print(f"OK: OpenRouter key valid | free-model requests today: {free}")
+
+    llm = LLMManager.with_structured_output(
+        LLMManager.get_llm("lead"), Answer, include_raw=True
+    )
     run_id = uuid4()
     start = time.time()
     out = llm.invoke(
-        "Name one statistical test for two categorical variables and what it is used for.",
+        "Name one statistical test for two categorical variables, what it is used "
+        "for, and the code to run it.",
         config={"run_name": "llm-smoke", "run_id": run_id, "tags": ["smoke"]},
     )
     secs = time.time() - start
     if out["parsing_error"] or out["parsed"] is None:
         print(f"FAIL: structured output did not parse: {out['parsing_error']}")
+        return 1
+    # Specialists send code in structured output; some models flatten it to one
+    # line, which turns a cell that starts with a comment into a no-op
+    if "\n" not in out["parsed"].code:
+        print(f"FAIL: code came back without line breaks: {out['parsed'].code!r}")
         return 1
     usage = out["raw"].usage_metadata or {}
     meta = out["raw"].response_metadata

@@ -1,5 +1,6 @@
 from typing import Literal
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,26 +11,48 @@ class Settings(BaseSettings):
         env_file=".env", extra="ignore", env_ignore_empty=True
     )
 
+    # Where models run: local Ollama, or hosted OpenRouter / Anthropic. Each provider
+    # keeps its own model, so switching is one setting (MODEL_PROVIDER or --provider).
+    model_provider: Literal["ollama", "openrouter", "anthropic"] = "ollama"
+
     # Ollama configuration
     ollama_base_url: str = "http://host.docker.internal:11434"
+    ollama_model: str = "qwen3.5:9b"
 
-    # Model configuration
-    analyst_model: str = "qwen3.5:9b"
-    coder_model: str = "qwen3.5:9b"
-    reporter_model: str = "qwen3.5:9b"
+    # OpenRouter configuration. Free (":free") models have a daily request cap;
+    # scripts/llm_smoke.py shows what is left.
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    openrouter_api_key: SecretStr | None = None
+    openrouter_model: str = "nvidia/nemotron-3-ultra-550b-a55b:free"
+    openrouter_reasoning: bool = True
 
-    # Generation limits (Ollama). Thinking mode and the 4k default context make
-    # local runs hang or silently truncate prompts, so both are set explicitly.
-    llm_reasoning: bool = False
+    # Anthropic configuration (thinking is on by default on current Claude models)
+    anthropic_api_key: SecretStr | None = None
+    anthropic_model: str = "claude-haiku-5-5"
+
+    # Per-role model overrides; empty = the provider's model above
+    analyst_model: str | None = None
+    coder_model: str | None = None
+    reporter_model: str | None = None
+
+    @property
+    def model(self) -> str:
+        """The active provider's model"""
+        return {
+            "ollama": self.ollama_model,
+            "openrouter": self.openrouter_model,
+            "anthropic": self.anthropic_model,
+        }[self.model_provider]
+
+    # Generation limits. Thinking mode and the 4k default context make local
+    # Ollama runs hang or silently truncate prompts, so both are set explicitly.
+    llm_reasoning: bool = False  # Ollama only; OpenRouter uses openrouter_reasoning
     llm_num_ctx: int = 16384  # 8k cut off reports once task reports got complete
     llm_max_tokens: int = 4096
     llm_timeout_s: int = 900
     # Layers to put on the GPU; None lets Ollama decide. Ollama's estimate can be
     # very conservative on small GPUs, so this is a per-machine setting for .env.
     llm_num_gpu: int | None = None
-
-    model_provider: Literal["ollama", "openai"] = "ollama"
-    openai_api_key: str | None = None
 
     # Temperature settings
     reporter_temperature: float = 0.3

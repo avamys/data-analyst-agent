@@ -65,9 +65,8 @@ def synthesizer_node(state: HierarchicalState) -> HierarchicalState:
     # Use BaseAgent directly - no need for subclass
     agent = BaseAgent(agent_type="synthesizer")
     response = agent.invoke(prompt)
-    synthesis = (
-        response.content.strip() if hasattr(response, "content") else str(response)
-    )
+    # text(): with thinking on (Claude), content is a list of blocks
+    synthesis = response.text().strip()
 
     logger.info("Synthesis complete")
 

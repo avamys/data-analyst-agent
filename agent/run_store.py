@@ -89,9 +89,12 @@ class LLMCallRecorder(BaseCallbackHandler):
         self.output_tokens += usage.get("output_tokens", 0)
         self._write(
             run_id,
-            response=message.content,
+            # Structured calls over function calling (OpenRouter) arrive as tool calls
+            response=message.content or message.tool_calls,
             input_tokens=usage.get("input_tokens"),
             output_tokens=usage.get("output_tokens"),
+            # Part of output_tokens; billed as output by hosted providers
+            reasoning_tokens=(usage.get("output_token_details") or {}).get("reasoning"),
         )
 
     def on_llm_error(self, error, *, run_id, **kwargs):

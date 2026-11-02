@@ -57,7 +57,8 @@ def hierarchical_reporter_node(state: HierarchicalState) -> HierarchicalState:
     # Use BaseAgent directly - no need for subclass
     agent = BaseAgent(agent_type="reporter")
     response = agent.invoke(prompt)
-    report = response.content.strip() if hasattr(response, "content") else str(response)
+    # text(): with thinking on (Claude), content is a list of blocks
+    report = response.text().strip()
 
     logger.info("Final report generated")
     logger.info(f"Report length: {len(report)} characters")

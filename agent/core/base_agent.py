@@ -63,7 +63,7 @@ class BaseAgent:
 
         # Support structured output
         if use_structured_output and output_schema:
-            self.llm = self.llm.with_structured_output(output_schema)
+            self.llm = LLMManager.with_structured_output(self.llm, output_schema)
             self.logger.debug(
                 f"Configured structured output with schema: {output_schema.__name__}"
             )

@@ -21,6 +21,8 @@ dependencies = [
   "scipy",
   "statsmodels",
   "tabulate",
+  "langchain-openai<1",
+  "langchain-anthropic<1",
 ]
 
 [dependency-groups]

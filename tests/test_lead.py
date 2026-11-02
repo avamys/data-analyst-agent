@@ -2,6 +2,7 @@
 
 import pytest
 from conftest import ScriptedLLM
+from langchain_core.messages import AIMessage
 from test_specialist import finish, run_cell
 
 from agent.config import settings
@@ -232,3 +233,30 @@ def test_follow_ups_repeating_a_brief_are_dropped(analyse):
         "question x",
     ]
     assert state["follow_ups_added"] == 1
+
+
+def test_writers_read_text_from_block_replies(monkeypatch, tmp_path, small_csv):
+    # With thinking on (Claude), a plain reply is a list: thinking, then text
+    def blocks(text):
+        return AIMessage(
+            content=[
+                {"type": "thinking", "thinking": "", "signature": "s"},
+                {"type": "text", "text": text},
+            ]
+        )
+
+    llm = ScriptedLLM(
+        [
+            _plan(_brief("eda_1")),
+            finish(),
+            accept(),
+            blocks("synthesis"),
+            blocks("report"),
+        ]
+    )
+    monkeypatch.setattr(LLMManager, "get_llm", lambda **_: llm)
+    state = build_hierarchical_graph().invoke(
+        {"dataset_info": "", "dataset_path": small_csv, "run_dir": str(tmp_path)},
+        config={"recursion_limit": 100},
+    )
+    assert (state["synthesis"], state["report"]) == ("synthesis", "report")

@@ -3,7 +3,11 @@
 import logging
 from typing import Any
 
+from anthropic import transform_schema
 from langchain.chat_models import init_chat_model
+from langchain_core.output_parsers import PydanticOutputParser
+from langchain_core.runnables import RunnableLambda
+from pydantic import BaseModel
 
 from agent.config import settings
 
@@ -92,10 +96,7 @@ class LLMManager:
         )
 
         llm = init_chat_model(
-            model_name,
-            model_provider=settings.model_provider,
-            temperature=temperature,
-            **cls._provider_kwargs(),
+            model_name, **{"temperature": temperature, **cls._provider_kwargs()}
         )
 
         # Cache it
@@ -118,25 +119,76 @@ class LLMManager:
             )
         config = cls.AGENT_CONFIGS[agent_type]
         return (
-            model_name or getattr(settings, config["model"]),
+            model_name or getattr(settings, config["model"]) or settings.model,
             temperature if temperature is not None else config["temperature"],
+        )
+
+    @staticmethod
+    def with_structured_output(llm, schema: type[BaseModel], include_raw=False):
+        """Make llm return schema objects, the way the active provider supports"""
+        if settings.model_provider != "anthropic":
+            # Many OpenRouter free models take tools but not response_format
+            method = (
+                "function_calling"
+                if settings.model_provider == "openrouter"
+                else "json_schema"
+            )
+            return llm.with_structured_output(
+                schema, method=method, include_raw=include_raw
+            )
+        # JSON outputs: schema-valid by construction (forced tool calls let Haiku
+        # drop required fields) and accepted by models that reject forced tools
+        parser = PydanticOutputParser(pydantic_object=schema)
+        llm = llm.bind(
+            output_config={
+                "format": {"type": "json_schema", "schema": transform_schema(schema)}
+            }
+        )
+        if not include_raw:
+            return llm | parser
+        return llm | RunnableLambda(
+            lambda raw: {
+                "raw": raw,
+                "parsed": parser.invoke(raw),
+                "parsing_error": None,
+            }
         )
 
     @staticmethod
     def _provider_kwargs() -> dict[str, Any]:
         """Provider-specific options passed to init_chat_model"""
-        if settings.model_provider == "ollama":
+        if settings.model_provider == "openrouter":
+            if settings.openrouter_api_key is None:
+                raise ValueError("OPENROUTER_API_KEY is not set (see .env.example)")
+            # OpenRouter speaks the OpenAI API; reasoning is its own request field
             return {
-                "base_url": settings.ollama_base_url,
-                "reasoning": settings.llm_reasoning,
-                "num_ctx": settings.llm_num_ctx,
-                "num_predict": settings.llm_max_tokens,
-                "num_gpu": settings.llm_num_gpu,  # None = Ollama default
-                "client_kwargs": {"timeout": settings.llm_timeout_s},
+                "model_provider": "openai",
+                "base_url": settings.openrouter_base_url,
+                "api_key": settings.openrouter_api_key,
+                "extra_body": {"reasoning": {"enabled": settings.openrouter_reasoning}},
+                "max_tokens": settings.llm_max_tokens,
+                "timeout": settings.llm_timeout_s,
+            }
+        if settings.model_provider == "anthropic":
+            if settings.anthropic_api_key is None:
+                raise ValueError("ANTHROPIC_API_KEY is not set (see .env.example)")
+            return {
+                "model_provider": "anthropic",
+                "api_key": settings.anthropic_api_key,
+                # Current Claude models reject sampling parameters
+                "temperature": None,
+                # Thinking counts against the cap, and an unused cap costs nothing
+                "max_tokens": 16000,
+                "timeout": settings.llm_timeout_s,
             }
         return {
-            "max_tokens": settings.llm_max_tokens,
-            "timeout": settings.llm_timeout_s,
+            "model_provider": "ollama",
+            "base_url": settings.ollama_base_url,
+            "reasoning": settings.llm_reasoning,
+            "num_ctx": settings.llm_num_ctx,
+            "num_predict": settings.llm_max_tokens,
+            "num_gpu": settings.llm_num_gpu,  # None = Ollama default
+            "client_kwargs": {"timeout": settings.llm_timeout_s},
         }
 
     @classmethod

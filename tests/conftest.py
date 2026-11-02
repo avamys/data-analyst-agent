@@ -48,7 +48,7 @@ class ScriptedLLM:
         response = next(self.responses)
         return AIMessage(content=response) if isinstance(response, str) else response
 
-    def with_structured_output(self, schema):
+    def with_structured_output(self, schema, **kwargs):
         return RunnableLambda(self._respond)
 
     def with_retry(self, **kwargs):

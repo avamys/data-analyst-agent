@@ -35,6 +35,33 @@ def test_recorder_captures_calls_made_inside_graph_nodes(tmp_path):
     assert recorder.calls == 1
 
 
+def test_recorder_logs_tool_calls_and_reasoning_tokens(tmp_path):
+    # Structured output over function calling (OpenRouter) has no text content
+    call = {"name": "Review", "args": {"verdict": "accept"}, "id": "c1"}
+    llm = GenericFakeChatModel(
+        messages=iter(
+            [
+                AIMessage(
+                    content="",
+                    tool_calls=[call],
+                    usage_metadata={
+                        "input_tokens": 10,
+                        "output_tokens": 30,
+                        "total_tokens": 40,
+                        "output_token_details": {"reasoning": 25},
+                    },
+                )
+            ]
+        )
+    )
+    recorder = LLMCallRecorder(tmp_path / "llm_calls.jsonl")
+    llm.invoke([HumanMessage(content="review")], config={"callbacks": [recorder]})
+
+    [record] = [json.loads(line) for line in (tmp_path / "llm_calls.jsonl").open()]
+    assert record["response"][0]["args"] == {"verdict": "accept"}
+    assert record["reasoning_tokens"] == 25
+
+
 def test_write_tasks_writes_every_attempt(tmp_path):
     store = RunStore(tmp_path, "titanic", "qwen3.5:9b")
     assert store.path.name.endswith("_titanic_qwen3.5-9b")
