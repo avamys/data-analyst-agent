@@ -19,7 +19,8 @@ from pathlib import Path
 
 from dotenv import dotenv_values
 
-from evals.cases import Case, dataset
+from evals.cases import Case, dataset, load_case
+from evals.graders import fetch_prices, grade
 
 ROOT = Path(__file__).resolve().parent.parent
 RUNS_DIR = ROOT / "evals" / "runs"
@@ -106,7 +107,12 @@ def _execute(
 
 
 def run_one(
-    config: Config, case: Case, repeat: int, suite_dir: Path, cwd: Path
+    config: Config,
+    case: Case,
+    repeat: int,
+    suite_dir: Path,
+    cwd: Path,
+    prices: dict | None = None,
 ) -> dict:
     """Run one case once; the result line (run_meta.json figures included)"""
     runs_dir = suite_dir / case.name / f"r{repeat}"
@@ -161,7 +167,19 @@ def run_one(
                 "unverified_numbers",
             )
         },
+        "grades": grade(case, run_dir, prices) if run_dir else None,
     }
+
+
+def regrade(results: Path) -> None:
+    """Recompute the grades of every line of a results file, in place"""
+    prices = fetch_prices()
+    lines = [json.loads(line) for line in results.read_text().splitlines()]
+    for line in lines:
+        run_dir = ROOT / line["run_dir"] if line["run_dir"] else None
+        case = load_case(line["case"])
+        line["grades"] = grade(case, run_dir, prices) if run_dir else None
+    results.write_text("".join(json.dumps(line) + "\n" for line in lines))
 
 
 def run_suite(config: Config, cases: list[Case]) -> Path:
@@ -172,13 +190,16 @@ def run_suite(config: Config, cases: list[Case]) -> Path:
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     results = RESULTS_DIR / f"{suite_id}.jsonl"
     cwd = checkout(config.version)
+    prices = fetch_prices()
     for case in cases:
         dataset(case)  # generate or download each dataset once, up front
     jobs = [(case, r) for r in range(1, config.repeats + 1) for case in cases]
     lock = threading.Lock()
     print(f"Suite {suite_id}: {len(jobs)} runs, {config.jobs} at a time")
     with ThreadPoolExecutor(max_workers=config.jobs) as pool:
-        futures = [pool.submit(run_one, config, c, r, suite_dir, cwd) for c, r in jobs]
+        futures = [
+            pool.submit(run_one, config, c, r, suite_dir, cwd, prices) for c, r in jobs
+        ]
         for done, future in enumerate(as_completed(futures), 1):
             line = future.result()
             with lock, results.open("a") as f:

@@ -3,7 +3,7 @@
 > **This is the main plan for the project.** It replaces `todo.md`; everything still useful from there is folded in below (see [Appendix: todo.md mapping](#appendix-todomd-mapping)).
 > Update the checkboxes and the **Status** block as work lands. Record decisions in the [Decision log](#decision-log).
 
-**Status:** Phase 1 done on `phase-1` (P1.1–P1.5). Measured on the Titanic reference run: wrong claims 7 → 0, unsupported 6 → 0, baseline findings absent 7 → 0, charts in the report 0 → 5 ([P1.5 check](docs/progress/p1.5/annotations.md)). The exit criteria were met on Claude Haiku 5.5 (9 min, $0.08 a run); not yet re-run on qwen3.5. Hosted providers (OpenRouter, Anthropic) and a cost report added. Phase 2 planned (eval harness; both versions on Haiku 5.5, Sonnet 5.5 as judge). P2.0 (central configuration, presets) and P2.1 (baseline on Haiku, `v0.1.1-baseline-hosted`) done; P2.2 (7 eval cases with known answers) done; P2.3 (runner) done; first suite, judged by hand: current 30/30 findings, baseline 16/30 ([first look](docs/eval/first-look.md)). P2.3a: task scripts no longer see API keys; Ollama prompts are checked against the context window. Next: P2.4 deterministic graders · **Last updated:** 2026-11-02
+**Status:** Phase 1 done on `phase-1` (P1.1–P1.5). Measured on the Titanic reference run: wrong claims 7 → 0, unsupported 6 → 0, baseline findings absent 7 → 0, charts in the report 0 → 5 ([P1.5 check](docs/progress/p1.5/annotations.md)). The exit criteria were met on Claude Haiku 5.5 (9 min, $0.08 a run); not yet re-run on qwen3.5. Hosted providers (OpenRouter, Anthropic) and a cost report added. Phase 2 planned (eval harness; both versions on Haiku 5.5, Sonnet 5.5 as judge). P2.0 (central configuration, presets) and P2.1 (baseline on Haiku, `v0.1.1-baseline-hosted`) done; P2.2 (7 eval cases with known answers) done; P2.3 (runner) done; first suite, judged by hand: current 30/30 findings, baseline 16/30 ([first look](docs/eval/first-look.md)). P2.3a: task scripts no longer see API keys; Ollama prompts are checked against the context window. P2.4 (deterministic graders) done. Next: P2.5 LLM judge · **Last updated:** 2026-11-02
 
 ---
 
@@ -416,10 +416,11 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 - Found: of the 62 writer prompts recorded on Haiku, at today's qwen settings (16k window, 4k output) 10 would stop and 38 be flagged. Before the next qwen run: a larger `LLM_NUM_CTX`, or a more compact writer input.
 
 **P2.4 Deterministic graders** (M)
-- [ ] From the run directory (both versions): run success, tasks completed / failed, wall time, LLM calls, tokens, cost (the `scripts/run_cost.py` functions).
-- [ ] From the report text (both versions): fact-in-text (each expected value appears, rounding-aware, on a line with one of its keywords; reuses `number_check`), caveat keywords.
-- [ ] Phase 1 agent only: numbers left unverified, review verdicts and revisions, follow-ups used.
-- [ ] Unit tests on small fixture reports and run directories.
+- [x] From the run directory (both versions): run success, tasks completed / failed, wall time, LLM calls, tokens, cost (the `scripts/run_cost.py` functions).
+- [x] From the report text (both versions): fact-in-text (each expected value appears, rounding-aware, on a line with one of its keywords; reuses `number_check`), caveat keywords.
+- [x] Phase 1 agent only: numbers left unverified, review verdicts and revisions, follow-ups used.
+- [x] Unit tests on small fixture reports and run directories.
+- `evals/graders.py`; every result line gets `grades`, and `python -m evals grade <results…>` recomputes them in place. Re-grading the first suite reproduced the hand analysis (facts 9/21 vs 21/21, caveats 4/4 each, $0.16 vs $0.50) and added the review figures: 3–5 revisions per run, 6 objections left unresolved across 7 runs, the follow-up budget used up in 6 of 7.
 
 **P2.5 LLM judge** (M)
 - [ ] Claude Sonnet 5.5 through the Anthropic provider, with its own settings, independent of the agent's provider and model.

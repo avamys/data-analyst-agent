@@ -2,10 +2,12 @@
 
 uv run python -m evals run --version current --provider anthropic --repeats 3
 uv run python -m evals run --version baseline --provider anthropic --cases titanic
+uv run python -m evals grade evals/results/<suite id>.jsonl
 """
 
 import argparse
 import sys
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -13,7 +15,7 @@ load_dotenv(".env")
 
 from agent.config import PRESETS, settings  # noqa: E402
 from evals.cases import all_cases, load_case  # noqa: E402
-from evals.runner import Config, run_suite  # noqa: E402
+from evals.runner import Config, regrade, run_suite  # noqa: E402
 
 
 def main() -> int:
@@ -28,7 +30,15 @@ def main() -> int:
     run.add_argument("--repeats", type=int, default=1)
     run.add_argument("--jobs", type=int, default=4)
     run.add_argument("--timeout-min", type=int, default=60, help="Per run")
+    grade = commands.add_parser("grade", help="Recompute the grades of results files")
+    grade.add_argument("results", nargs="+", type=Path)
     args = parser.parse_args()
+
+    if args.command == "grade":
+        for results in args.results:
+            regrade(results)
+            print(f"Graded: {results}")
+        return 0
 
     settings.model_provider = args.provider
     cases = [load_case(n) for n in args.cases.split(",")] if args.cases else all_cases()
