@@ -150,7 +150,7 @@ caveats_required: [overfitting]   # when applicable
 - `uv run python -m evals compare A B` → per-metric deltas, per-case regressions.
 - **CI smoke test:** graders run over a committed eval run (run directory + stored judge verdicts): deterministic, no LLM calls. ~~LLM record/replay cache~~: deferred (decision log, 2026-11-02).
 - Results are committed (small JSONL) so history is visible in git.
-- **LangSmith:** every eval run is traced and tagged with its case and repeat, so a failing case can be opened straight from the results table. Optionally, results are also pushed as LangSmith experiments for side-by-side comparison. The local JSONL stays the source of truth: it works offline, is committed to git, and feeds the README.
+- **LangSmith:** every eval run is traced and tagged with its case, repeat and version, and each row of the results table links to its trace, so a failing case opens in one click. The judge is traced too. Optionally, grades are attached to traces as feedback, so they can be filtered in the UI. No LangSmith experiments: the committed table and `evals compare` cover the comparison. The local JSONL stays the source of truth: it works offline, is committed to git, and feeds the README.
 
 ### Test harness (separate from evals)
 - `pytest` unit tests for pure logic: profiler, plan validation/topo sort, sanity rules, fact resolution, verifier number-scan, renderer.
@@ -431,13 +431,19 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 **P2.6 Judge calibration** (S–M)
 - [ ] Labels: the 6 Titanic reports already checked claim by claim (baseline, P1.2, P1.3, P1.4, P1.4 on Haiku, P1.5), plus ≥ 4 reports from synthetic cases, labelled by hand and spot-checked by the owner.
 - [ ] ≥ 90% agreement per item. Disagreements are fixed in the rubric, not by relabelling. The judge prompt is versioned (hash recorded).
+- [ ] Trace the judge (`wrap_anthropic` in `evals/judge.py`), tagged with case, repeat, version and rubric hash, so each disagreement can be read with exactly what the judge was given and returned. Labels stay in git, not in a LangSmith annotation queue.
 
 **P2.7 Report, compare, CI** (S)
 - [ ] `python -m evals report <results…>`: Markdown table per version, mean and min–max over repeats, per case and overall.
 - [ ] `python -m evals compare A B`: per-metric deltas and per-case regressions.
 - [ ] CI grades a committed eval run (run directory + stored judge verdicts) and checks the scores; no LLM calls.
+- [ ] Eval traces carry case, repeat and version: the runner passes them, `run.py` adds them to the trace's tags and metadata, and `run_meta.json` records the root `run_id`. The tagged baseline is unchanged; its traces are found through the `trace_url` it already writes.
+- [ ] Each row of the `evals report` table links to its run's trace.
+- [ ] *Optional:* `python -m evals push <results…>` attaches each run's grades (finding recall, false claims, unverified numbers, cost) to its trace as feedback, so "recall < 1" is a filter in the LangSmith UI.
+- Found 2026-11-03: P2.3 says runs are tagged with case, repeat and version, but traces get only the dataset name (the neutral file name in evals, [run.py](run.py)) and the suite's project; `run_meta.json` has the trace URL but not the `run_id`.
 
 **P2.8 Before/after** (S, mostly waiting)
+- [ ] First: specialists record every number they cite as a fact value, not inside its description, where the number check doesn't read it (open in the [first look](docs/eval/first-look.md): 8 untraced numbers in `planted_effects`, 3 in `datetime_trend`). Otherwise the unverified-numbers figure in the before/after table is inflated.
 - [ ] Suite × 3 repeats on Haiku 5.5 for: the baseline, the Phase 1 agent with today's budgets, and the Phase 1 agent with the `hosted` preset (which also answers Phase 3's budget question).
 - [ ] Commit the results and the table (`docs/eval/`); update the Status block.
 - Estimate: 63 runs, about $8–10 of agent calls plus about $2 for the judge; 1–2 h of wall time with `--jobs 4`.
@@ -478,7 +484,12 @@ Goal: close the gaps the eval exposes.
 - [ ] HTML report (single self-contained file, charts embedded) + Markdown.
 - [ ] CLI polish: `analyst run <csv> [--target] [--model] [--out]`, live progress output (stream graph events).
 - [ ] Minimal UI (Streamlit recommended): upload CSV → live task progress → rendered report + run artifacts.
-- [ ] Structured logging; one LangSmith trace per analysis, linked from the run dir and the UI.
+- [ ] Structured logging.
+- [ ] Choose the tracing backend at the start of this phase: self-hosted Langfuse (MIT, docker compose; tracing can be on by default because nothing leaves the machine) vs LangSmith (opt-in, as today). Decide on: whether always-on local tracing is part of the demo, and whether the machine has the RAM for Langfuse's services (Postgres, ClickHouse, Redis, object store) next to Ollama. Switching is about ½–1 day (`agent/tracing.py`, the eval runner's env, `.env.example`, tests).
+- [ ] Monitoring reuses the eval graders: every run gets its run-level grades from `evals/graders.py` (run success, failed tasks, unverified numbers, revisions, cost, tokens) in `run_meta.json` and on its trace as feedback.
+- [ ] One trace per analysis, linked from the run dir and the UI; root metadata (commit, preset, model, the grades above) for the tracing backend's dashboards. One rule: runs with unverified numbers or failed tasks go to a review queue.
+- [ ] The UI shows each run's grades next to the report.
+- Not planned: an online LLM judge on real runs (the eval judge needs `expected.yaml`; a reference-free claim check is Phase 3's, if the eval shows the need); OpenTelemetry (see the decision log).
 
 **Exit:** a demo-able app on a fresh dataset.
 
@@ -563,6 +574,9 @@ PLAN.md  README.md
 | 2026-11-02 | Task scripts get an allowlisted environment; no code blocklist; network isolation moves to the front of Phase 3 | They ran with our API keys and network access, and they're written by an LLM that reads user data (a prompt-injection path). A blocklist of "dangerous" calls is easy to get around (as decided in Phase 0); isolation is the boundary |
 | 2026-11-02 | Context check only for Ollama: certain overflow stops the run, possible overflow is flagged | Ollama cuts long prompts silently; a stop is better than a report written from a cut prompt. Without qwen's tokenizer the size is a range (2.7–4.5 chars/token), so only the certain case stops |
 | 2026-11-02 | No idle watchdog; resume via checkpoints instead (Phase 3) | Calls, scripts and eval runs already have timeouts; the stalls seen were the host sleeping, which only resuming helps with |
+| 2026-11-03 | Eval results link to their traces; grades can be attached as feedback; no LangSmith experiments or annotation queues. The JSONL stays the source of truth | The tracing UI is the viewer for a failing case; comparison and labels already live in git (`evals compare`, the calibration labels), where they're versioned and reviewable |
+| 2026-11-03 | Stay on LangSmith through Phase 2; choose LangSmith vs self-hosted Langfuse at the start of Phase 5 | Switching mid-measurement adds risk and no numbers. Langfuse's one real advantage here is free self-hosting, i.e. always-on tracing for local runs without data leaving the machine; it matters for the demo, not the eval |
+| 2026-11-03 | No separate OpenTelemetry layer | A single-process CLI with a local run store and no OTel backend: it would be code with no consumer. LangChain callbacks give richer LLM detail, and non-LangChain code (judge, sandbox) can be traced with the SDK's decorator. If Langfuse is chosen, OTel comes with its SDK |
 | 2026-10-31 | Tracing: **LangSmith only**; MLflow removed | Built for agents; clearer traces. Tracing is opt-in via env, because when it's on, prompts and data samples leave the machine (relevant to the local-first pitch) |
 | 2026-10-31 | Delete untracked `todo.md`, `docs/`, `notebooks/`, and the `multi-specialist` branch | Confirmed by owner; superseded by this plan / `feature/new-flow` |
 | 2026-10-31 | New Phase 1 (agent quality) before the eval harness | The baseline review shows structural failures; the tagged baseline keeps the before/after story measurable |
