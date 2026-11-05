@@ -4,6 +4,7 @@ uv run python -m evals run --version current --provider anthropic --repeats 3
 uv run python -m evals run --version baseline --provider anthropic --cases titanic
 uv run python -m evals grade evals/results/<suite id>.jsonl
 uv run python -m evals judge evals/results/<suite id>.jsonl
+uv run python -m evals agree
 """
 
 import argparse
@@ -16,8 +17,9 @@ from dotenv import load_dotenv
 load_dotenv(".env")
 
 from agent.config import PRESETS, settings  # noqa: E402
+from evals.calibration import agreement, calibrate  # noqa: E402
 from evals.cases import all_cases, load_case  # noqa: E402
-from evals.judge import judge_results  # noqa: E402
+from evals.judge import PROMPT_VERSION, judge_results  # noqa: E402
 from evals.runner import ROOT, Config, regrade, run_suite  # noqa: E402
 
 
@@ -43,7 +45,15 @@ def main() -> int:
     judge.add_argument("results", nargs="+", type=Path)
     judge.add_argument("--jobs", type=int, default=4)
     judge.add_argument("--force", action="store_true", help="Re-judge judged lines")
+    agree = commands.add_parser(
+        "agree", help="Judge agreement with the hand labels (docs/eval/calibration)"
+    )
+    agree.add_argument("--jobs", type=int, default=4)
+    agree.add_argument("--force", action="store_true", help="Re-judge every report")
     args = parser.parse_args()
+
+    if args.command == "agree":
+        return _agree(calibrate(jobs=args.jobs, force=args.force))
 
     if args.command == "grade":
         for results in args.results:
@@ -54,7 +64,14 @@ def main() -> int:
     if args.command == "judge":
         for results in args.results:
             lines = [json.loads(line) for line in results.read_text().splitlines()]
-            n = judge_results(lines, ROOT, jobs=args.jobs, force=args.force)
+            # Traced to the suite's project, next to the runs it judges
+            n = judge_results(
+                lines,
+                ROOT,
+                jobs=args.jobs,
+                force=args.force,
+                project=f"evals-{results.stem}",
+            )
             results.write_text("".join(json.dumps(line) + "\n" for line in lines))
             errors = sum(1 for line in lines if (line.get("judge") or {}).get("error"))
             print(f"Judged {n} reports in {results} ({errors} errors)")
@@ -72,6 +89,22 @@ def main() -> int:
         timeout_s=args.timeout_min * 60,
     )
     print(f"Results: {run_suite(config, cases)}")
+    return 0
+
+
+def _agree(rows: list[dict]) -> int:
+    print("| Items | n | Exact | Within ½ |\n|---|---|---|---|")
+    for kind, a in agreement(rows).items():
+        print(f"| {kind} | {a['items']} | {a['exact']:.0%} | {a['within_half']:.0%} |")
+    print(f"\nRubric {PROMPT_VERSION}, {len({r['report'] for r in rows})} reports")
+    for r in rows:
+        if not r["exact"]:
+            print(f"\n{r['report']} · {r['kind']}: {r['item']}")
+            note = f" ({r['note']})" if r["note"] else ""
+            print(f"  label {r['label']}{note}")
+            print(f"  judge {r['verdict']}: {r['reason']}")
+            if r["quote"]:
+                print(f"  quote: {r['quote']}")
     return 0
 
 

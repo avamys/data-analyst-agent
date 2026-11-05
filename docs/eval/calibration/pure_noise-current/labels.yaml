@@ -1,0 +1,14 @@
+case: pure_noise
+source: evals/runs/20261102-203054_current_claude-haiku-5-5/pure_noise/r1/20261102-203113_survey_claude-haiku-5-5/report.md
+must_find:
+- item: None of the features is meaningfully associated with outcome.
+  label: 'yes'
+- item: Predictive models do not meaningfully beat the majority-class baseline.
+  label: 'yes'
+must_not_claim:
+- item: One of the features (feat_1 to feat_5, or group) significantly predicts or drives
+    outcome, stated as a real effect.
+  label: 'no'
+- item: A model predicts outcome well, or clearly better than the majority-class baseline.
+  label: 'no'
+caveats: []

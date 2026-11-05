@@ -1,0 +1,25 @@
+case: leakage
+source: evals/runs/20261102-203054_current_claude-haiku-5-5/leakage/r1/20261102-203111_subscriptions_claude-haiku-5-5/report.md
+must_find:
+- item: refund_issued almost exactly reproduces churned (target leakage) and must not be used
+    as a predictor.
+  label: 'yes'
+- item: Without refund_issued, models predict churn only moderately well, far from perfect.
+  label: 'yes'
+  note: 'Says models without it don''t beat the baseline: weaker than "moderately", but far
+    from perfect'
+- item: Customers with lower usage_hours churn more often.
+  label: 'yes'
+- item: Customers with shorter tenure_months churn more often.
+  label: 'yes'
+- item: The basic plan has a higher churn rate than the other plans.
+  label: 'yes'
+must_not_claim:
+- item: A near-perfect model is presented as a genuine predictive result, without flagging
+    leakage.
+  label: 'no'
+- item: refund_issued is presented as a cause of churn or a valid predictor of it.
+  label: 'no'
+caveats:
+- item: leakage
+  label: 'yes'

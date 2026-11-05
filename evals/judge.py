@@ -5,7 +5,7 @@ through the Anthropic SDK: independent of the provider of the agent under test.
 Each item gets yes / partly / no with the quote it rests on; quotes are checked
 against the report. Verdicts are stored with the results, tagged with a hash of
 the prompt and schema, so a changed rubric is re-judged and an unchanged one
-is not.
+is not. With LangSmith tracing on, each call is traced with its case and rubric.
 """
 
 import hashlib
@@ -16,6 +16,8 @@ from typing import Literal
 
 import anthropic
 from anthropic import transform_schema
+from langsmith import tracing_context
+from langsmith.wrappers import wrap_anthropic
 from pydantic import BaseModel, Field
 
 from agent.config import settings
@@ -32,9 +34,9 @@ Grade each item by what the report says, nothing else. Wording may differ from t
 
 FINDINGS THE REPORT SHOULD MAKE:
 {must_find}
-- yes: the report states it, with its direction (which group is higher, positive or negative) where the item has one
-- partly: the report names the effect but not its direction, size or comparison, or states only part of the item
-- no: the report doesn't state it, states the opposite, or says it could not determine it
+- yes: the report states it, with its direction (which group is higher, positive or negative) where the item has one, and with numbers close to the item's where the item gives them
+- partly: the report relates the item's variables to each other but leaves out the direction, size or comparison (for example "significant, but the direction was not reported"), states only part of the item, or gives a number clearly different from the item's
+- no: the report doesn't state it, states the opposite, or says it could not determine whether the effect exists at all. The report must make the statement itself: giving numbers from which a reader could work it out, or discussing the variable only in another connection, is no
 
 CLAIMS THE REPORT MUST NOT MAKE:
 {must_not_claim}
@@ -44,7 +46,7 @@ CLAIMS THE REPORT MUST NOT MAKE:
 
 CAVEATS THE REPORT SHOULD STATE:
 {caveats}
-- yes: the report warns about it
+- yes: the report warns about it, even if it could not measure it
 - partly: it is mentioned without being treated as a limitation
 - no: not mentioned
 
@@ -101,25 +103,37 @@ def _quoted(quote: str, report: str) -> bool:
     return all(part in report for part in parts if part)
 
 
-def judge(case: Case, report: str, client: anthropic.Anthropic | None = None) -> dict:
-    """The judge's verdict on every item of the case, with scores"""
+def judge(
+    case: Case,
+    report: str,
+    client: anthropic.Anthropic | None = None,
+    project: str | None = None,
+    metadata: dict | None = None,
+) -> dict:
+    """The judge's verdict on every item of the case, with scores. The trace goes
+    to the given LangSmith project, with the case, rubric and metadata"""
     items = _items(case)
     prompt = PROMPT.format(report=report, **{k: _numbered(v) for k, v in items.items()})
-    client = client or anthropic.Anthropic(
-        api_key=settings.anthropic_api_key.get_secret_value()
+    client = client or wrap_anthropic(
+        anthropic.Anthropic(api_key=settings.anthropic_api_key.get_secret_value())
     )
-    response = client.beta.messages.create(
-        model=settings.judge_model,
-        max_tokens=16000,  # thinking counts against it
-        messages=[{"role": "user", "content": prompt}],
-        output_config={
-            "format": {"type": "json_schema", "schema": transform_schema(Verdicts)}
-        },
-        # Recommended for Sonnet 5.5: a declined request is retried on another
-        # model. Which model served is recorded, so a fallback shows.
-        betas=["server-side-fallback-2026-07-01"],
-        fallbacks="default",
-    )
+    with tracing_context(
+        project_name=project,
+        tags=["judge", case.name],
+        metadata={"case": case.name, "rubric": PROMPT_VERSION, **(metadata or {})},
+    ):
+        response = client.beta.messages.create(
+            model=settings.judge_model,
+            max_tokens=16000,  # thinking counts against it
+            messages=[{"role": "user", "content": prompt}],
+            output_config={
+                "format": {"type": "json_schema", "schema": transform_schema(Verdicts)}
+            },
+            # Recommended for Sonnet 5.5: a declined request is retried on another
+            # model. Which model served is recorded, so a fallback shows.
+            betas=["server-side-fallback-2026-07-01"],
+            fallbacks="default",
+        )
     if response.stop_reason == "refusal":
         raise JudgeError(f"The judge declined: {response.stop_details}")
     # The schema guarantees the text block is valid JSON; thinking blocks come first
@@ -164,7 +178,13 @@ def judge(case: Case, report: str, client: anthropic.Anthropic | None = None) ->
     }
 
 
-def judge_results(lines: list[dict], root, jobs: int = 4, force: bool = False) -> int:
+def judge_results(
+    lines: list[dict],
+    root,
+    jobs: int = 4,
+    force: bool = False,
+    project: str | None = None,
+) -> int:
     """Judge result lines in place (those not judged with this prompt yet)"""
     from evals.cases import load_case
 
@@ -178,7 +198,12 @@ def judge_results(lines: list[dict], root, jobs: int = 4, force: bool = False) -
     def one(line):
         report = (root / line["run_dir"] / "report.md").read_text()
         try:
-            line["judge"] = judge(load_case(line["case"]), report)
+            line["judge"] = judge(
+                load_case(line["case"]),
+                report,
+                project=project,
+                metadata={k: line[k] for k in ("repeat", "version", "run_dir")},
+            )
         except (JudgeError, anthropic.APIError) as e:
             line["judge"] = {"prompt": None, "error": repr(e)}
 

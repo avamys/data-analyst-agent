@@ -2,6 +2,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from langsmith.run_helpers import get_tracing_context
 
 from evals import judge as judge_module
 from evals.cases import load_case
@@ -101,9 +102,17 @@ def test_only_lines_not_judged_with_this_prompt_are_judged(monkeypatch, tmp_path
     monkeypatch.setattr(
         judge_module,
         "judge",
-        lambda case, report: calls.append(case.name) or {"prompt": PROMPT_VERSION},
+        lambda case, report, **trace: (
+            calls.append(case.name) or {"prompt": PROMPT_VERSION}
+        ),
     )
-    line = {"case": "leakage", "run_dir": "run", "has_report": True}
+    line = {
+        "case": "leakage",
+        "run_dir": "run",
+        "has_report": True,
+        "repeat": 1,
+        "version": "current",
+    }
     lines = [
         dict(line),
         {**line, "judge": {"prompt": PROMPT_VERSION}},  # already judged
@@ -112,3 +121,21 @@ def test_only_lines_not_judged_with_this_prompt_are_judged(monkeypatch, tmp_path
     ]
     assert judge_results(lines, Path(tmp_path), jobs=2) == 2
     assert judge_results(lines, Path(tmp_path), jobs=2, force=True) == 3
+
+
+def test_the_call_is_traced_with_case_rubric_and_metadata(monkeypatch):
+    seen = {}
+
+    class Recording(FakeClient):
+        def _create(self, **kwargs):
+            seen.update(get_tracing_context())
+            return super()._create(**kwargs)
+
+    judge(CASE, REPORT, Recording(verdicts()), project="p", metadata={"repeat": 2})
+    assert seen["project_name"] == "p"
+    assert seen["tags"] == ["judge", "leakage"]
+    assert seen["metadata"] == {
+        "case": "leakage",
+        "rubric": PROMPT_VERSION,
+        "repeat": 2,
+    }

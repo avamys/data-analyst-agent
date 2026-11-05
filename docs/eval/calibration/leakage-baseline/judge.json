@@ -1,0 +1,77 @@
+{
+  "model": "claude-sonnet-5-5",
+  "served_by": "claude-sonnet-5-5",
+  "prompt": "983aca5d02a5",
+  "must_find": [
+    {
+      "item": "refund_issued almost exactly reproduces churned (target leakage) and must not be used as a predictor.",
+      "quote": "`refund_issued` may be recorded after a customer decides to cancel, in which case it is a consequence of churn rather than a predictor. If so, the 0.9914 ROC-AUC is inflated.",
+      "reason": "The report flags leakage as a possibility and says not to deploy, but it does not state that refund_issued nearly reproduces churn, and it still treats it as the strongest predictor.",
+      "verdict": "partly",
+      "quote_found": true
+    },
+    {
+      "item": "Without refund_issued, models predict churn only moderately well, far from perfect.",
+      "quote": "Whether the 0.99 ROC-AUC will hold on new data or without refund status.",
+      "reason": "The report lists model performance without refund as an open question and never states that it is only moderate.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "Customers with lower usage_hours churn more often.",
+      "quote": "Churned customers use the product less than retained customers: about 17.3 vs. 21.8 hours on average, with a moderate effect size (d \u2248 0.46).",
+      "reason": "The report states that lower usage goes with higher churn, with direction and numbers.",
+      "verdict": "yes",
+      "quote_found": true
+    },
+    {
+      "item": "Customers with shorter tenure_months churn more often.",
+      "quote": "Whether tenure is protective or risky.",
+      "reason": "The report says the tenure difference is significant but states that its direction is unknown.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "The basic plan has a higher churn rate than the other plans.",
+      "quote": "Which plan has the highest churn, or whether plan matters beyond refund status.",
+      "reason": "The report says plan-level churn rates and direction were not reported and it cannot say which plan is highest.",
+      "verdict": "no",
+      "quote_found": true
+    }
+  ],
+  "must_not_claim": [
+    {
+      "item": "A near-perfect model is presented as a genuine predictive result, without flagging leakage.",
+      "quote": "The predictive model performs very well, which raises a warning as much as a result.",
+      "reason": "The report presents the near-perfect AUC with an explicit leakage warning and says it should not be deployed.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "refund_issued is presented as a cause of churn or a valid predictor of it.",
+      "quote": "Refund status is the most consistently supported driver. It appears as the top predictor in two model families and has a significant association with churn in the chi-square results.",
+      "reason": "The report calls refund the strongest and most consistent driver in the synthesis and conclusions, though it also hedges heavily on causality and leakage.",
+      "verdict": "partly",
+      "quote_found": true
+    }
+  ],
+  "caveats": [
+    {
+      "item": "leakage (e.g. mentioning: leak)",
+      "quote": "**Possible leakage (most important).** `refund_issued` may be recorded after a customer decides to cancel, in which case it is a consequence of churn rather than a predictor.",
+      "reason": "The report explicitly warns about leakage as the most important model risk.",
+      "verdict": "yes",
+      "quote_found": true
+    }
+  ],
+  "scores": {
+    "finding_recall": 0.3,
+    "false_claims": 0.5,
+    "caveat_coverage": 1.0,
+    "quotes_not_found": 0
+  },
+  "usage": {
+    "input_tokens": 7042,
+    "output_tokens": 756
+  }
+}

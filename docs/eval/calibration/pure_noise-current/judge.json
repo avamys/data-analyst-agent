@@ -1,0 +1,48 @@
+{
+  "model": "claude-sonnet-5-5",
+  "served_by": "claude-sonnet-5-5",
+  "prompt": "983aca5d02a5",
+  "must_find": [
+    {
+      "item": "None of the features is meaningfully associated with outcome.",
+      "quote": "No numeric feature differs significantly between outcome classes. The largest raw difference, feat_5 (outcome=1 minus outcome=0: +0.091, Welch p=0.207), is not significant after multiplicity correction (BH p=0.579).",
+      "reason": "The report states that no numeric feature is significantly associated with outcome, and that group is not significant either, so no feature is meaningfully associated.",
+      "verdict": "yes",
+      "quote_found": true
+    },
+    {
+      "item": "Predictive models do not meaningfully beat the majority-class baseline.",
+      "quote": "Neither model beats the majority-class baseline (accuracy 0.5875) on the 160-row test split: logistic regression reaches 0.550 and gradient boosting 0.531.",
+      "reason": "The report states directly that neither model beats the majority baseline and that the features carry little out-of-sample signal.",
+      "verdict": "yes",
+      "quote_found": true
+    }
+  ],
+  "must_not_claim": [
+    {
+      "item": "One of the features (feat_1 to feat_5, or group) significantly predicts or drives outcome, stated as a real effect.",
+      "quote": "No numeric feature differs significantly between outcome classes.",
+      "reason": "The report explicitly says no feature or group is significant and does not claim any real effect.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "A model predicts outcome well, or clearly better than the majority-class baseline.",
+      "quote": "Neither model beats the majority-class baseline (accuracy 0.5875) on the 160-row test split",
+      "reason": "The report says neither model beats the baseline and does not claim good prediction.",
+      "verdict": "no",
+      "quote_found": true
+    }
+  ],
+  "caveats": [],
+  "scores": {
+    "finding_recall": 1.0,
+    "false_claims": 0.0,
+    "caveat_coverage": null,
+    "quotes_not_found": 0
+  },
+  "usage": {
+    "input_tokens": 6743,
+    "output_tokens": 424
+  }
+}

@@ -1,0 +1,30 @@
+case: leakage
+source: evals/runs/20261102-203054_baseline_claude-haiku-5-5/leakage/r1/20261102-203111_subscriptions_claude-haiku-5-5/report.md
+must_find:
+- item: refund_issued almost exactly reproduces churned (target leakage) and must not be used
+    as a predictor.
+  label: partly
+  note: Leakage is suspected ("Possible leakage (most important)"), not established; refund
+    is still called the strongest predictor
+- item: Without refund_issued, models predict churn only moderately well, far from perfect.
+  label: 'no'
+- item: Customers with lower usage_hours churn more often.
+  label: 'yes'
+- item: Customers with shorter tenure_months churn more often.
+  label: partly
+  note: Tenure significant, but "the direction ... is unknown and should not be stated". Relabelled
+    from no for consistency with string_target-baseline (fee, support calls), when the rubric
+    rule was written down
+- item: The basic plan has a higher churn rate than the other plans.
+  label: 'no'
+must_not_claim:
+- item: A near-perfect model is presented as a genuine predictive result, without flagging
+    leakage.
+  label: 'no'
+- item: refund_issued is presented as a cause of churn or a valid predictor of it.
+  label: partly
+  note: '"Refund status is the most consistently supported driver", hedged by the leakage
+    concern'
+caveats:
+- item: leakage
+  label: 'yes'

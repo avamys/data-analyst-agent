@@ -1,0 +1,62 @@
+{
+  "model": "claude-sonnet-5-5",
+  "served_by": "claude-sonnet-5-5",
+  "prompt": "983aca5d02a5",
+  "must_find": [
+    {
+      "item": "Customers on monthly contracts churn more often than those on annual contracts.",
+      "quote": "The analysis does not establish whether month-to-month (or any specific) contract type carries higher churn risk.",
+      "reason": "The report finds contract significantly associated with churn but explicitly says the direction (monthly vs annual) was not reported or established.",
+      "verdict": "partly",
+      "quote_found": true
+    },
+    {
+      "item": "Higher monthly_fee is associated with more churn.",
+      "quote": "Churned and retained customers differ in monthly fee at the 5% level. The direction of the difference (whether churners pay more or less) was not reported, and the magnitude is unknown.",
+      "reason": "It reports a significant difference but gives no direction, so it does not state that higher fees go with more churn.",
+      "verdict": "partly",
+      "quote_found": true
+    },
+    {
+      "item": "More support_calls are associated with more churn.",
+      "quote": "The significance result is reported but its supporting output is not shown, so treat it as provisional until verified.",
+      "reason": "The report relates support_calls to churn as significant but gives no direction and treats it as unverified.",
+      "verdict": "partly",
+      "quote_found": true
+    },
+    {
+      "item": "region shows no meaningful association with churn.",
+      "quote": "Region has no detectable association with churn.",
+      "reason": "The report states region shows no association with churn (p = 0.448).",
+      "verdict": "yes",
+      "quote_found": true
+    }
+  ],
+  "must_not_claim": [
+    {
+      "item": "region is a significant or important predictor of churn.",
+      "quote": "Region is not useful for targeting. Consistent with the null chi-square result.",
+      "reason": "The report says region is not associated with churn, rejecting the claim.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "Annual-contract customers churn more often than monthly-contract customers.",
+      "quote": "Targeting decisions should not be made on the assumption that a specific contract type is the high-risk group.",
+      "reason": "The report never claims annual-contract customers churn more; it declines to state direction.",
+      "verdict": "no",
+      "quote_found": true
+    }
+  ],
+  "caveats": [],
+  "scores": {
+    "finding_recall": 0.625,
+    "false_claims": 0.0,
+    "caveat_coverage": null,
+    "quotes_not_found": 0
+  },
+  "usage": {
+    "input_tokens": 6770,
+    "output_tokens": 501
+  }
+}

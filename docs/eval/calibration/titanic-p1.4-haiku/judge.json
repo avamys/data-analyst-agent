@@ -1,0 +1,105 @@
+{
+  "model": "claude-sonnet-5-5",
+  "served_by": "claude-sonnet-5-5",
+  "prompt": "983aca5d02a5",
+  "must_find": [
+    {
+      "item": "Women survived at a much higher rate than men (about 74% against 19%).",
+      "quote": "Women survived at 74.2% (233 of 314) compared with 18.9% for men (109 of 577).",
+      "reason": "States the female and male survival rates with the correct direction and numbers.",
+      "verdict": "yes",
+      "quote_found": true
+    },
+    {
+      "item": "Survival falls with passenger class, highest in first class and lowest in third.",
+      "quote": "Class 1: 63.0% (n = 216)\n- Class 2: 47.3% (n = 184)\n- Class 3: 24.2% (n = 491)",
+      "reason": "Survival falls with class from first to third, with the rates given.",
+      "verdict": "yes",
+      "quote_found": true
+    },
+    {
+      "item": "Passengers who survived had paid higher fares on average.",
+      "quote": "Fare: survivors have mean \u00a348.40 and median 26.0. Non-survivors have mean 22.12 and median 10.5.",
+      "reason": "Survivors paid higher fares on average, and the report says so with numbers.",
+      "verdict": "yes",
+      "quote_found": true
+    },
+    {
+      "item": "Passengers without a recorded cabin survived less often than those with one.",
+      "quote": "survival is 30.0% when Cabin is missing versus 66.7% when present (p = 6.7e-21)",
+      "reason": "Missing cabin is linked to lower survival, with the numbers given.",
+      "verdict": "yes",
+      "quote_found": true
+    },
+    {
+      "item": "Passengers with a missing Age survived less often than those with a recorded Age.",
+      "quote": "survival is 29.4% when Age is missing versus 40.6% when present (p = 0.008)",
+      "reason": "Missing Age is linked to lower survival, with the numbers given.",
+      "verdict": "yes",
+      "quote_found": true
+    },
+    {
+      "item": "A predictive model is compared with the majority-class baseline (about 62% accuracy) and beats it.",
+      "quote": "Logistic regression reaches 77.6% test accuracy and ROC AUC 0.841, against 61.4% for a majority-class baseline.",
+      "reason": "The model is compared with the majority-class baseline of about 61% and beats it.",
+      "verdict": "yes",
+      "quote_found": true
+    },
+    {
+      "item": "Model results include precision, recall or F1, not only accuracy.",
+      "quote": "| Logistic regression | 0.808 | 0.776 | 0.720 | 0.686 | 0.702 | 0.841 |",
+      "reason": "The results table includes precision, recall and F1 as well as accuracy.",
+      "verdict": "yes",
+      "quote_found": true
+    }
+  ],
+  "must_not_claim": [
+    {
+      "item": "Most passengers survived.",
+      "quote": "Of the passengers, 549 (61.6%) did not survive and 342 (38.4%) did.",
+      "reason": "The report says most passengers did not survive, which contradicts the claim.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "Men survived at a higher rate than women.",
+      "quote": "Women survived at 74.2% (233 of 314) compared with 18.9% for men (109 of 577).",
+      "reason": "The report shows women surviving more than men, the opposite of the claim.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "Third-class passengers survived at a higher rate than first-class passengers.",
+      "quote": "Survival falls steadily with class.",
+      "reason": "The report says third class had lower survival than first class, the opposite of the claim.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "Age is the strongest predictor of survival.",
+      "quote": "Age is borderline and not significant after family-level correction (Holm p = 0.082).",
+      "reason": "The report says Sex is the dominant predictor and treats Age as borderline and not significant.",
+      "verdict": "no",
+      "quote_found": true
+    }
+  ],
+  "caveats": [
+    {
+      "item": "missing cabin (e.g. mentioning: Cabin)",
+      "quote": "Cabin is missing for 77.1% of passengers and Age for 19.9%.",
+      "reason": "The report flags missing cabin as a data quality limitation and says it was not used in any model.",
+      "verdict": "yes",
+      "quote_found": true
+    }
+  ],
+  "scores": {
+    "finding_recall": 1.0,
+    "false_claims": 0.0,
+    "caveat_coverage": 1.0,
+    "quotes_not_found": 0
+  },
+  "usage": {
+    "input_tokens": 10721,
+    "output_tokens": 966
+  }
+}

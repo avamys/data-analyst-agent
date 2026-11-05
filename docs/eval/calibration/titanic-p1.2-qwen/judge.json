@@ -1,0 +1,105 @@
+{
+  "model": "claude-sonnet-5-5",
+  "served_by": "claude-sonnet-5-5",
+  "prompt": "983aca5d02a5",
+  "must_find": [
+    {
+      "item": "Women survived at a much higher rate than men (about 74% against 19%).",
+      "quote": "There is a very strong association between sex and survival; independence is rejected.",
+      "reason": "The report shows a strong sex-survival association and calls sex the primary factor, but it never gives survival rates or states that women survived more than men.",
+      "verdict": "partly",
+      "quote_found": true
+    },
+    {
+      "item": "Survival falls with passenger class, highest in first class and lowest in third.",
+      "quote": "providing a distinct advantage to first-class passengers compared to third-class counterparts (Chi-square = 102.89, p < 0.001).",
+      "reason": "The report says first class had an advantage over third class, which gives the direction, though no per-class rates are reported.",
+      "verdict": "yes",
+      "quote_found": true
+    },
+    {
+      "item": "Passengers who survived had paid higher fares on average.",
+      "quote": "",
+      "reason": "The report never compares fares between survivors and non-survivors.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "Passengers without a recorded cabin survived less often than those with one.",
+      "quote": "Dropping the highly sparse 'Cabin' feature (~77% missing)",
+      "reason": "The report discusses Cabin missingness only as a data-quality issue and never compares survival for passengers with and without a cabin.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "Passengers with a missing Age survived less often than those with a recorded Age.",
+      "quote": "Age: Missingness is not random; it is heavily concentrated in **Third Class males** (136 out of 157 missing ages).",
+      "reason": "The report discusses missing Age but never compares survival between passengers with and without a recorded Age.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "A predictive model is compared with the majority-class baseline (about 62% accuracy) and beats it.",
+      "quote": "The Random Forest model achieved an **83.80% accuracy** and a balanced F1-score of **77.17%**, effectively navigating the dataset's class imbalance (38.38% survival rate).",
+      "reason": "The report gives model accuracy and mentions the class imbalance, but it never compares accuracy with the 62% majority-class baseline.",
+      "verdict": "partly",
+      "quote_found": true
+    },
+    {
+      "item": "Model results include precision, recall or F1, not only accuracy.",
+      "quote": "**Precision:** 84.48% **Recall:** 71.01% **F1-Score:** 77.17%",
+      "reason": "The report gives precision, recall and F1 for both models.",
+      "verdict": "yes",
+      "quote_found": true
+    }
+  ],
+  "must_not_claim": [
+    {
+      "item": "Most passengers survived.",
+      "quote": "Only **38.38%** of passengers survived (342 out of 891), while 61.62% did not survive (549).",
+      "reason": "The report states that most passengers did not survive.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "Men survived at a higher rate than women.",
+      "quote": "",
+      "reason": "The report says sex is the dominant factor and never claims men survived more than women.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "Third-class passengers survived at a higher rate than first-class passengers.",
+      "quote": "providing a distinct advantage to first-class passengers compared to third-class counterparts",
+      "reason": "The report states the opposite: first class had the advantage.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "Age is the strongest predictor of survival.",
+      "quote": "the hierarchy of predictive power is: **Sex > Pclass > Age > Fare/Embarked**",
+      "reason": "The report ranks Sex first and Age third, so it does not call Age the strongest predictor.",
+      "verdict": "no",
+      "quote_found": true
+    }
+  ],
+  "caveats": [
+    {
+      "item": "missing cabin (e.g. mentioning: Cabin)",
+      "quote": "The 'Cabin' column is severely degraded (77% missing), forcing its exclusion despite potential utility in specific contexts.",
+      "reason": "The report lists the missing Cabin data as a limitation.",
+      "verdict": "yes",
+      "quote_found": true
+    }
+  ],
+  "scores": {
+    "finding_recall": 0.42857142857142855,
+    "false_claims": 0.0,
+    "caveat_coverage": 1.0,
+    "quotes_not_found": 0
+  },
+  "usage": {
+    "input_tokens": 4781,
+    "output_tokens": 962
+  }
+}
