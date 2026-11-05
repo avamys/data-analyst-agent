@@ -1,6 +1,7 @@
 """LangSmith tracing helpers. Tracing is enabled through env vars (see .env.example)."""
 
 import logging
+import os
 from uuid import UUID
 
 from langchain_core.tracers.langchain import wait_for_all_tracers
@@ -12,6 +13,13 @@ logger = logging.getLogger(__name__)
 
 def tracing_enabled() -> bool:
     return bool(ls_utils.tracing_is_enabled())
+
+
+def eval_metadata() -> dict[str, str]:
+    """Case, repeat and version of an eval run (set by evals/runner.py), so its
+    trace can be found by them"""
+    keys = {key: f"EVAL_{key.upper()}" for key in ("case", "repeat", "version")}
+    return {key: os.environ[var] for key, var in keys.items() if var in os.environ}
 
 
 def trace_url(run_id: UUID) -> str | None:

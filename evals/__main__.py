@@ -4,6 +4,9 @@ uv run python -m evals run --version current --provider anthropic --repeats 3
 uv run python -m evals run --version baseline --provider anthropic --cases titanic
 uv run python -m evals grade evals/results/<suite id>.jsonl
 uv run python -m evals judge evals/results/<suite id>.jsonl
+uv run python -m evals report evals/results/<suite id>.jsonl [...]
+uv run python -m evals compare evals/results/<A>.jsonl evals/results/<B>.jsonl
+uv run python -m evals snapshot evals/results/<suite id>.jsonl
 uv run python -m evals agree
 """
 
@@ -20,7 +23,8 @@ from agent.config import PRESETS, settings  # noqa: E402
 from evals.calibration import agreement, calibrate  # noqa: E402
 from evals.cases import all_cases, load_case  # noqa: E402
 from evals.judge import PROMPT_VERSION, judge_results  # noqa: E402
-from evals.runner import ROOT, Config, regrade, run_suite  # noqa: E402
+from evals.report import compare, report  # noqa: E402
+from evals.runner import ROOT, Config, regrade, run_suite, snapshot  # noqa: E402
 
 
 def main() -> int:
@@ -45,12 +49,35 @@ def main() -> int:
     judge.add_argument("results", nargs="+", type=Path)
     judge.add_argument("--jobs", type=int, default=4)
     judge.add_argument("--force", action="store_true", help="Re-judge judged lines")
+    table = commands.add_parser("report", help="Markdown table per results file")
+    table.add_argument("results", nargs="+", type=Path)
+    diff = commands.add_parser("compare", help="Deltas from suite A to suite B")
+    diff.add_argument("a", type=Path)
+    diff.add_argument("b", type=Path)
+    snap = commands.add_parser(
+        "snapshot", help="Keep what the graders read of a suite's runs, for CI"
+    )
+    snap.add_argument("results", nargs="+", type=Path)
     agree = commands.add_parser(
         "agree", help="Judge agreement with the hand labels (docs/eval/calibration)"
     )
     agree.add_argument("--jobs", type=int, default=4)
     agree.add_argument("--force", action="store_true", help="Re-judge every report")
     args = parser.parse_args()
+
+    if args.command == "report":
+        print(report(args.results))
+        return 0
+
+    if args.command == "compare":
+        print(compare(args.a, args.b))
+        return 0
+
+    if args.command == "snapshot":
+        for results in args.results:
+            snapshot(results)
+            print(f"Snapshot of {results} in evals/snapshots/")
+        return 0
 
     if args.command == "agree":
         return _agree(calibrate(jobs=args.jobs, force=args.force))

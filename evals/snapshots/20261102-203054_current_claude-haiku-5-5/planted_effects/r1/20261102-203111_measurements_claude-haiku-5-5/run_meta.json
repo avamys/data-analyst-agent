@@ -1,0 +1,190 @@
+{
+  "status": "ok",
+  "started": "2026-11-02T20:31:11",
+  "command": [
+    "run.py",
+    "/workspaces/agents/evals/data/measurements.csv",
+    "--target",
+    "outcome",
+    "--model",
+    "claude-haiku-5-5",
+    "--provider",
+    "anthropic"
+  ],
+  "commit": "0992eb3",
+  "dirty": false,
+  "settings": {
+    "preset": "local",
+    "model_provider": "anthropic",
+    "ollama_base_url": "http://host.docker.internal:11434",
+    "ollama_model": "qwen3.5:9b",
+    "openrouter_base_url": "https://openrouter.ai/api/v1",
+    "openrouter_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "openrouter_reasoning": true,
+    "anthropic_model": "claude-haiku-5-5",
+    "analyst_model": "claude-haiku-5-5",
+    "coder_model": "claude-haiku-5-5",
+    "reporter_model": "claude-haiku-5-5",
+    "llm_reasoning": false,
+    "llm_num_ctx": 16384,
+    "llm_max_tokens": 4096,
+    "anthropic_max_tokens": 16000,
+    "llm_timeout_s": 900,
+    "llm_num_gpu": 17,
+    "llm_retries": 1,
+    "lead_temperature": 0.2,
+    "eda_temperature": 0.3,
+    "statistical_temperature": 0.2,
+    "ml_temperature": 0.1,
+    "reporter_temperature": 0.3,
+    "max_tasks": 6,
+    "max_follow_ups": 2,
+    "max_revisions": 1,
+    "max_specialist_steps": 5,
+    "max_report_rewrites": 1,
+    "code_timeout_s": 300,
+    "max_cell_output_chars": 3000,
+    "prompt_fact_chars": 200,
+    "review_script_chars": 8000,
+    "plan_description_chars": 1000,
+    "overfit_gap": 0.1,
+    "near_perfect_score": 0.99,
+    "baseline_margin": 0.02,
+    "leakage_score": 0.9,
+    "imbalance_ratio": 2.0,
+    "number_check_max_label": 10,
+    "number_check_conventions": [
+      0.05
+    ],
+    "runs_directory": "/workspaces/agents/evals/runs/20261102-203054_current_claude-haiku-5-5/planted_effects/r1",
+    "log_level": "INFO"
+  },
+  "nodes": [
+    {
+      "node": "profile",
+      "seconds": 0.4
+    },
+    {
+      "node": "plan",
+      "seconds": 7.2
+    },
+    {
+      "node": "run_task",
+      "seconds": 18.3
+    },
+    {
+      "node": "review",
+      "seconds": 9.7
+    },
+    {
+      "node": "run_task",
+      "seconds": 8.5
+    },
+    {
+      "node": "review",
+      "seconds": 6.1
+    },
+    {
+      "node": "run_task",
+      "seconds": 18.9
+    },
+    {
+      "node": "review",
+      "seconds": 8.6
+    },
+    {
+      "node": "run_task",
+      "seconds": 21.8
+    },
+    {
+      "node": "review",
+      "seconds": 5.9
+    },
+    {
+      "node": "run_task",
+      "seconds": 47.7
+    },
+    {
+      "node": "review",
+      "seconds": 9.3
+    },
+    {
+      "node": "run_task",
+      "seconds": 35.1
+    },
+    {
+      "node": "review",
+      "seconds": 8.0
+    },
+    {
+      "node": "run_task",
+      "seconds": 31.3
+    },
+    {
+      "node": "review",
+      "seconds": 9.4
+    },
+    {
+      "node": "run_task",
+      "seconds": 67.4
+    },
+    {
+      "node": "review",
+      "seconds": 9.8
+    },
+    {
+      "node": "run_task",
+      "seconds": 15.8
+    },
+    {
+      "node": "review",
+      "seconds": 4.6
+    },
+    {
+      "node": "run_task",
+      "seconds": 6.8
+    },
+    {
+      "node": "review",
+      "seconds": 4.6
+    },
+    {
+      "node": "run_task",
+      "seconds": 50.0
+    },
+    {
+      "node": "review",
+      "seconds": 8.3
+    },
+    {
+      "node": "run_task",
+      "seconds": 23.4
+    },
+    {
+      "node": "review",
+      "seconds": 7.7
+    },
+    {
+      "node": "report",
+      "seconds": 46.4
+    }
+  ],
+  "finished": "2026-11-02T20:39:23",
+  "seconds": 491.5,
+  "llm_calls": 49,
+  "input_tokens": 328866,
+  "output_tokens": 67919,
+  "tasks_completed": 7,
+  "tasks_failed": 0,
+  "unverified_numbers": [
+    "0.0346",
+    "0.0349",
+    "0.0187",
+    "0.0221",
+    "0.0084",
+    "0.0107",
+    "0.0011",
+    "0.0064"
+  ],
+  "trace_url": "https://eu.smith.langchain.com/o/26c8aa3e-ae1f-439e-95e7-a6a980ce7d4d/projects/p/1211d6ef-d04e-4c70-9d23-085a0d039445/r/fe3c8ad4-ec16-4831-a842-af921f5214cd?poll=true"
+}

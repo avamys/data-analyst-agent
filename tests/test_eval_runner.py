@@ -13,7 +13,9 @@ def fake_run(meta: dict | None, exit_code: int | None = 0, report=True):
     """Stands in for _execute: writes a run directory the way run.py does"""
 
     def _execute(cmd, cwd, env, log, timeout_s):
-        log.write_text("output")
+        log.write_text(
+            json.dumps({k: v for k, v in env.items() if k.startswith("EVAL_")})
+        )
         if meta is not None:
             run_dir = log.parent / "20261102-120000_pure_noise_m"
             run_dir.mkdir()
@@ -57,6 +59,19 @@ def test_a_finished_run_is_read_from_its_run_meta(monkeypatch, dirs):
     assert line["status"] == "ok" and line["has_report"]
     assert (line["llm_calls"], line["tasks_completed"]) == (47, 7)
     assert line["run_dir"] == "s/pure_noise/r1/20261102-120000_pure_noise_m"
+
+
+def test_a_run_knows_its_case_repeat_and_version_and_trace(monkeypatch, dirs):
+    meta = {"status": "ok", "run_id": "1234", "trace_url": "https://smith/r/1234"}
+    monkeypatch.setattr(runner, "_execute", fake_run(meta))
+    line = run_one(Config("baseline", "anthropic", "m"), CASE, 2, dirs / "s", dirs)
+    passed = json.loads((dirs / "s" / "pure_noise" / "r2" / "output.log").read_text())
+    assert passed == {
+        "EVAL_CASE": "pure_noise",
+        "EVAL_REPEAT": "2",
+        "EVAL_VERSION": "baseline",
+    }
+    assert (line["run_id"], line["trace_url"]) == ("1234", "https://smith/r/1234")
 
 
 @pytest.mark.parametrize(

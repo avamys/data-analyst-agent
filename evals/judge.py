@@ -70,6 +70,7 @@ PROMPT_VERSION = hashlib.sha256(
 ).hexdigest()[:12]
 
 SCORE = {"yes": 1.0, "partly": 0.5, "no": 0.0}
+KINDS = ("must_find", "must_not_claim", "caveats")
 
 
 class JudgeError(RuntimeError):
@@ -101,6 +102,23 @@ def _quoted(quote: str, report: str) -> bool:
     joined by an ellipsis where the judge left something out"""
     parts = [_normalized(p) for p in re.split(r"\.\.\.|…", quote)]
     return all(part in report for part in parts if part)
+
+
+def scores(graded: dict) -> dict:
+    """The scores of a report from its verdicts (also from stored ones)"""
+
+    def mean(kind):
+        values = [SCORE[v["verdict"]] for v in graded[kind]]
+        return sum(values) / len(values) if values else None
+
+    return {
+        "finding_recall": mean("must_find"),
+        "false_claims": sum(SCORE[v["verdict"]] for v in graded["must_not_claim"]),
+        "caveat_coverage": mean("caveats"),
+        "quotes_not_found": sum(
+            not v["quote_found"] for kind in KINDS for v in graded[kind]
+        ),
+    }
 
 
 def judge(
@@ -154,23 +172,12 @@ def judge(
             for text, v in zip(texts, given, strict=True)
         ]
 
-    def mean(kind):
-        scores = [SCORE[v["verdict"]] for v in graded[kind]]
-        return sum(scores) / len(scores) if scores else None
-
     return {
         "model": settings.judge_model,
         "served_by": response.model,
         "prompt": PROMPT_VERSION,
         **graded,
-        "scores": {
-            "finding_recall": mean("must_find"),
-            "false_claims": sum(SCORE[v["verdict"]] for v in graded["must_not_claim"]),
-            "caveat_coverage": mean("caveats"),
-            "quotes_not_found": sum(
-                not v["quote_found"] for kind in graded for v in graded[kind]
-            ),
-        },
+        "scores": scores(graded),
         "usage": {
             "input_tokens": response.usage.input_tokens,
             "output_tokens": response.usage.output_tokens,

@@ -16,10 +16,9 @@ import yaml
 from pydantic import BaseModel, field_validator
 
 from evals.cases import Case, load_case
-from evals.judge import PROMPT_VERSION, SCORE, judge
+from evals.judge import KINDS, PROMPT_VERSION, SCORE, judge
 
 CALIBRATION_DIR = Path(__file__).parent.parent / "docs" / "eval" / "calibration"
-KINDS = ("must_find", "must_not_claim", "caveats")
 
 
 class Label(BaseModel):

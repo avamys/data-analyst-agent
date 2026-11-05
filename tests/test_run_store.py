@@ -81,3 +81,14 @@ def test_write_tasks_writes_every_attempt(tmp_path):
     assert (task_dir / "attempt_1.py").read_text() == "boom()"
     assert (task_dir / "attempt_2_output.txt").read_text() == "1\n"
     assert json.loads((task_dir / "result.json").read_text())["task_id"] == "eda_1"
+
+
+def test_eval_metadata_comes_from_the_runners_environment(monkeypatch):
+    from agent.tracing import eval_metadata
+
+    for var in ("EVAL_CASE", "EVAL_REPEAT", "EVAL_VERSION"):
+        monkeypatch.delenv(var, raising=False)
+    assert eval_metadata() == {}
+    monkeypatch.setenv("EVAL_CASE", "leakage")
+    monkeypatch.setenv("EVAL_REPEAT", "3")
+    assert eval_metadata() == {"case": "leakage", "repeat": "3"}

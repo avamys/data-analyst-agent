@@ -3,7 +3,8 @@
 Versions: "current" runs the working tree, "baseline" the tagged baseline from a
 git worktree. Each run gets its own runs directory under evals/runs/ (gitignored);
 results go to evals/results/<suite id>.jsonl (committed). A run that fails, times
-out or crashes is a result, not an error of the suite.
+out or crashes is a result, not an error of the suite. A snapshot keeps what the
+graders read of a suite's runs, in evals/snapshots/ (committed), so CI can grade it.
 """
 
 import json
@@ -26,6 +27,7 @@ ROOT = Path(__file__).resolve().parent.parent
 RUNS_DIR = ROOT / "evals" / "runs"
 RESULTS_DIR = ROOT / "evals" / "results"
 WORKTREES_DIR = ROOT / "evals" / "worktrees"
+SNAPSHOTS_DIR = ROOT / "evals" / "snapshots"
 BASELINE_TAG = "v0.1.1-baseline-hosted"
 
 
@@ -124,6 +126,10 @@ def run_one(
             # One LangSmith project per suite: traces grouped by version and suite
             "LANGSMITH_PROJECT": f"evals-{suite_dir.name}",
             "LANGCHAIN_PROJECT": f"evals-{suite_dir.name}",
+            # Trace metadata (agent/tracing.py); the tagged baseline ignores them
+            "EVAL_CASE": case.name,
+            "EVAL_REPEAT": str(repeat),
+            "EVAL_VERSION": config.version,
         }
     )
     start = time.time()
@@ -165,6 +171,8 @@ def run_one(
                 "tasks_completed",
                 "tasks_failed",
                 "unverified_numbers",
+                "run_id",
+                "trace_url",
             )
         },
         "grades": grade(case, run_dir, prices) if run_dir else None,
@@ -180,6 +188,39 @@ def regrade(results: Path) -> None:
         case = load_case(line["case"])
         line["grades"] = grade(case, run_dir, prices) if run_dir else None
     results.write_text("".join(json.dumps(line) + "\n" for line in lines))
+
+
+def snapshot_path(run_dir: str) -> Path:
+    """Where the snapshot of a run directory (as a result line names it) lives"""
+    return SNAPSHOTS_DIR / Path(run_dir).relative_to("evals/runs")
+
+
+def snapshot(results: Path) -> None:
+    """Copy what the graders read from each run of a suite (evals/graders.py):
+    run_meta.json, report.md, and of the task results and plan only the review
+    verdicts and task ids. Not the LLM calls, so CI can't check the cost"""
+    for line in (json.loads(x) for x in results.read_text().splitlines()):
+        if not line["run_dir"]:
+            continue
+        src, dst = ROOT / line["run_dir"], snapshot_path(line["run_dir"])
+        dst.mkdir(parents=True, exist_ok=True)
+        for name in ("run_meta.json", "report.md"):
+            if (src / name).exists():
+                (dst / name).write_bytes((src / name).read_bytes())
+        for result in src.glob("tasks/*/result.json"):
+            task = json.loads(result.read_text())
+            kept = {"task_id": task["task_id"]}
+            if "reviews" in task:  # the baseline has none
+                kept["revisions"] = task["revisions"]
+                kept["reviews"] = [{"verdict": r["verdict"]} for r in task["reviews"]]
+            out = dst / result.relative_to(src)
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(json.dumps(kept, indent=1) + "\n")
+        for plan in src.glob("state/*_plan.json"):
+            ids = [{"id": b["id"]} for b in json.loads(plan.read_text())["backlog"]]
+            out = dst / plan.relative_to(src)
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(json.dumps({"backlog": ids}, indent=1) + "\n")
 
 
 def run_suite(config: Config, cases: list[Case]) -> Path:

@@ -21,7 +21,7 @@ from agent.data_loader import generate_dataset_info, load_dataset  # noqa: E402
 from agent.graph import build_hierarchical_graph  # noqa: E402
 from agent.logging_config import setup_logging  # noqa: E402
 from agent.run_store import LLMCallRecorder, RunStore  # noqa: E402
-from agent.tracing import trace_url, tracing_enabled  # noqa: E402
+from agent.tracing import eval_metadata, trace_url, tracing_enabled  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ def main():
         "run_id": run_id,
         "run_name": f"analysis:{dataset}",
         "tags": [dataset, settings.model_provider, model, settings.preset],
-        "metadata": {"commit": commit, "run_dir": store.path.name},
+        "metadata": {"commit": commit, "run_dir": store.path.name, **eval_metadata()},
         "callbacks": [recorder],
         # Each task is a run_task + review step, once more per revision
         "recursion_limit": 10
@@ -95,6 +95,7 @@ def main():
     }
     meta = {
         "status": "running",
+        "run_id": str(run_id),
         "started": datetime.now().isoformat(timespec="seconds"),
         "command": sys.argv,
         "commit": commit,
