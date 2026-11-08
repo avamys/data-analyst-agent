@@ -6,7 +6,7 @@ file: survey.csv
 target: outcome
 data: {generator: pure_noise, seed: 6}
 facts:
-  - {name: outcome_rate, value: 0.41125, near: [outcome]}
+  - {name: outcome_rate, value: 0.41125, near: [outcome, target]}
 must_find:
   - None of the features is meaningfully associated with outcome.
   - Predictive models do not meaningfully beat the majority-class baseline.

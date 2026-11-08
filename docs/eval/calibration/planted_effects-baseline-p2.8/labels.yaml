@@ -1,0 +1,29 @@
+case: planted_effects
+source: evals/runs/20261105-134725_baseline_claude-haiku-5-5/planted_effects/r3/20261105-140255_measurements_claude-haiku-5-5/report.md
+must_find:
+- item: feat_a has the strongest association with outcome.
+  label: yes
+  note: ''
+- item: feat_b is associated with outcome, more weakly than feat_a.
+  label: no
+  note: 'report states that the relation is not demonstrated. Left as the question to investigate'
+- item: feat_d is associated with outcome.
+  label: no
+  note: ''
+- item: feat_c shows no meaningful association with outcome.
+  label: no
+  note: 'report states that the relation is unknown. Left as the question to investigate'
+- item: About 15% of feat_d values are missing.
+  label: yes
+  note: ''
+must_not_claim:
+- item: feat_c is a significant or important predictor of outcome.
+  label: no
+  note: 'report states that the relation is unknown. Left as the question to investigate'
+- item: feat_b is the strongest predictor of outcome.
+  label: partly
+  note: 'report states that the relation is not demonstrated. Left as the question to investigate'
+caveats:
+- item: missing_values
+  label: partly
+  note: 'missing values mentioned, but  missingness mechanism is unresolved'

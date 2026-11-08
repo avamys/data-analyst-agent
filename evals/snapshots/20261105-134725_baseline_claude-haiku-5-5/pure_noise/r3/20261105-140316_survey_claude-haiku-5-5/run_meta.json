@@ -1,0 +1,61 @@
+{
+  "status": "ok",
+  "started": "2026-11-05T14:03:16",
+  "command": [
+    "run.py",
+    "/workspaces/agents/evals/data/survey.csv",
+    "--target",
+    "outcome",
+    "--model",
+    "claude-haiku-5-5"
+  ],
+  "commit": "49bd21c",
+  "dirty": false,
+  "settings": {
+    "ollama_base_url": "http://host.docker.internal:11434",
+    "analyst_model": "claude-haiku-5-5",
+    "coder_model": "claude-haiku-5-5",
+    "reporter_model": "claude-haiku-5-5",
+    "llm_reasoning": false,
+    "llm_num_ctx": 8192,
+    "llm_max_tokens": 4096,
+    "llm_timeout_s": 900,
+    "llm_num_gpu": 17,
+    "model_provider": "anthropic",
+    "reporter_temperature": 0.3,
+    "max_code_retries": 2,
+    "max_tasks": 6,
+    "runs_directory": "/workspaces/agents/evals/runs/20261105-134725_baseline_claude-haiku-5-5/pure_noise/r3",
+    "log_level": "INFO"
+  },
+  "nodes": [
+    {
+      "node": "orchestrator",
+      "seconds": 2.9
+    },
+    {
+      "node": "planner",
+      "seconds": 6.0
+    },
+    {
+      "node": "execution_manager",
+      "seconds": 120.3
+    },
+    {
+      "node": "synthesizer",
+      "seconds": 19.3
+    },
+    {
+      "node": "reporter",
+      "seconds": 39.6
+    }
+  ],
+  "finished": "2026-11-05T14:06:27",
+  "seconds": 190.4,
+  "llm_calls": 10,
+  "input_tokens": 16929,
+  "output_tokens": 36557,
+  "tasks_completed": 6,
+  "tasks_failed": 0,
+  "trace_url": "https://eu.smith.langchain.com/o/26c8aa3e-ae1f-439e-95e7-a6a980ce7d4d/projects/p/7b4519a0-3e76-4622-9602-f4ee33dcfe15/r/eee93427-3266-4a34-99b1-eba5690a6040?poll=true"
+}

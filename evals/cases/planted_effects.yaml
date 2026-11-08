@@ -6,7 +6,7 @@ file: measurements.csv
 target: outcome
 data: {generator: planted_effects, seed: 6}
 facts:
-  - {name: outcome_rate, value: 0.397, near: [outcome]}
+  - {name: outcome_rate, value: 0.397, near: [outcome, target]}
   - {name: feat_d_missing, value: 0.15, near: [feat_d]}
 must_find:
   - feat_a has the strongest association with outcome.

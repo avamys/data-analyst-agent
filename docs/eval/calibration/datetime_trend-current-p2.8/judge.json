@@ -1,0 +1,55 @@
+{
+  "model": "claude-sonnet-5-5",
+  "served_by": "claude-sonnet-5-5",
+  "prompt": "983aca5d02a5",
+  "must_find": [
+    {
+      "item": "sales rise over time (an upward trend across the two years).",
+      "quote": "Monthly mean sales rise from 219.7 in January 2023 to 324.4 in December 2024. The linear trend is about +4.7 per month across 24 months.",
+      "reason": "The report clearly states an upward sales trend over the two years, with numbers.",
+      "verdict": "yes",
+      "quote_found": true
+    },
+    {
+      "item": "sales are higher on weekends than on weekdays.",
+      "quote": "",
+      "reason": "The report never compares weekend and weekday sales; it only mentions weekday as a possible future calendar feature.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "Promotion days have higher sales than other days.",
+      "quote": "Promo days average 298.4 sales versus 266.3 on non-promo days, a difference of 32.1 (95% CI [24.0, 40.3], Welch p = 1.3e-12; Cohen's d = 0.81).",
+      "reason": "The report states that promo days have higher sales and gives the size of the difference.",
+      "verdict": "yes",
+      "quote_found": true
+    }
+  ],
+  "must_not_claim": [
+    {
+      "item": "sales decline over time.",
+      "quote": "Monthly mean sales rise from 219.7 in January 2023 to 324.4 in December 2024.",
+      "reason": "The report says sales rise over time, not decline.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "temperature is a significant driver of sales.",
+      "quote": "**Temperature has no detectable relationship with sales.**",
+      "reason": "The report explicitly rejects temperature as a significant driver.",
+      "verdict": "no",
+      "quote_found": true
+    }
+  ],
+  "caveats": [],
+  "scores": {
+    "finding_recall": 0.6666666666666666,
+    "false_claims": 0.0,
+    "caveat_coverage": null,
+    "quotes_not_found": 0
+  },
+  "usage": {
+    "input_tokens": 5225,
+    "output_tokens": 423
+  }
+}

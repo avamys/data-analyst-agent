@@ -1,0 +1,208 @@
+{
+  "status": "ok",
+  "run_id": "f7987d22-3c2f-4c00-a65f-f4bb1e0da7ac",
+  "started": "2026-11-05T15:11:28",
+  "command": [
+    "run.py",
+    "/workspaces/agents/evals/data/titanic.csv",
+    "--target",
+    "Survived",
+    "--model",
+    "claude-haiku-5-5",
+    "--provider",
+    "anthropic"
+  ],
+  "commit": "9066886",
+  "dirty": true,
+  "settings": {
+    "preset": "local",
+    "model_provider": "anthropic",
+    "ollama_base_url": "http://host.docker.internal:11434",
+    "ollama_model": "qwen3.5:9b",
+    "openrouter_base_url": "https://openrouter.ai/api/v1",
+    "openrouter_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "openrouter_reasoning": true,
+    "anthropic_model": "claude-haiku-5-5",
+    "analyst_model": "claude-haiku-5-5",
+    "coder_model": "claude-haiku-5-5",
+    "reporter_model": "claude-haiku-5-5",
+    "llm_reasoning": false,
+    "llm_num_ctx": 16384,
+    "llm_max_tokens": 4096,
+    "anthropic_max_tokens": 16000,
+    "llm_timeout_s": 900,
+    "llm_num_gpu": 17,
+    "llm_retries": 1,
+    "lead_temperature": 0.2,
+    "eda_temperature": 0.3,
+    "statistical_temperature": 0.2,
+    "ml_temperature": 0.1,
+    "reporter_temperature": 0.3,
+    "max_tasks": 6,
+    "max_follow_ups": 2,
+    "max_revisions": 1,
+    "max_specialist_steps": 5,
+    "max_report_rewrites": 1,
+    "code_timeout_s": 300,
+    "max_cell_output_chars": 3000,
+    "prompt_fact_chars": 200,
+    "review_script_chars": 8000,
+    "plan_description_chars": 1000,
+    "overfit_gap": 0.1,
+    "near_perfect_score": 0.99,
+    "baseline_margin": 0.02,
+    "leakage_score": 0.9,
+    "imbalance_ratio": 2.0,
+    "number_check_max_label": 10,
+    "number_check_conventions": [
+      0.05
+    ],
+    "judge_model": "claude-sonnet-5-5",
+    "runs_directory": "/workspaces/agents/evals/runs/20261105-140404_current_claude-haiku-5-5/titanic/r3",
+    "log_level": "INFO"
+  },
+  "nodes": [
+    {
+      "node": "profile",
+      "seconds": 2.1
+    },
+    {
+      "node": "plan",
+      "seconds": 7.2
+    },
+    {
+      "node": "run_task",
+      "seconds": 40.6
+    },
+    {
+      "node": "review",
+      "seconds": 8.6
+    },
+    {
+      "node": "run_task",
+      "seconds": 63.5
+    },
+    {
+      "node": "review",
+      "seconds": 7.6
+    },
+    {
+      "node": "run_task",
+      "seconds": 18.7
+    },
+    {
+      "node": "review",
+      "seconds": 11.9
+    },
+    {
+      "node": "run_task",
+      "seconds": 41.0
+    },
+    {
+      "node": "review",
+      "seconds": 12.3
+    },
+    {
+      "node": "run_task",
+      "seconds": 70.3
+    },
+    {
+      "node": "review",
+      "seconds": 12.8
+    },
+    {
+      "node": "run_task",
+      "seconds": 65.5
+    },
+    {
+      "node": "review",
+      "seconds": 6.9
+    },
+    {
+      "node": "run_task",
+      "seconds": 37.4
+    },
+    {
+      "node": "review",
+      "seconds": 13.4
+    },
+    {
+      "node": "run_task",
+      "seconds": 24.0
+    },
+    {
+      "node": "review",
+      "seconds": 5.9
+    },
+    {
+      "node": "run_task",
+      "seconds": 66.2
+    },
+    {
+      "node": "review",
+      "seconds": 9.0
+    },
+    {
+      "node": "run_task",
+      "seconds": 118.5
+    },
+    {
+      "node": "review",
+      "seconds": 7.6
+    },
+    {
+      "node": "run_task",
+      "seconds": 65.2
+    },
+    {
+      "node": "review",
+      "seconds": 15.3
+    },
+    {
+      "node": "run_task",
+      "seconds": 31.6
+    },
+    {
+      "node": "review",
+      "seconds": 9.7
+    },
+    {
+      "node": "run_task",
+      "seconds": 82.6
+    },
+    {
+      "node": "review",
+      "seconds": 8.5
+    },
+    {
+      "node": "run_task",
+      "seconds": 107.2
+    },
+    {
+      "node": "review",
+      "seconds": 11.7
+    },
+    {
+      "node": "report",
+      "seconds": 72.5
+    }
+  ],
+  "finished": "2026-11-05T15:29:06",
+  "seconds": 1056.0,
+  "llm_calls": 66,
+  "input_tokens": 492415,
+  "output_tokens": 113288,
+  "tasks_completed": 8,
+  "tasks_failed": 0,
+  "unverified_numbers": [],
+  "context": {
+    "largest_prompt_tokens": 38219,
+    "window_warnings": [],
+    "prompt_cuts": {
+      "dataset description": 1,
+      "fact value": 178,
+      "cell output": 2
+    }
+  },
+  "trace_url": "https://eu.smith.langchain.com/o/26c8aa3e-ae1f-439e-95e7-a6a980ce7d4d/projects/p/485c6898-6f2b-4d29-9251-6ceb7287079a/r/f7987d22-3c2f-4c00-a65f-f4bb1e0da7ac?poll=true"
+}

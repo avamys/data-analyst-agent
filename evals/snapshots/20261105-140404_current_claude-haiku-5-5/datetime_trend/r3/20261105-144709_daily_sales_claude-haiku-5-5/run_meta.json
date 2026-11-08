@@ -1,0 +1,175 @@
+{
+  "status": "ok",
+  "run_id": "dbe3dcbe-4c89-4806-8b01-06007547430e",
+  "started": "2026-11-05T14:47:09",
+  "command": [
+    "run.py",
+    "/workspaces/agents/evals/data/daily_sales.csv",
+    "--target",
+    "sales",
+    "--model",
+    "claude-haiku-5-5",
+    "--provider",
+    "anthropic"
+  ],
+  "commit": "9066886",
+  "dirty": true,
+  "settings": {
+    "preset": "local",
+    "model_provider": "anthropic",
+    "ollama_base_url": "http://host.docker.internal:11434",
+    "ollama_model": "qwen3.5:9b",
+    "openrouter_base_url": "https://openrouter.ai/api/v1",
+    "openrouter_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "openrouter_reasoning": true,
+    "anthropic_model": "claude-haiku-5-5",
+    "analyst_model": "claude-haiku-5-5",
+    "coder_model": "claude-haiku-5-5",
+    "reporter_model": "claude-haiku-5-5",
+    "llm_reasoning": false,
+    "llm_num_ctx": 16384,
+    "llm_max_tokens": 4096,
+    "anthropic_max_tokens": 16000,
+    "llm_timeout_s": 900,
+    "llm_num_gpu": 17,
+    "llm_retries": 1,
+    "lead_temperature": 0.2,
+    "eda_temperature": 0.3,
+    "statistical_temperature": 0.2,
+    "ml_temperature": 0.1,
+    "reporter_temperature": 0.3,
+    "max_tasks": 6,
+    "max_follow_ups": 2,
+    "max_revisions": 1,
+    "max_specialist_steps": 5,
+    "max_report_rewrites": 1,
+    "code_timeout_s": 300,
+    "max_cell_output_chars": 3000,
+    "prompt_fact_chars": 200,
+    "review_script_chars": 8000,
+    "plan_description_chars": 1000,
+    "overfit_gap": 0.1,
+    "near_perfect_score": 0.99,
+    "baseline_margin": 0.02,
+    "leakage_score": 0.9,
+    "imbalance_ratio": 2.0,
+    "number_check_max_label": 10,
+    "number_check_conventions": [
+      0.05
+    ],
+    "judge_model": "claude-sonnet-5-5",
+    "runs_directory": "/workspaces/agents/evals/runs/20261105-140404_current_claude-haiku-5-5/datetime_trend/r3",
+    "log_level": "INFO"
+  },
+  "nodes": [
+    {
+      "node": "profile",
+      "seconds": 2.2
+    },
+    {
+      "node": "plan",
+      "seconds": 10.2
+    },
+    {
+      "node": "run_task",
+      "seconds": 48.5
+    },
+    {
+      "node": "review",
+      "seconds": 8.9
+    },
+    {
+      "node": "run_task",
+      "seconds": 12.0
+    },
+    {
+      "node": "review",
+      "seconds": 6.7
+    },
+    {
+      "node": "run_task",
+      "seconds": 46.1
+    },
+    {
+      "node": "review",
+      "seconds": 8.2
+    },
+    {
+      "node": "run_task",
+      "seconds": 38.4
+    },
+    {
+      "node": "review",
+      "seconds": 7.7
+    },
+    {
+      "node": "run_task",
+      "seconds": 39.6
+    },
+    {
+      "node": "review",
+      "seconds": 10.0
+    },
+    {
+      "node": "run_task",
+      "seconds": 59.1
+    },
+    {
+      "node": "review",
+      "seconds": 8.3
+    },
+    {
+      "node": "run_task",
+      "seconds": 22.1
+    },
+    {
+      "node": "review",
+      "seconds": 4.2
+    },
+    {
+      "node": "run_task",
+      "seconds": 70.1
+    },
+    {
+      "node": "review",
+      "seconds": 9.7
+    },
+    {
+      "node": "run_task",
+      "seconds": 54.5
+    },
+    {
+      "node": "review",
+      "seconds": 9.3
+    },
+    {
+      "node": "run_task",
+      "seconds": 45.2
+    },
+    {
+      "node": "review",
+      "seconds": 8.6
+    },
+    {
+      "node": "report",
+      "seconds": 21.4
+    }
+  ],
+  "finished": "2026-11-05T14:56:22",
+  "seconds": 551.4,
+  "llm_calls": 43,
+  "input_tokens": 249041,
+  "output_tokens": 57397,
+  "tasks_completed": 6,
+  "tasks_failed": 0,
+  "unverified_numbers": [],
+  "context": {
+    "largest_prompt_tokens": 12491,
+    "window_warnings": [],
+    "prompt_cuts": {
+      "dataset description": 1,
+      "fact value": 56
+    }
+  },
+  "trace_url": "https://eu.smith.langchain.com/o/26c8aa3e-ae1f-439e-95e7-a6a980ce7d4d/projects/p/485c6898-6f2b-4d29-9251-6ceb7287079a/r/dbe3dcbe-4c89-4806-8b01-06007547430e?poll=true"
+}

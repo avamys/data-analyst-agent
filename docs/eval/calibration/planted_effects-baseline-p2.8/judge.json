@@ -1,0 +1,77 @@
+{
+  "model": "claude-sonnet-5-5",
+  "served_by": "claude-sonnet-5-5",
+  "prompt": "983aca5d02a5",
+  "must_find": [
+    {
+      "item": "feat_a has the strongest association with outcome.",
+      "quote": "feat_a is the clearest driver of the outcome.** It differs significantly between outcome groups (t-test, p < 0.05), is significantly correlated with the outcome, and ranks first in all three importance measures.",
+      "reason": "The report states feat_a is the strongest predictor and associated with the outcome, with a positive direction (higher feat_a gives higher odds).",
+      "verdict": "yes",
+      "quote_found": true
+    },
+    {
+      "item": "feat_b is associated with outcome, more weakly than feat_a.",
+      "quote": "feat_b differs between outcome groups, but this does not show it is useful for prediction.",
+      "reason": "It says feat_b differs by outcome, but it does not say the association is weaker than feat_a's and gives no direction, though feat_a is the top-ranked feature.",
+      "verdict": "partly",
+      "quote_found": true
+    },
+    {
+      "item": "feat_d is associated with outcome.",
+      "quote": "feat_d means differ by outcome | Two-group t-test | p < 0.05 (listed in the extracted insights, not in the test output) | feat_d's average differs by outcome | **Supported, but unverified**",
+      "reason": "It says feat_d is associated with the outcome, but with hedging as unverified and with no direction.",
+      "verdict": "partly",
+      "quote_found": true
+    },
+    {
+      "item": "feat_c shows no meaningful association with outcome.",
+      "quote": "feat_c appears not to differ by outcome, but the failed-rejection line is not explicitly labeled, so this should be confirmed.",
+      "reason": "It says feat_c probably shows no difference by outcome, though heavily hedged.",
+      "verdict": "partly",
+      "quote_found": true
+    },
+    {
+      "item": "About 15% of feat_d values are missing.",
+      "quote": "Missing data | feat_d only: 150 rows (15.0%); all other columns complete",
+      "reason": "It states clearly that 15% of feat_d values are missing.",
+      "verdict": "yes",
+      "quote_found": true
+    }
+  ],
+  "must_not_claim": [
+    {
+      "item": "feat_c is a significant or important predictor of outcome.",
+      "quote": "feat_c appears not to differ by outcome",
+      "reason": "The report says feat_c is probably not associated with the outcome, so it does not claim it is important.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "feat_b is the strongest predictor of outcome.",
+      "quote": "feat_a is the primary signal. It passes the t-test, the correlation test, and all three model-based importance measures.",
+      "reason": "The report names feat_a, not feat_b, as the strongest predictor.",
+      "verdict": "no",
+      "quote_found": true
+    }
+  ],
+  "caveats": [
+    {
+      "item": "missing values (e.g. mentioning: missing)",
+      "quote": "feat_d has 15% missing values, and its missingness mechanism is unresolved.",
+      "reason": "The report treats missing values as a data-quality limitation and discusses the imputation risk at length.",
+      "verdict": "yes",
+      "quote_found": true
+    }
+  ],
+  "scores": {
+    "finding_recall": 0.7,
+    "false_claims": 0.0,
+    "caveat_coverage": 1.0,
+    "quotes_not_found": 0
+  },
+  "usage": {
+    "input_tokens": 7448,
+    "output_tokens": 757
+  }
+}
