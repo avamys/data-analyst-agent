@@ -1,15 +1,19 @@
 """Runs a task's cell script (`analysis.py`) in a fresh subprocess"""
 
 import json
+import logging
 import os
 import subprocess
 import sys
 import time
+from functools import cache
 from pathlib import Path
 
 from pydantic import BaseModel
 
 from agent.execution.cells import split_cells
+
+logger = logging.getLogger(__name__)
 
 SCRIPT = "analysis.py"
 RESULTS = ".results.jsonl"
@@ -60,6 +64,24 @@ def _script_env() -> dict[str, str]:
     return {**env, "MPLBACKEND": "Agg"}
 
 
+# ...and no network: in a new user and network namespace there is only loopback,
+# so nothing can be sent out or downloaded. Needs no root; Linux only.
+NO_NETWORK = ["unshare", "--user", "--map-root-user", "--net"]
+
+
+@cache
+def network_blocked() -> bool:
+    """Whether scripts run without network access (checked once per process)"""
+    try:
+        check = subprocess.run([*NO_NETWORK, "true"], capture_output=True, timeout=10)
+        blocked = check.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        blocked = False
+    if not blocked:
+        logger.warning("unshare is not available: task scripts have network access")
+    return blocked
+
+
 def run_script(task_dir: str | Path, timeout: float) -> ScriptResult:
     task_dir = Path(task_dir)
     n_cells = len(split_cells((task_dir / SCRIPT).read_text()))
@@ -69,7 +91,14 @@ def run_script(task_dir: str | Path, timeout: float) -> ScriptResult:
     start = time.time()
     try:
         proc = subprocess.run(
-            [sys.executable, "-m", "agent.execution.driver", SCRIPT, RESULTS],
+            [
+                *(NO_NETWORK if network_blocked() else []),
+                sys.executable,
+                "-m",
+                "agent.execution.driver",
+                SCRIPT,
+                RESULTS,
+            ],
             cwd=task_dir,
             capture_output=True,
             text=True,

@@ -18,6 +18,7 @@ from agent import context  # noqa: E402
 from agent.config import PRESETS, settings  # noqa: E402
 from agent.core.llm_manager import LLMManager  # noqa: E402
 from agent.data_loader import generate_dataset_info, load_dataset  # noqa: E402
+from agent.execution.runner import network_blocked  # noqa: E402
 from agent.graph import build_hierarchical_graph  # noqa: E402
 from agent.logging_config import setup_logging  # noqa: E402
 from agent.run_store import LLMCallRecorder, RunStore  # noqa: E402
@@ -100,6 +101,7 @@ def main():
         "command": sys.argv,
         "commit": commit,
         "dirty": bool(_git("status", "--porcelain", "--untracked-files=no")),
+        "network_blocked": network_blocked(),
         "settings": settings.model_dump(
             exclude={"openrouter_api_key", "anthropic_api_key"}
         ),

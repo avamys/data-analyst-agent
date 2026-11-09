@@ -3,7 +3,7 @@
 > **This is the main plan for the project.** It replaces `todo.md`; everything still useful from there is folded in below (see [Appendix: todo.md mapping](#appendix-todomd-mapping)).
 > Update the checkboxes and the **Status** block as work lands. Record decisions in the [Decision log](#decision-log).
 
-**Status:** Phase 1 done on `phase-1` (P1.1–P1.5). Measured on the Titanic reference run: wrong claims 7 → 0, unsupported 6 → 0, baseline findings absent 7 → 0, charts in the report 0 → 5 ([P1.5 check](docs/progress/p1.5/annotations.md)). The exit criteria were met on Claude Haiku 5.5 (9 min, $0.08 a run); not yet re-run on qwen3.5. Hosted providers (OpenRouter, Anthropic) and a cost report added. Phase 2 planned (eval harness; both versions on Haiku 5.5, Sonnet 5.5 as judge). P2.0 (central configuration, presets) and P2.1 (baseline on Haiku, `v0.1.1-baseline-hosted`) done; P2.2 (7 eval cases with known answers) done; P2.3 (runner) done; first suite, judged by hand: current 30/30 findings, baseline 16/30 ([first look](docs/eval/first-look.md)). P2.3a: task scripts no longer see API keys; Ollama prompts are checked against the context window. P2.4 (deterministic graders) done; P2.5 (LLM judge) done: on the first suite it agrees with the hand labels on 87% of findings exactly, 100% within ½. P2.6 calibration: 12 labelled reports, 93–96% exact agreement, 100% within ½; the judge agrees with itself on 95%; labels spot-checked by the owner. P2.7: `evals report` / `compare`, eval traces tagged, CI regrades the committed suites. P2.8 [before/after](docs/eval/before-after.md), 7 cases × 3 repeats on Haiku 5.5: findings 53% → 98%, false claims 0.1 → 0 a run, $0.024 → $0.076 a run; the `hosted` preset adds no findings at 1.8× the cost. Next: Phase 3 · **Last updated:** 2026-11-08
+**Status:** Phase 1 done on `phase-1` (P1.1–P1.5). Measured on the Titanic reference run: wrong claims 7 → 0, unsupported 6 → 0, baseline findings absent 7 → 0, charts in the report 0 → 5 ([P1.5 check](docs/progress/p1.5/annotations.md)). The exit criteria were met on Claude Haiku 5.5 (9 min, $0.08 a run); not yet re-run on qwen3.5. Hosted providers (OpenRouter, Anthropic) and a cost report added. Phase 2 planned (eval harness; both versions on Haiku 5.5, Sonnet 5.5 as judge). P2.0 (central configuration, presets) and P2.1 (baseline on Haiku, `v0.1.1-baseline-hosted`) done; P2.2 (7 eval cases with known answers) done; P2.3 (runner) done; first suite, judged by hand: current 30/30 findings, baseline 16/30 ([first look](docs/eval/first-look.md)). P2.3a: task scripts no longer see API keys; Ollama prompts are checked against the context window. P2.4 (deterministic graders) done; P2.5 (LLM judge) done: on the first suite it agrees with the hand labels on 87% of findings exactly, 100% within ½. P2.6 calibration: 12 labelled reports, 93–96% exact agreement, 100% within ½; the judge agrees with itself on 95%; labels spot-checked by the owner. P2.7: `evals report` / `compare`, eval traces tagged, CI regrades the committed suites. P2.8 [before/after](docs/eval/before-after.md), 7 cases × 3 repeats on Haiku 5.5: findings 53% → 98%, false claims 0.1 → 0 a run, $0.024 → $0.076 a run; the `hosted` preset adds no findings at 1.8× the cost. Phase 2 done. Phase 3 planned: network block, 5–6 harder cases (real and synthetic), faster runs. P3.1 done (network block). Next: P3.2 · **Last updated:** 2026-11-09
 
 ---
 
@@ -376,7 +376,7 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 **Decided 2026-11-02:** both versions run on **Claude Haiku 5.5**: the baseline gets the hosted provider on a branch and nothing else. The judge is **Claude Sonnet 5.5**. The local vs hosted comparison is Phase 4's.
 
 **Exit criteria**
-- [ ] `uv run python -m evals run --suite core --version current --repeats 3` works from a clean clone with an API key, and `evals report` turns the results into a table *(works in this checkout, without `--suite`: all cases are the default; not yet tried from a clean clone)*
+- [x] `uv run python -m evals run --version current --repeats 3` works from a clean clone with an API key, and `evals report` turns the results into a table *(2026-11-08: fresh clone of `phase-1` from GitHub, `uv sync`, `.env` with the Anthropic and LangSmith keys; `titanic` (downloaded, checksum checked) and `pure_noise` (generated) ran ok, with traces. There's no `--suite` flag: all cases are the default)*
 - [x] ≥ 6 cases, including the `pure_noise` and `leakage` traps, each with seeded data (or a downloaded, checksummed file) and an `expected.yaml` *(7 cases, `evals/cases/<case>.yaml`)*
 - [x] The judge agrees with hand labels on ≥ 90% of items across ≥ 10 reports; judge model and prompt version are recorded with every result *(93% exact, 100% within ½, 15 reports)*
 - [x] CI grades a committed eval run: no LLM calls, no API keys
@@ -462,20 +462,57 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 | Large variance across 3 repeats | Report min–max; add repeats for cases that swing |
 | Rate limits with parallel runs | `--jobs`; the SDKs retry 429s |
 
-### Phase 3: Hardening, guided by the eval (M)
-Goal: close the gaps the eval exposes.
-- [ ] Sandbox isolation: network blocked, environment scrubbed; optional Docker backend. *Environment scrubbed in P2.3a. Next, and first in this phase: block network access for task scripts (network namespace or a container with `--network none`), then the Docker backend with only the task directory and a read-only dataset.*
-- [ ] Resume an interrupted run: a LangGraph checkpointer (SQLite in the run directory) and `run.py --resume <run dir>`. Matters for local runs (1–2 h); the stalls seen so far were the host sleeping.
-- [ ] If numbers in reports still drift: the writer cites `{{fact:…}}` references and a renderer fills in values.
-- [ ] If the judge finds false qualitative claims: an LLM claim check against facts, looping back to the writer.
-- [ ] Retry strategies targeted at the failure types the eval shows.
-- [ ] Parallel task execution (`Send`, `max_concurrency`) for hosted models.
-- [ ] **Depth: fewer open questions.** The P1.5 report left 10 open questions; 9 were answerable with this data, and 1 was a review objection that ran out of revisions. Measure on the eval: (a) larger budgets in the `hosted` preset (`max_follow_ups` 2 → 5, `max_revisions` 1 → 2) *(measured in P2.8: no more findings, fewer unresolved objections, 1.8× the cost; fails the rule below)*; (b) a closing review: when the backlog is empty and follow-up budget is left, the lead ranks every open question (suggested follow-ups and unresolved objections across tasks) and briefs the most important, instead of choosing only at each task's review; (c) the report keeps only the open questions the lead judges important. Keep a change only if finding recall goes up and false claims don't.
-- [ ] Re-run the eval; compare with Phase 2.
+### Phase 3: Hardening and harder cases (M–L), detailed
 
-**Exit:** trap cases pass; clear improvement over the Phase 2 numbers.
+**Goal:** isolate the code the agent runs, give the eval cases the current agent can still fail, and make runs faster without losing findings.
+
+**Decided 2026-11-09:** P2.8 left Phase 3 little to measure on the 7 cases: findings 98%, no false claims, 63 of 63 runs ok, 0.1 unverified numbers a run. So the conditional items (fact references, an LLM claim check, targeted retries) wait for the new cases to show their failure. The new cases mix real datasets (open licences, stable URLs, not Kaggle: it needs an account and often forbids redistribution) and synthetic ones where exact ground truth matters. The target for speed is time; cost may rise.
+
+**Exit criteria**
+- [ ] A task script can't open a network connection (a test proves it); where the block isn't available, `run_meta.json` says so
+- [ ] ≥ 4 new cases, real and synthetic, each with its expected answers checked by a committed script
+- [ ] On the new cases: findings clearly above the P3.2 bar, no false claims
+- [ ] No regression on the original 7 cases
+- [ ] Time per run down by a third at equal findings (same machine load as the reference)
+
+**P3.1 Network block** (S)
+- [x] Task scripts run under `unshare -rn` (a user and network namespace: loopback only, no root needed). Scripts never need the network: libraries are installed, data is local. *`agent/execution/runner.py`. Parallel scikit-learn (`n_jobs=-1`, joblib) works inside it. Checked in a titanic eval run: ok, no task hit a network error.*
+- [x] Where `unshare` isn't available or not permitted (macOS, Windows, some containers): run without it, log a warning once, and record `"network_blocked": false` in `run_meta.json`. *Also Ubuntu 24.04+ by default (AppArmor restricts unprivileged user namespaces); CI lifts the restriction so the test runs.*
+- [x] Tests: a script that opens a socket fails with the block on; a normal cell still runs. *The script sees only `lo` and gets `ENETUNREACH`; with the block replaced by a no-op the test fails.*
+- [ ] *Optional:* bubblewrap (`bwrap`) when installed: the script sees only its task directory (writable), the dataset and the Python environment (read-only). Falls back to the network block.
+- Not planned: a Docker backend (Docker isn't installed here; the namespace covers exfiltration, the worst case).
+- Found 2026-11-09, in the check run: a whole task (titanic `ml_1`, 6 findings) cited no facts, and review accepted it, so the report had 23 unverified numbers. In P2.8: 0 of 706 findings in the current suite, 4 of 985 with `hosted`. Candidate for P3.4: the specialist's report is sent back when a finding states numbers and cites no fact (deterministic, no LLM call).
+
+**P3.2 Harder cases** (M)
+- [ ] Real, downloaded and checksummed, with a script that computes every expected finding and fact from the file:
+  - **penguins** (Palmer penguins, CC0): confounding. Bill depth vs length is negative pooled, positive within each species.
+  - **diabetes** (Pima, OpenML): missing values in disguise. Zeros in glucose, BMI and blood pressure mean "missing".
+  - **bike sharing** (UCI daily, CC BY 4.0): a real time series. Season, weather and working-day effects.
+- [ ] Synthetic, exact ground truth:
+  - **u_shape:** a strong non-linear effect with correlation ≈ 0.
+  - **small_sample:** n ≈ 60 with one real and several null effects; caution is the right answer.
+- [ ] **imbalance:** Adult census income (UCI, CC BY 4.0, 76/24, 48k rows) if one run shows its size is workable; a synthetic 95/5 case otherwise. Accuracy alone must not be called good.
+- [ ] Licence and URL checked before each real case goes in. Neutral file names, as for the others.
+- [ ] Memorisation: the model may know a famous dataset from its columns. The number check catches memorised numbers (they match no recorded fact); findings without numbers it doesn't. Note it with the results.
+- [ ] Current agent × 3 repeats on the new cases: the bar for P3.4. *Estimate: 15–18 runs, about $1.50.*
+
+**P3.3 Faster runs** (M)
+- [ ] Measure where a run's time goes: LLM calls (per node), script execution, waiting. *P2.8, current suite: about half of the 14.3 min is LLM time, under load.*
+- [ ] Parallel task execution (`Send`, `max_concurrency`) for independent tasks.
+- [ ] Revisions (4.6 a run) against what they change: objections resolved vs findings. Cut only what doesn't move findings.
+- [ ] Check: the 7 original cases × 3, same load as the reference suite. Time down by a third, findings and false claims unchanged.
+
+**P3.4 Fix what P3.2 exposes** (M)
+- [ ] One change per failure type the new cases show, each kept only if findings go up and false claims don't. Candidates, used only if their failure appears: depth (b) a closing review that ranks open questions; (c) the report keeps only important open questions; an LLM claim check against facts; `{{fact:…}}` references; targeted retries.
+- Measured in P2.8 and rejected: larger budgets (`hosted` preset): no more findings, 1.8× the cost.
+
+**P3.5 Re-run and compare** (S)
+- [ ] All cases × 3 with the Phase 3 agent; compare with the P3.2 bar and the P2.8 suites; commit the table and snapshots.
+
+Moved to Phase 4: resume an interrupted run (a LangGraph checkpointer and `run.py --resume`). It matters for local models, where runs take 1–2 h.
 
 ### Phase 4: Models & providers (S–M)
+- [ ] Resume an interrupted run: a LangGraph checkpointer (SQLite in the run directory) and `run.py --resume <run dir>`. Matters for local runs (1–2 h); the stalls seen so far were the host sleeping. *(Moved from Phase 3.)*
 - [x] Provider config: `ollama`, `openrouter`, `anthropic` via `init_chat_model` (`MODEL_PROVIDER` / `--provider`, one model setting per provider). Done early, 2026-11-02, because local runs were the bottleneck. `openai` dropped: OpenRouter serves those models.
 - [ ] Per-role model config (planner / coder / writer / judge) in `settings` / `.env`. *(Partly there: `ANALYST_MODEL` / `CODER_MODEL` / `REPORTER_MODEL` override the provider's model; no judge yet.)*
 - [x] Token and cost report per run: `scripts/run_cost.py` (tokens per node; cost at OpenRouter list prices, also projected onto other models).
@@ -582,6 +619,9 @@ PLAN.md  README.md
 | 2026-11-03 | Stay on LangSmith through Phase 2; choose LangSmith vs self-hosted Langfuse at the start of Phase 5 | Switching mid-measurement adds risk and no numbers. Langfuse's one real advantage here is free self-hosting, i.e. always-on tracing for local runs without data leaving the machine; it matters for the demo, not the eval |
 | 2026-11-03 | Judge: one call per report, no majority vote over repeated calls; within ½ is the figure to quote; no more rubric tuning on the calibration set | The judge disagrees with itself on 5% of items, all at the `partly` boundary, so exact agreement moves ±3 points by noise. The before/after gap (16/30 vs 30/30 findings in the first suite) is far larger. Revisit (median of 3 calls, ~$4 more for P2.8) if a comparison comes down to a few half-points |
 | 2026-11-03 | No separate OpenTelemetry layer | A single-process CLI with a local run store and no OTel backend: it would be code with no consumer. LangChain callbacks give richer LLM detail, and non-LangChain code (judge, sandbox) can be traced with the SDK's decorator. If Langfuse is chosen, OTel comes with its SDK |
+| 2026-11-09 | Phase 3 adds harder cases, real and synthetic; its conditional items wait for them | P2.8: 98% findings, no false claims, no failed runs on the 7 cases, so nothing left to measure there. Real data (penguins, Pima, bike sharing) brings realistic mess and credibility; synthetic keeps exact truth where it matters (non-linear, small sample) |
+| 2026-11-09 | Task scripts run in a network namespace (`unshare -rn`), not Docker | Blocks exfiltration and downloads, the worst a prompt-injected script can do; no root, no daemon, a few lines. Files stay readable and writable: bubblewrap is the optional next step |
+| 2026-11-09 | Phase 3's speed target is time per run (−⅓ at equal findings), not cost | Wall time matters for the demo and local runs; the current agent's cost ($0.08 a run on Haiku) is not a constraint |
 | 2026-10-31 | Tracing: **LangSmith only**; MLflow removed | Built for agents; clearer traces. Tracing is opt-in via env, because when it's on, prompts and data samples leave the machine (relevant to the local-first pitch) |
 | 2026-10-31 | Delete untracked `todo.md`, `docs/`, `notebooks/`, and the `multi-specialist` branch | Confirmed by owner; superseded by this plan / `feature/new-flow` |
 | 2026-10-31 | New Phase 1 (agent quality) before the eval harness | The baseline review shows structural failures; the tagged baseline keeps the before/after story measurable |

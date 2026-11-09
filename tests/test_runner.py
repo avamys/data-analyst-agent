@@ -1,8 +1,10 @@
+import errno
 import json
 import pickle
 
 import pytest
 
+from agent.execution import runner
 from agent.execution.cells import join_cells, split_cells
 from agent.execution.runner import prepare_task_dir, run_script
 
@@ -168,3 +170,35 @@ def test_scripts_dont_see_our_secrets(task_dir, monkeypatch):
     [cell] = result.cells
     assert cell.error is None
     assert "API_KEY" not in cell.output and "PATH" in cell.output
+
+
+@pytest.fixture
+def fresh_check():
+    runner.network_blocked.cache_clear()
+    yield
+    runner.network_blocked.cache_clear()
+
+
+@pytest.mark.skipif(not runner.network_blocked(), reason="unshare not available")
+def test_scripts_have_no_network(task_dir):
+    # Only loopback, so a connection fails at once, before any DNS or routing
+    result = _run(
+        task_dir,
+        "import socket\nprint([name for _, name in socket.if_nameindex()])",
+        "try:\n"
+        "    socket.create_connection(('1.1.1.1', 80), timeout=5)\n"
+        "except OSError as e:\n"
+        "    print(e.errno)",
+    )
+    assert result.ok
+    assert [c.output for c in result.cells] == ["['lo']\n", f"{errno.ENETUNREACH}\n"]
+
+
+def test_scripts_run_where_the_network_cant_be_blocked(
+    task_dir, monkeypatch, fresh_check, caplog
+):
+    monkeypatch.setattr(runner, "NO_NETWORK", ["no-such-unshare"])
+    result = _run(task_dir, "print('ran')")
+    assert result.ok and result.cells[0].output == "ran\n"
+    assert not runner.network_blocked()
+    assert "network access" in caplog.text

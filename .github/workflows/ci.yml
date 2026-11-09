@@ -24,5 +24,10 @@ jobs:
       - name: Format
         run: uv run ruff format --check
 
+      # Ubuntu 24.04 restricts unprivileged user namespaces, which the network
+      # block for task scripts needs; without this its test is skipped
+      - name: Allow user namespaces
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
       - name: Test
-        run: uv run pytest
+        run: uv run pytest -rs
