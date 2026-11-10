@@ -15,6 +15,13 @@ def test_the_local_preset_is_the_defaults():
     assert (s.max_follow_ups, s.max_revisions) == (2, 1)
 
 
+def test_tasks_run_in_parallel_on_hosted_providers_only():
+    assert make(model_provider="anthropic").parallel_tasks == 3
+    assert make(model_provider="openrouter").parallel_tasks == 3
+    assert make(model_provider="ollama").parallel_tasks == 1
+    assert make(model_provider="ollama", max_parallel_tasks=2).parallel_tasks == 2
+
+
 def test_a_preset_replaces_defaults():
     s = make(preset="hosted")
     assert s.max_follow_ups == PRESETS["hosted"]["max_follow_ups"]

@@ -64,11 +64,16 @@ class BaseAgent:
         )
 
         # Support structured output
+        effort = LLMManager.effort(agent_type)
         if use_structured_output and output_schema:
-            self.llm = LLMManager.with_structured_output(self.llm, output_schema)
+            self.llm = LLMManager.with_structured_output(
+                self.llm, output_schema, effort=effort
+            )
             self.logger.debug(
                 f"Configured structured output with schema: {output_schema.__name__}"
             )
+        elif effort:
+            self.llm = self.llm.bind(output_config={"effort": effort})
 
         # A crashed Ollama runner (HTTP 500, or a stream that ends with no data,
         # a ValueError) is restarted on the next request, and a malformed

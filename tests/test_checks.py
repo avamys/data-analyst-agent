@@ -2,7 +2,7 @@
 
 from agent.checks import sanity_checks
 from agent.profiling import auto_profile_dataset
-from agent.states import Brief, Output, TaskResult
+from agent.states import Brief, Finding, Output, TaskReport, TaskResult
 
 
 def _brief(specialist="ml", outputs=()) -> Brief:
@@ -64,3 +64,21 @@ def test_ml_tasks_are_warned_about_leakage_suspects(small_df):
     (warning,) = sanity_checks(_brief(), _model(), profile)
     assert "'leak'" in warning
     assert sanity_checks(_brief(specialist="eda"), _model(), profile) == []
+
+
+def test_findings_without_recorded_facts_are_flagged(small_df):
+    profile = auto_profile_dataset(small_df, "x.csv")
+    result = _model()
+    result.report = TaskReport(
+        status="complete",
+        findings=[
+            Finding(statement="cited", facts=["m"]),
+            Finding(statement="uncited", facts=[]),
+            Finding(statement="unknown", facts=["never_recorded"]),
+        ],
+    )
+    problems = " ".join(sanity_checks(_brief(), result, profile))
+    assert "cite no recorded fact: ['uncited']" in problems
+    assert "never recorded: ['never_recorded']" in problems
+    result.report.findings = result.report.findings[:1]
+    assert sanity_checks(_brief(), result, profile) == []

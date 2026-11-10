@@ -12,6 +12,7 @@ Layout of runs/<YYYYmmdd-HHMMSS>_<dataset>_<model>/:
 import json
 import logging
 import re
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
@@ -73,6 +74,7 @@ class LLMCallRecorder(BaseCallbackHandler):
         self.output_tokens = 0
         self.max_input_tokens = 0  # The largest prompt of the run
         self._pending: dict[UUID, dict] = {}
+        self._lock = threading.Lock()  # Tasks run in parallel threads
 
     def on_chat_model_start(self, serialized, messages, *, run_id, **kwargs):
         metadata = kwargs.get("metadata") or {}
@@ -86,9 +88,12 @@ class LLMCallRecorder(BaseCallbackHandler):
     def on_llm_end(self, response, *, run_id, **kwargs):
         message = response.generations[0][0].message
         usage = message.usage_metadata or {}
-        self.input_tokens += usage.get("input_tokens", 0)
-        self.max_input_tokens = max(self.max_input_tokens, usage.get("input_tokens", 0))
-        self.output_tokens += usage.get("output_tokens", 0)
+        with self._lock:
+            self.input_tokens += usage.get("input_tokens", 0)
+            self.max_input_tokens = max(
+                self.max_input_tokens, usage.get("input_tokens", 0)
+            )
+            self.output_tokens += usage.get("output_tokens", 0)
         self._write(
             run_id,
             # Structured calls over function calling (OpenRouter) arrive as tool calls
@@ -103,7 +108,6 @@ class LLMCallRecorder(BaseCallbackHandler):
         self._write(run_id, error=repr(error))
 
     def _write(self, run_id: UUID, **fields):
-        self.calls += 1
         call = self._pending.pop(run_id, {})
         started = call.pop("started", time.time())
         record = {
@@ -112,5 +116,6 @@ class LLMCallRecorder(BaseCallbackHandler):
             "seconds": round(time.time() - started, 2),
             **fields,
         }
-        with self.path.open("a") as f:
+        with self._lock, self.path.open("a") as f:
+            self.calls += 1
             f.write(json.dumps(record, default=str) + "\n")

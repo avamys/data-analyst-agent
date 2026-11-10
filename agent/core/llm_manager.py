@@ -29,14 +29,31 @@ class LLMManager:
     # Settings fields per agent type, read at call time so presets and CLI flags
     # apply
     AGENT_CONFIGS = {
-        "lead": {"model": "analyst_model", "temperature": "lead_temperature"},
-        "eda": {"model": "coder_model", "temperature": "eda_temperature"},
+        "lead": {
+            "model": "analyst_model",
+            "temperature": "lead_temperature",
+            "effort": "lead_effort",
+        },
+        "eda": {
+            "model": "coder_model",
+            "temperature": "eda_temperature",
+            "effort": "specialist_effort",
+        },
         "statistical": {
             "model": "coder_model",
             "temperature": "statistical_temperature",
+            "effort": "specialist_effort",
         },
-        "ml": {"model": "coder_model", "temperature": "ml_temperature"},
-        "reporter": {"model": "reporter_model", "temperature": "reporter_temperature"},
+        "ml": {
+            "model": "coder_model",
+            "temperature": "ml_temperature",
+            "effort": "specialist_effort",
+        },
+        "reporter": {
+            "model": "reporter_model",
+            "temperature": "reporter_temperature",
+            "effort": "lead_effort",
+        },
     }
 
     @classmethod
@@ -110,8 +127,17 @@ class LLMManager:
             else getattr(settings, config["temperature"]),
         )
 
+    @classmethod
+    def effort(cls, agent_type: str) -> str | None:
+        """Claude's effort for an agent type; None: the model's default"""
+        if settings.model_provider != "anthropic":
+            return None
+        return getattr(settings, cls.AGENT_CONFIGS[agent_type]["effort"])
+
     @staticmethod
-    def with_structured_output(llm, schema: type[BaseModel], include_raw=False):
+    def with_structured_output(
+        llm, schema: type[BaseModel], include_raw=False, effort: str | None = None
+    ):
         """Make llm return schema objects, the way the active provider supports"""
         if settings.model_provider != "anthropic":
             # Many OpenRouter free models take tools but not response_format
@@ -128,7 +154,8 @@ class LLMManager:
         parser = PydanticOutputParser(pydantic_object=schema)
         llm = llm.bind(
             output_config={
-                "format": {"type": "json_schema", "schema": transform_schema(schema)}
+                "format": {"type": "json_schema", "schema": transform_schema(schema)},
+                **({"effort": effort} if effort else {}),
             }
         )
         if not include_raw:

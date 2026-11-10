@@ -102,6 +102,7 @@ def main():
         "commit": commit,
         "dirty": bool(_git("status", "--porcelain", "--untracked-files=no")),
         "network_blocked": network_blocked(),
+        "parallel_tasks": settings.parallel_tasks,
         "settings": settings.model_dump(
             exclude={"openrouter_api_key", "anthropic_api_key"}
         ),

@@ -1,8 +1,12 @@
 import pytest
+from langchain_core.language_models import BaseChatModel
+from langchain_core.runnables import RunnableSequence
 from pydantic import SecretStr
 
 from agent.config import settings
+from agent.core.base_agent import BaseAgent
 from agent.core.llm_manager import LLMManager
+from agent.states import Review, SpecialistStep
 
 
 @pytest.mark.parametrize(
@@ -85,3 +89,32 @@ def test_anthropic_without_key_fails_early(monkeypatch):
     monkeypatch.setattr(settings, "anthropic_api_key", None)
     with pytest.raises(ValueError, match="ANTHROPIC_API_KEY"):
         LLMManager._provider_kwargs()
+
+
+def _payload(agent) -> dict:
+    """The request an agent would send, with the kwargs bound anywhere in its chain"""
+    runnable, kwargs = agent.llm, {}
+    while not isinstance(runnable, BaseChatModel):
+        if isinstance(runnable, RunnableSequence):  # model | parser
+            runnable = runnable.first
+        else:  # bindings, the retry wrapper
+            kwargs |= runnable.kwargs
+            runnable = runnable.bound
+    return runnable._get_request_payload("hi", **kwargs)
+
+
+def test_anthropic_effort_is_set_per_role(monkeypatch):
+    monkeypatch.setattr(settings, "model_provider", "anthropic")
+    monkeypatch.setattr(settings, "anthropic_api_key", SecretStr("sk-ant-test"))
+    monkeypatch.setattr(settings, "specialist_effort", "low")
+    monkeypatch.setattr(settings, "lead_effort", "high")
+    LLMManager.clear_cache()
+    step = BaseAgent("eda", use_structured_output=True, output_schema=SpecialistStep)
+    assert _payload(step)["output_config"]["effort"] == "low"
+    assert _payload(step)["output_config"]["format"]["type"] == "json_schema"
+    review = BaseAgent("lead", use_structured_output=True, output_schema=Review)
+    assert _payload(review)["output_config"]["effort"] == "high"
+    assert _payload(BaseAgent("reporter"))["output_config"] == {"effort": "high"}
+    monkeypatch.setattr(settings, "lead_effort", None)  # the model's default
+    assert "output_config" not in _payload(BaseAgent("reporter"))
+    LLMManager.clear_cache()

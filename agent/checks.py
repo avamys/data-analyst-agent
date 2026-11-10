@@ -1,7 +1,18 @@
 """Deterministic sanity checks on a task result, shown to the lead during review"""
 
 from agent.config import settings
-from agent.states import Brief, DatasetProfile, TaskResult
+from agent.states import Brief, DatasetProfile, TaskReport, TaskResult
+
+
+def citation_gaps(
+    report: TaskReport | None, recorded: dict
+) -> tuple[list[str], list[str]]:
+    """Findings that cite no fact, and cited fact names that were never recorded"""
+    if report is None:
+        return [], []
+    cited = {name for finding in report.findings for name in finding.facts}
+    uncited = [f.statement for f in report.findings if not f.facts]
+    return uncited, sorted(cited - set(recorded))
 
 
 def missing_outputs(brief: Brief, published: list[str]) -> list[str]:
@@ -20,6 +31,16 @@ def sanity_checks(
         problems.append(
             f"Outputs later tasks need were not published: {missing}. "
             "The task must be sent back to publish them."
+        )
+    uncited, unknown = citation_gaps(result.report, result.facts)
+    if uncited:
+        problems.append(f"Findings that cite no recorded fact: {uncited}.")
+    if unknown:
+        problems.append(f"Findings cite facts that were never recorded: {unknown}.")
+    if uncited or unknown:
+        problems.append(
+            "Every finding must cite the recorded facts behind it: the task must be"
+            " sent back to record and cite them."
         )
 
     for name, fact in result.facts.items():

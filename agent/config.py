@@ -10,6 +10,8 @@ from typing import Literal
 from pydantic import PrivateAttr, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+Effort = Literal["low", "medium", "high", "xhigh", "max"]
+
 # Named sets of values; a preset replaces defaults, never explicit settings
 PRESETS: dict[str, dict] = {
     # The defaults: sized for qwen3.5 on a 4 GB GPU, ~1-2 h per run
@@ -70,6 +72,11 @@ class Settings(BaseSettings):
     llm_max_tokens: int = 4096
     # Thinking counts against the cap, and an unused cap costs nothing
     anthropic_max_tokens: int = 16000
+    # Effort on Claude (output_config.effort), which sets how much it thinks:
+    # thinking is most of the output. None: the model's default (medium on
+    # Haiku 5.5). Lead: plan, reviews and report; specialists: their steps.
+    lead_effort: Effort | None = None
+    specialist_effort: Effort | None = None
     llm_timeout_s: int = 900
     # Layers to put on the GPU; None lets Ollama decide. Ollama's estimate can be
     # very conservative on small GPUs, so this is a per-machine setting for .env.
@@ -88,6 +95,16 @@ class Settings(BaseSettings):
     max_tasks: int = 6  # Upper bound on planned tasks
     max_follow_ups: int = 2  # Tasks the lead may add during reviews, per run
     max_revisions: int = 1  # Times the lead may send one task back
+    # Tasks worked at once (reviews stay one at a time). None: 3 on hosted
+    # providers, 1 on Ollama, where a small GPU serves one request at a time
+    max_parallel_tasks: int | None = None
+
+    @property
+    def parallel_tasks(self) -> int:
+        if self.max_parallel_tasks is not None:
+            return self.max_parallel_tasks
+        return 1 if self.model_provider == "ollama" else 3
+
     max_specialist_steps: int = 5  # LLM steps per attempt (run a cell or finish)
     max_report_rewrites: int = 1  # Times numbers matching no fact go back to the writer
     code_timeout_s: int = 300  # Per run of a task script

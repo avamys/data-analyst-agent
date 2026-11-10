@@ -2,14 +2,20 @@
 
 Nodes return partial state updates; `next_step` routes the loop:
 plan → run_task → review → run_task (sent back, or next brief) … → report
+
+Briefs whose dependencies are all accepted are started ahead of their turn,
+in background threads (settings.parallel_tasks at once). Reviews still happen
+one at a time, in backlog order, so each sees what it would see in a serial run.
 """
 
 import logging
+from concurrent.futures import Future
 
 import pandas as pd
+from langchain_core.runnables.config import ContextThreadPoolExecutor
 
 from agent import context
-from agent.checks import missing_outputs, sanity_checks
+from agent.checks import citation_gaps, missing_outputs, sanity_checks
 from agent.config import settings
 from agent.core.base_agent import BaseAgent
 from agent.core.specialists import format_task_report, get_specialist
@@ -59,12 +65,50 @@ def run_task_node(state: HierarchicalState) -> dict:
     previous = state.under_review
     if previous is not None:
         brief, backlog = previous.brief, state.backlog
+        _start_ready(state, backlog)
         logger.info(f"Revising {brief.id} (revision {previous.revisions})")
+        result = get_specialist(brief.specialist).execute(brief, state, previous)
+        return {"under_review": result, "backlog": backlog}
+
+    brief, backlog = state.backlog[0], state.backlog[1:]
+    _start_ready(state, backlog)
+    started = _started.pop((state.run_dir, brief.id), None)
+    if started is not None:
+        logger.info(f"Waiting for {brief.id}, started ahead of its turn")
+        result = started.result()
     else:
-        brief, backlog = state.backlog[0], state.backlog[1:]
         logger.info(f"Running {brief.id} ({brief.specialist}): {brief.question}")
-    result = get_specialist(brief.specialist).execute(brief, state, previous)
+        result = get_specialist(brief.specialist).execute(brief, state)
     return {"under_review": result, "backlog": backlog}
+
+
+# Briefs started ahead of their turn, by run directory and task id. The context
+# is copied into the threads, so their LLM calls reach the run's callbacks.
+_started: dict[tuple[str, str], Future] = {}
+_pool = ContextThreadPoolExecutor(max_workers=8, thread_name_prefix="task")
+
+
+def _start_ready(state: HierarchicalState, waiting: list[Brief]):
+    """
+    Start waiting briefs whose dependencies are all accepted, while fewer than
+    settings.parallel_tasks tasks run (counting the one this node runs)
+    """
+    done = {r.task_id for r in state.completed_tasks + state.failed_tasks}
+    running = [
+        f for (run, _), f in _started.items() if run == state.run_dir and not f.done()
+    ]
+    free = settings.parallel_tasks - 1 - len(running)
+    for brief in waiting:
+        if free <= 0:
+            return
+        if (state.run_dir, brief.id) in _started or not set(brief.depends_on) <= done:
+            continue
+        logger.info(f"Starting {brief.id} ({brief.specialist}): {brief.question}")
+        specialist = get_specialist(brief.specialist)
+        _started[state.run_dir, brief.id] = _pool.submit(
+            specialist.execute, brief, state
+        )
+        free -= 1
 
 
 def review_node(state: HierarchicalState) -> dict:
@@ -96,11 +140,21 @@ def review_node(state: HierarchicalState) -> dict:
     lead = BaseAgent("lead", use_structured_output=True, output_schema=Review)
     review: Review = lead.invoke(prompt)
 
+    # Later tasks depend on the outputs, and the number check on the citations,
+    # so these are not the lead's call
     missing = missing_outputs(brief, result.published)
-    if missing and review.verdict == "accept":
-        # Later tasks depend on these, so this is not the lead's call
+    uncited, unknown = citation_gaps(result.report, result.facts)
+    if review.verdict == "accept" and (missing or uncited or unknown):
         review.verdict = "revise"
-        review.feedback = f"Publish the outputs later tasks need: {missing}. {review.feedback}".strip()
+        if uncited or unknown:
+            review.feedback = (
+                "Every finding must cite the recorded facts behind it: record the"
+                " missing ones with record_fact and cite them."
+                f" Citing nothing: {uncited}. Never recorded: {unknown}."
+                f" {review.feedback}"
+            ).strip()
+        if missing:
+            review.feedback = f"Publish the outputs later tasks need: {missing}. {review.feedback}".strip()
     logger.info(f"Review of {brief.id}: {review.verdict}: {review.reasoning}")
     if review.feedback:
         logger.info(f"  Feedback: {review.feedback}")

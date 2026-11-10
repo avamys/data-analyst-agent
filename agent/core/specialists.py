@@ -7,7 +7,7 @@ from importlib.metadata import version
 from pathlib import Path
 
 from agent import context
-from agent.checks import missing_outputs
+from agent.checks import citation_gaps, missing_outputs
 from agent.config import settings
 from agent.core.base_agent import BaseAgent
 from agent.core.template_manager import prompt_templates
@@ -323,10 +323,7 @@ class SpecialistAgent(BaseAgent):
         Feedback when findings cite unrecorded facts or none at all, or when
         outputs the brief asks for are not published
         """
-        recorded = _read_json(task_dir / "facts.json")
-        cited = {name for finding in report.findings for name in finding.facts}
-        unknown = sorted(cited - set(recorded))
-        uncited = [f.statement for f in report.findings if not f.facts]
+        uncited, unknown = citation_gaps(report, _read_json(task_dir / "facts.json"))
         problems = []
         if unknown:
             problems.append(
