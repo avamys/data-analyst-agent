@@ -2,11 +2,14 @@
 
 Each planted effect must be clearly recoverable with a plain test at the chosen
 seed (and nothing found on pure_noise), or the case would grade the agent on
-noise. Titanic's data is downloaded, so its values come from the claim checks.
+noise. Titanic's values come from the claim checks; the other downloaded cases
+are checked here against their files (downloaded once, into evals/data).
 """
 
 import hashlib
+import io
 import warnings
+import zipfile
 
 import numpy as np
 import pandas as pd
@@ -24,7 +27,9 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 def data(name: str) -> pd.DataFrame:
     case = load_case(name)
-    return GENERATORS[case.data.generator](case.data.seed)
+    if case.data.generator:
+        return GENERATORS[case.data.generator](case.data.seed)
+    return pd.read_csv(dataset(case))
 
 
 def test_all_cases_load():
@@ -37,6 +42,11 @@ def test_all_cases_load():
         "regression_outliers",
         "string_target",
         "datetime_trend",
+        "penguins",
+        "diabetes",
+        "bike_sharing",
+        "u_shape",
+        "small_sample",
     }
 
 
@@ -92,6 +102,25 @@ def test_generated_data_is_reproducible_and_has_the_target(name):
             "weekday_sales",
             lambda d: d[pd.to_datetime(d.date).dt.dayofweek < 5].sales.mean(),
         ),
+        ("u_shape", "outcome_rate", lambda d: d.outcome.mean()),
+        ("small_sample", "mean_score", lambda d: d.score.mean()),
+        ("penguins", "mean_mass", lambda d: d.body_mass_g.mean()),
+        (
+            "penguins",
+            "gentoo_mass",
+            lambda d: d[d.species == "Gentoo"].body_mass_g.mean(),
+        ),
+        (
+            "penguins",
+            "adelie_mass",
+            lambda d: d[d.species == "Adelie"].body_mass_g.mean(),
+        ),
+        ("diabetes", "outcome_rate", lambda d: d.Outcome.mean()),
+        ("diabetes", "insulin_zeros", lambda d: (d.Insulin == 0).sum()),
+        ("diabetes", "skin_zeros", lambda d: (d.SkinThickness == 0).sum()),
+        ("bike_sharing", "mean_cnt", lambda d: d.cnt.mean()),
+        ("bike_sharing", "rentals_2011", lambda d: d[d.yr == 0].cnt.mean()),
+        ("bike_sharing", "rentals_2012", lambda d: d[d.yr == 1].cnt.mean()),
     ],
 )
 def test_expected_facts_match_the_data(name, fact, compute):
@@ -164,6 +193,76 @@ def test_datetime_trend_effects():
     assert stats.pearsonr(d.temperature, d.sales).pvalue > 0.2
 
 
+def test_u_shape_is_missed_by_a_linear_test():
+    d = data("u_shape")
+    rates = d.groupby(pd.qcut(d.feat_a, 5), observed=True).outcome.mean().tolist()
+    assert min(rates[0], rates[-1]) > 0.5 and rates[2] < 0.2
+    assert stats.pointbiserialr(d.outcome, d.feat_a).pvalue > 0.5
+    p = smf.logit("outcome ~ feat_a + I(feat_a**2) + feat_b + feat_c", d).fit(disp=0)
+    assert p.pvalues["I(feat_a ** 2)"] < 1e-20 and p.pvalues.feat_b < 1e-6
+    assert p.pvalues.feat_c > 0.2
+
+
+def test_small_sample_has_one_effect_and_a_near_miss():
+    d = data("small_sample")
+    p = {c: stats.pearsonr(d[c], d.score).pvalue for c in d.columns if c != "score"}
+    assert len(d) == 60 and p.pop("feat_1") < 0.01
+    assert min(p.values()) > 0.05  # feat_3 at 0.063: close, not significant
+
+
+def test_penguins_bill_depth_is_confounded_by_species():
+    d = data("penguins").dropna(subset=["body_mass_g", "bill_depth_mm"])
+    assert stats.pearsonr(d.bill_depth_mm, d.body_mass_g)[0] < -0.4
+    for _, g in d.groupby("species"):
+        assert stats.pearsonr(g.bill_depth_mm, g.body_mass_g)[0] > 0.5
+    r = {c: d[c].corr(d.body_mass_g) for c in ["bill_length_mm", "flipper_length_mm"]}
+    assert max(r, key=r.get) == "flipper_length_mm"
+    mass = d.groupby("species").body_mass_g.mean()
+    assert mass.idxmax() == "Gentoo" and mass.Gentoo - mass.drop("Gentoo").max() > 1000
+    by_sex = d.groupby(["species", "sex"]).body_mass_g.mean().unstack()
+    assert (by_sex.male > by_sex.female).all()
+
+
+def test_diabetes_zeros_are_missing_values_that_hide_an_effect():
+    d = data("diabetes")
+    assert d.isna().sum().sum() == 0  # nothing a plain check calls missing
+    zeros = (
+        d[["Glucose", "BloodPressure", "SkinThickness", "Insulin", "BMI"]] == 0
+    ).sum()
+    assert zeros.Insulin == 374 and zeros.SkinThickness == 227 and zeros.min() > 0
+    r = {
+        c: stats.pointbiserialr(d.Outcome, d[c])[0] for c in d.columns if c != "Outcome"
+    }
+    assert max(r, key=r.get) == "Glucose"
+    assert r["BMI"] > 0.2 and r["Age"] > 0.2
+    # With the zeros, blood pressure looks unrelated; without them, it isn't
+    assert stats.pointbiserialr(d.Outcome, d.BloodPressure).pvalue > 0.05
+    bp = d[d.BloodPressure > 0]
+    assert (
+        stats.ttest_ind(
+            bp[bp.Outcome == 1].BloodPressure, bp[bp.Outcome == 0].BloodPressure
+        ).pvalue
+        < 1e-4
+    )
+
+
+def test_bike_sharing_leakage_and_effects():
+    d = data("bike_sharing")
+    assert (d.casual + d.registered == d.cnt).all()
+    assert stats.pearsonr(d.temp, d.cnt)[0] > 0.5
+    by_season = d.groupby("season").cnt.mean()
+    assert by_season.idxmin() == 1 and set(d[d.season == 1].mnth) == {12, 1, 2, 3}
+    by_weather = d.groupby("weathersit").cnt.mean()
+    assert by_weather.is_monotonic_decreasing
+    p = smf.ols("cnt ~ yr + temp + C(season) + C(weathersit)", d).fit().pvalues
+    assert p.yr < 1e-50 and p.temp < 1e-10
+    # Not an expected finding: the working-day difference is small
+    assert (
+        stats.ttest_ind(d[d.workingday == 1].cnt, d[d.workingday == 0].cnt).pvalue
+        > 0.05
+    )
+
+
 def test_generated_dataset_is_written_once(tmp_path):
     path = dataset(load_case("pure_noise"), tmp_path)
     assert pd.read_csv(path).equals(data("pure_noise"))
@@ -194,8 +293,53 @@ def test_downloads_are_checked_against_their_checksum(monkeypatch, tmp_path):
         dataset(case.model_copy(update={"file": "y.csv"}), tmp_path)
 
 
+def test_a_zip_download_is_checked_then_its_member_extracted(monkeypatch, tmp_path):
+    csv = b"a,b\n1,2\n"
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as z:
+        z.writestr("Readme.txt", "r")
+        z.writestr("day.csv", csv)
+    content = buffer.getvalue()
+
+    class Response:
+        def __init__(self, body):
+            self.content = body
+
+    case = Case(
+        name="dl",
+        description="d",
+        file="x.csv",
+        target="b",
+        data=Source(
+            url="https://example.org/x.zip",
+            sha256=hashlib.sha256(content).hexdigest(),
+            member="day.csv",
+        ),
+        must_find=["x"],
+    )
+    monkeypatch.setattr(cases_module.httpx, "get", lambda *a, **k: Response(content))
+    assert dataset(case, tmp_path).read_bytes() == csv
+
+
 def test_a_case_needs_exactly_one_source():
     with pytest.raises(ValueError):
         Source(generator="pure_noise", seed=1, url="u", sha256="s")
     with pytest.raises(ValueError):
         Source()
+
+
+def test_held_out_cases_load_from_their_own_directory(monkeypatch, tmp_path):
+    (tmp_path / "cases").mkdir()
+    (tmp_path / "generators.py").write_text(
+        "import pandas as pd\n"
+        "GENERATORS = {'hidden': lambda seed: pd.DataFrame({'y': [seed]})}\n"
+    )
+    (tmp_path / "cases" / "secret.yaml").write_text(
+        "description: d\nfile: hidden.csv\ntarget: y\n"
+        "data: {generator: hidden, seed: 3}\nmust_find: [x]\n"
+    )
+    monkeypatch.setattr(cases_module, "HELDOUT_DIR", tmp_path)
+    assert [c.name for c in all_cases("heldout")] == ["secret"]
+    assert "secret" not in {c.name for c in all_cases()}
+    case = load_case("secret")  # results name the case, so grading finds it
+    assert pd.read_csv(dataset(case, tmp_path / "data")).y.tolist() == [3]

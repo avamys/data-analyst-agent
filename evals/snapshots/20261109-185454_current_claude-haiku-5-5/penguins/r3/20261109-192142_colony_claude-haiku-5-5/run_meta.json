@@ -1,0 +1,216 @@
+{
+  "status": "ok",
+  "run_id": "9dcbd87a-24a4-4e5f-94d0-065a2f76fe17",
+  "started": "2026-11-09T19:21:42",
+  "command": [
+    "run.py",
+    "/workspaces/agents/evals/data/colony.csv",
+    "--target",
+    "body_mass_g",
+    "--model",
+    "claude-haiku-5-5",
+    "--provider",
+    "anthropic"
+  ],
+  "commit": "71d5304",
+  "dirty": true,
+  "network_blocked": true,
+  "settings": {
+    "preset": "local",
+    "model_provider": "anthropic",
+    "ollama_base_url": "http://host.docker.internal:11434",
+    "ollama_model": "qwen3.5:9b",
+    "openrouter_base_url": "https://openrouter.ai/api/v1",
+    "openrouter_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "openrouter_reasoning": true,
+    "anthropic_model": "claude-haiku-5-5",
+    "analyst_model": "claude-haiku-5-5",
+    "coder_model": "claude-haiku-5-5",
+    "reporter_model": "claude-haiku-5-5",
+    "llm_reasoning": false,
+    "llm_num_ctx": 16384,
+    "llm_max_tokens": 4096,
+    "anthropic_max_tokens": 16000,
+    "llm_timeout_s": 900,
+    "llm_num_gpu": 17,
+    "llm_retries": 1,
+    "lead_temperature": 0.2,
+    "eda_temperature": 0.3,
+    "statistical_temperature": 0.2,
+    "ml_temperature": 0.1,
+    "reporter_temperature": 0.3,
+    "max_tasks": 6,
+    "max_follow_ups": 2,
+    "max_revisions": 1,
+    "max_specialist_steps": 5,
+    "max_report_rewrites": 1,
+    "code_timeout_s": 300,
+    "max_cell_output_chars": 3000,
+    "prompt_fact_chars": 200,
+    "review_script_chars": 8000,
+    "plan_description_chars": 1000,
+    "overfit_gap": 0.1,
+    "near_perfect_score": 0.99,
+    "baseline_margin": 0.02,
+    "leakage_score": 0.9,
+    "imbalance_ratio": 2.0,
+    "number_check_max_label": 10,
+    "number_check_conventions": [
+      0.05
+    ],
+    "judge_model": "claude-sonnet-5-5",
+    "runs_directory": "/workspaces/agents/evals/runs/20261109-185454_current_claude-haiku-5-5/penguins/r3",
+    "log_level": "INFO"
+  },
+  "nodes": [
+    {
+      "node": "profile",
+      "seconds": 3.8
+    },
+    {
+      "node": "plan",
+      "seconds": 6.3
+    },
+    {
+      "node": "run_task",
+      "seconds": 19.3
+    },
+    {
+      "node": "review",
+      "seconds": 8.9
+    },
+    {
+      "node": "run_task",
+      "seconds": 17.2
+    },
+    {
+      "node": "review",
+      "seconds": 5.7
+    },
+    {
+      "node": "run_task",
+      "seconds": 44.6
+    },
+    {
+      "node": "review",
+      "seconds": 8.8
+    },
+    {
+      "node": "run_task",
+      "seconds": 14.5
+    },
+    {
+      "node": "review",
+      "seconds": 12.1
+    },
+    {
+      "node": "run_task",
+      "seconds": 51.8
+    },
+    {
+      "node": "review",
+      "seconds": 10.4
+    },
+    {
+      "node": "run_task",
+      "seconds": 15.8
+    },
+    {
+      "node": "review",
+      "seconds": 11.9
+    },
+    {
+      "node": "run_task",
+      "seconds": 45.8
+    },
+    {
+      "node": "review",
+      "seconds": 11.7
+    },
+    {
+      "node": "run_task",
+      "seconds": 53.3
+    },
+    {
+      "node": "review",
+      "seconds": 13.3
+    },
+    {
+      "node": "run_task",
+      "seconds": 26.3
+    },
+    {
+      "node": "review",
+      "seconds": 10.8
+    },
+    {
+      "node": "run_task",
+      "seconds": 13.0
+    },
+    {
+      "node": "review",
+      "seconds": 7.9
+    },
+    {
+      "node": "run_task",
+      "seconds": 58.5
+    },
+    {
+      "node": "review",
+      "seconds": 9.7
+    },
+    {
+      "node": "run_task",
+      "seconds": 50.7
+    },
+    {
+      "node": "review",
+      "seconds": 10.2
+    },
+    {
+      "node": "run_task",
+      "seconds": 12.9
+    },
+    {
+      "node": "review",
+      "seconds": 7.2
+    },
+    {
+      "node": "run_task",
+      "seconds": 220.2
+    },
+    {
+      "node": "review",
+      "seconds": 8.1
+    },
+    {
+      "node": "run_task",
+      "seconds": 212.2
+    },
+    {
+      "node": "review",
+      "seconds": 8.5
+    },
+    {
+      "node": "report",
+      "seconds": 50.7
+    }
+  ],
+  "finished": "2026-11-09T19:39:29",
+  "seconds": 1062.8,
+  "llm_calls": 59,
+  "input_tokens": 448608,
+  "output_tokens": 97506,
+  "tasks_completed": 8,
+  "tasks_failed": 0,
+  "unverified_numbers": [],
+  "context": {
+    "largest_prompt_tokens": 27957,
+    "window_warnings": [],
+    "prompt_cuts": {
+      "dataset description": 1,
+      "fact value": 142
+    }
+  },
+  "trace_url": "https://eu.smith.langchain.com/o/26c8aa3e-ae1f-439e-95e7-a6a980ce7d4d/projects/p/03e6613c-382d-4294-bd35-88c1eff7793a/r/9dcbd87a-24a4-4e5f-94d0-065a2f76fe17?poll=true"
+}

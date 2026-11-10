@@ -1,11 +1,19 @@
 """Eval cases: a dataset with known answers, defined in evals/cases/<name>.yaml
 
 A case's data is generated from a seed (evals/generators.py) or downloaded and
-checked against a SHA-256 checksum, and written to evals/data/<file>. The agents
+checked against a SHA-256 checksum (of the download: a zip's member is then
+extracted), and written to evals/data/<file>. The agents
 see that path, so file names are neutral: "pure_noise.csv" gave the answer away.
+
+Held-out cases live in evals/heldout/ (cases/<name>.yaml, and generators.py with
+its own GENERATORS), kept out of git until they are first run: see
+docs/eval/heldout-brief.md.
 """
 
 import hashlib
+import importlib.util
+import io
+import zipfile
 from pathlib import Path
 
 import httpx
@@ -16,6 +24,18 @@ from evals.generators import GENERATORS
 
 CASES_DIR = Path(__file__).parent / "cases"
 DATA_DIR = Path(__file__).parent / "data"
+HELDOUT_DIR = Path(__file__).parent / "heldout"
+
+
+def generators() -> dict:
+    """The dev generators, plus the held-out ones when they are present"""
+    path = HELDOUT_DIR / "generators.py"
+    if not path.exists():
+        return GENERATORS
+    spec = importlib.util.spec_from_file_location("heldout_generators", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return GENERATORS | module.GENERATORS
 
 
 class Source(BaseModel):
@@ -25,10 +45,11 @@ class Source(BaseModel):
     seed: int | None = None
     url: str | None = None
     sha256: str | None = None
+    member: str | None = None  # The CSV inside a downloaded zip
 
     @model_validator(mode="after")
     def _one_source(self):
-        generated = self.generator in GENERATORS and self.seed is not None
+        generated = self.generator in generators() and self.seed is not None
         downloaded = bool(self.url and self.sha256)
         if generated == downloaded:
             raise ValueError(
@@ -58,13 +79,19 @@ class Case(BaseModel):
     caveats: dict[str, list[str]] = {}
 
 
+def _cases_dir(suite: str) -> Path:
+    return CASES_DIR if suite == "dev" else HELDOUT_DIR / "cases"
+
+
 def load_case(name: str) -> Case:
-    spec = yaml.safe_load((CASES_DIR / f"{name}.yaml").read_text())
-    return Case(name=name, **spec)
+    path = CASES_DIR / f"{name}.yaml"
+    if not path.exists():
+        path = _cases_dir("heldout") / f"{name}.yaml"
+    return Case(name=name, **yaml.safe_load(path.read_text()))
 
 
-def all_cases() -> list[Case]:
-    return [load_case(p.stem) for p in sorted(CASES_DIR.glob("*.yaml"))]
+def all_cases(suite: str = "dev") -> list[Case]:
+    return [load_case(p.stem) for p in sorted(_cases_dir(suite).glob("*.yaml"))]
 
 
 def dataset(case: Case, data_dir: Path = DATA_DIR) -> Path:
@@ -74,7 +101,7 @@ def dataset(case: Case, data_dir: Path = DATA_DIR) -> Path:
         return path
     data_dir.mkdir(parents=True, exist_ok=True)
     if case.data.generator:
-        GENERATORS[case.data.generator](case.data.seed).to_csv(path, index=False)
+        generators()[case.data.generator](case.data.seed).to_csv(path, index=False)
         return path
     content = httpx.get(case.data.url, follow_redirects=True, timeout=60).content
     digest = hashlib.sha256(content).hexdigest()
@@ -82,5 +109,7 @@ def dataset(case: Case, data_dir: Path = DATA_DIR) -> Path:
         raise ValueError(
             f"{case.name}: download from {case.data.url} has sha256 {digest}"
         )
+    if case.data.member:
+        content = zipfile.ZipFile(io.BytesIO(content)).read(case.data.member)
     path.write_bytes(content)
     return path

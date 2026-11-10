@@ -180,3 +180,5 @@ cython_debug/
 evals/data/
 evals/runs/
 evals/worktrees/
+# Held-out eval cases, out of git until their first run (docs/eval/heldout-brief.md)
+evals/heldout/

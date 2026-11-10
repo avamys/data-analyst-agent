@@ -37,6 +37,12 @@ def main() -> int:
     run = commands.add_parser("run", help="Run cases and write a results file")
     run.add_argument("--version", choices=["current", "baseline"], default="current")
     run.add_argument("--cases", help="Comma-separated case names (default: all)")
+    run.add_argument(
+        "--suite",
+        choices=["dev", "heldout"],
+        default="dev",
+        help="Which cases 'all' means (held-out: evals/heldout/)",
+    )
     run.add_argument("--provider", default=settings.model_provider)
     run.add_argument("--model", help="Default: the provider's model in the settings")
     run.add_argument("--preset", choices=list(PRESETS), help="Current version only")
@@ -105,7 +111,11 @@ def main() -> int:
         return 0
 
     settings.model_provider = args.provider
-    cases = [load_case(n) for n in args.cases.split(",")] if args.cases else all_cases()
+    cases = (
+        [load_case(n) for n in args.cases.split(",")]
+        if args.cases
+        else all_cases(args.suite)
+    )
     config = Config(
         version=args.version,
         provider=args.provider,

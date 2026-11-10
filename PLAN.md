@@ -3,7 +3,7 @@
 > **This is the main plan for the project.** It replaces `todo.md`; everything still useful from there is folded in below (see [Appendix: todo.md mapping](#appendix-todomd-mapping)).
 > Update the checkboxes and the **Status** block as work lands. Record decisions in the [Decision log](#decision-log).
 
-**Status:** Phase 1 done on `phase-1` (P1.1–P1.5). Measured on the Titanic reference run: wrong claims 7 → 0, unsupported 6 → 0, baseline findings absent 7 → 0, charts in the report 0 → 5 ([P1.5 check](docs/progress/p1.5/annotations.md)). The exit criteria were met on Claude Haiku 5.5 (9 min, $0.08 a run); not yet re-run on qwen3.5. Hosted providers (OpenRouter, Anthropic) and a cost report added. Phase 2 planned (eval harness; both versions on Haiku 5.5, Sonnet 5.5 as judge). P2.0 (central configuration, presets) and P2.1 (baseline on Haiku, `v0.1.1-baseline-hosted`) done; P2.2 (7 eval cases with known answers) done; P2.3 (runner) done; first suite, judged by hand: current 30/30 findings, baseline 16/30 ([first look](docs/eval/first-look.md)). P2.3a: task scripts no longer see API keys; Ollama prompts are checked against the context window. P2.4 (deterministic graders) done; P2.5 (LLM judge) done: on the first suite it agrees with the hand labels on 87% of findings exactly, 100% within ½. P2.6 calibration: 12 labelled reports, 93–96% exact agreement, 100% within ½; the judge agrees with itself on 95%; labels spot-checked by the owner. P2.7: `evals report` / `compare`, eval traces tagged, CI regrades the committed suites. P2.8 [before/after](docs/eval/before-after.md), 7 cases × 3 repeats on Haiku 5.5: findings 53% → 98%, false claims 0.1 → 0 a run, $0.024 → $0.076 a run; the `hosted` preset adds no findings at 1.8× the cost. Phase 2 done. Phase 3 planned: network block, 5–6 harder cases (real and synthetic), faster runs. P3.1 done (network block). Next: P3.2 · **Last updated:** 2026-11-09
+**Status:** Phase 1 done on `phase-1` (P1.1–P1.5). Measured on the Titanic reference run: wrong claims 7 → 0, unsupported 6 → 0, baseline findings absent 7 → 0, charts in the report 0 → 5 ([P1.5 check](docs/progress/p1.5/annotations.md)). The exit criteria were met on Claude Haiku 5.5 (9 min, $0.08 a run); not yet re-run on qwen3.5. Hosted providers (OpenRouter, Anthropic) and a cost report added. Phase 2 planned (eval harness; both versions on Haiku 5.5, Sonnet 5.5 as judge). P2.0 (central configuration, presets) and P2.1 (baseline on Haiku, `v0.1.1-baseline-hosted`) done; P2.2 (7 eval cases with known answers) done; P2.3 (runner) done; first suite, judged by hand: current 30/30 findings, baseline 16/30 ([first look](docs/eval/first-look.md)). P2.3a: task scripts no longer see API keys; Ollama prompts are checked against the context window. P2.4 (deterministic graders) done; P2.5 (LLM judge) done: on the first suite it agrees with the hand labels on 87% of findings exactly, 100% within ½. P2.6 calibration: 12 labelled reports, 93–96% exact agreement, 100% within ½; the judge agrees with itself on 95%; labels spot-checked by the owner. P2.7: `evals report` / `compare`, eval traces tagged, CI regrades the committed suites. P2.8 [before/after](docs/eval/before-after.md), 7 cases × 3 repeats on Haiku 5.5: findings 53% → 98%, false claims 0.1 → 0 a run, $0.024 → $0.076 a run; the `hosted` preset adds no findings at 1.8× the cost. Phase 2 done. Phase 3 planned: network block, 5–6 harder cases (real and synthetic), faster runs. P3.1 done (network block). P3.2: 5 new cases; the current agent scores 96% findings on them, no false claims (the bar). Fixes will be developed on these and the original cases, and judged on held-out cases nothing is tuned on. P3.2b: 4 held-out cases written by the owner ([brief](docs/eval/heldout-brief.md)), their hash committed. Next: P3.3 · **Last updated:** 2026-11-10
 
 ---
 
@@ -468,10 +468,14 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 
 **Decided 2026-11-09:** P2.8 left Phase 3 little to measure on the 7 cases: findings 98%, no false claims, 63 of 63 runs ok, 0.1 unverified numbers a run. So the conditional items (fact references, an LLM claim check, targeted retries) wait for the new cases to show their failure. The new cases mix real datasets (open licences, stable URLs, not Kaggle: it needs an account and often forbids redistribution) and synthetic ones where exact ground truth matters. The target for speed is time; cost may rise.
 
+**Decided 2026-11-09, after the bar:** fixes are developed on a **dev** suite (the 7 original cases and the 5 from P3.2) and judged on a **held-out** suite that nobody runs or looks at before P3.5. Tuning prompts until the dev cases pass and then scoring the same cases would measure the tuning. The bar also left little to gain on the dev cases (96%), so a dev score alone couldn't show a fix works.
+
 **Exit criteria**
 - [ ] A task script can't open a network connection (a test proves it); where the block isn't available, `run_meta.json` says so
-- [ ] ≥ 4 new cases, real and synthetic, each with its expected answers checked by a committed script
-- [ ] On the new cases: findings clearly above the P3.2 bar, no false claims
+- [x] ≥ 4 new cases, real and synthetic, each with its expected answers checked by a committed script
+- [x] ≥ 3 held-out cases, written by the owner before any P3.4 change, their hash committed, run only in P3.5 *(the run is P3.5's)*
+- [ ] On the held-out cases: the Phase 3 agent finds at least as much as the P3.2 agent, with no false claims; the baseline is run on them too, a held-out check of P2.8's gap. Dev and held-out results are reported side by side; a gain on dev only is reported as tuning
+- [ ] No prompt names a case, its file or its columns (a test checks)
 - [ ] No regression on the original 7 cases
 - [ ] Time per run down by a third at equal findings (same machine load as the reference)
 
@@ -484,17 +488,27 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 - Found 2026-11-09, in the check run: a whole task (titanic `ml_1`, 6 findings) cited no facts, and review accepted it, so the report had 23 unverified numbers. In P2.8: 0 of 706 findings in the current suite, 4 of 985 with `hosted`. Candidate for P3.4: the specialist's report is sent back when a finding states numbers and cites no fact (deterministic, no LLM call).
 
 **P3.2 Harder cases** (M)
-- [ ] Real, downloaded and checksummed, with a script that computes every expected finding and fact from the file:
+- [x] Real, downloaded and checksummed, with a script that computes every expected finding and fact from the file: *the checks are tests in `tests/test_eval_cases.py`; a case can name a CSV inside a downloaded zip (bike sharing). Pima comes from a GitHub mirror (`plotly/datasets`), with its zeros most common in insulin (374) and skin thickness (227).*
   - **penguins** (Palmer penguins, CC0): confounding. Bill depth vs length is negative pooled, positive within each species.
   - **diabetes** (Pima, OpenML): missing values in disguise. Zeros in glucose, BMI and blood pressure mean "missing".
   - **bike sharing** (UCI daily, CC BY 4.0): a real time series. Season, weather and working-day effects.
-- [ ] Synthetic, exact ground truth:
+- [x] Synthetic, exact ground truth: *`u_shape` and `small_sample` in `evals/generators.py`.*
   - **u_shape:** a strong non-linear effect with correlation ≈ 0.
   - **small_sample:** n ≈ 60 with one real and several null effects; caution is the right answer.
-- [ ] **imbalance:** Adult census income (UCI, CC BY 4.0, 76/24, 48k rows) if one run shows its size is workable; a synthetic 95/5 case otherwise. Accuracy alone must not be called good.
+- [ ] ~~**imbalance:**~~ *Proposed 2026-11-09 to skip: the agent already compares models with the majority-class baseline and reports F1, so it would most likely score 100% too.* Adult census income (UCI, CC BY 4.0, 76/24, 48k rows) if one run shows its size is workable; a synthetic 95/5 case otherwise. Accuracy alone must not be called good.
 - [ ] Licence and URL checked before each real case goes in. Neutral file names, as for the others.
 - [ ] Memorisation: the model may know a famous dataset from its columns. The number check catches memorised numbers (they match no recorded fact); findings without numbers it doesn't. Note it with the results.
-- [ ] Current agent × 3 repeats on the new cases: the bar for P3.4. *Estimate: 15–18 runs, about $1.50.*
+- [x] Current agent × 3 repeats on the new cases: the bar for P3.4. *2026-11-09, agent at `71d5304`, 15 of 15 runs ok: findings 96% (92–98%), no false claims, facts 96%, 0.1 unverified numbers, $0.091 and 12.2 min a run ($1.37 in all). diabetes, small_sample and u_shape 100% in every repeat (checked against the reports: zeros treated as missing and counted, feat_3's p = 0.063 not called an effect after Holm, the U found with a squared term). Missed: penguins' within-species slope in 2 of 3 runs (83%); the direction of an effect twice (temperature in bike_sharing, flipper length in penguins), given only as an importance rank. The real datasets are well known, so part of the score may be memory; the held-out cases are synthetic for that reason.*
+
+**P3.2b Held-out cases** (S, owner)
+- The owner writes them, so the person writing the fixes hasn't seen them: [brief](docs/eval/heldout-brief.md). They live in `evals/heldout/` (gitignored until P3.5) with their own generators and checks; one sha256 over the directory is committed, so they can't change after the fixes without it showing.
+- [x] Harness: `evals run --suite heldout`; held-out cases load and grade by name like the dev ones; the main test suite doesn't collect their checks.
+- [x] 3–4 cases written before any P3.4 change. *4 cases, 2026-11-10; their checks pass (owner).* They test the failure types the bar showed, in forms the dev cases don't, plus older trap types in new forms. Synthetic, with neutral names and no well-known dataset, so the model can't know the answers:
+  - confounding of a different shape from penguins (e.g. a group mix that changes over time and reverses a trend);
+  - effects whose direction is the finding, in data where a model's importance rank is the easy answer;
+  - a P2 trap type in a new form (e.g. leakage through a timestamp, not a copied column).
+- [ ] Expected answers checked by a script (`evals/heldout/test_cases.py`), committed with the cases in P3.5.
+- [x] Hash committed (`evals/heldout.sha256`, `84373d41…`, recomputed and matching before the commit). Nobody runs the agent on them before P3.5.
 
 **P3.3 Faster runs** (M)
 - [ ] Measure where a run's time goes: LLM calls (per node), script execution, waiting. *P2.8, current suite: about half of the 14.3 min is LLM time, under load.*
@@ -503,11 +517,17 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 - [ ] Check: the 7 original cases × 3, same load as the reference suite. Time down by a third, findings and false claims unchanged.
 
 **P3.4 Fix what P3.2 exposes** (M)
+- Rules: changes are developed on the dev cases only and must be general. No case, file or column name goes into a prompt; a test compares the prompt templates with the names in the case files. Prefer checks in code (they apply to every dataset) to prompt lines.
+- Seen in the bar: confounding not followed through (penguins, 2 of 3); effect direction missing when a model's importance is reported (2 findings); a task whose findings cite no fact (P3.1 check run). Candidates: a finding that reports an importance or association must state its sign; send back a specialist report whose findings state numbers but cite no fact.
 - [ ] One change per failure type the new cases show, each kept only if findings go up and false claims don't. Candidates, used only if their failure appears: depth (b) a closing review that ranks open questions; (c) the report keeps only important open questions; an LLM claim check against facts; `{{fact:…}}` references; targeted retries.
 - Measured in P2.8 and rejected: larger budgets (`hosted` preset): no more findings, 1.8× the cost.
 
 **P3.5 Re-run and compare** (S)
-- [ ] All cases × 3 with the Phase 3 agent; compare with the P3.2 bar and the P2.8 suites; commit the table and snapshots.
+- [ ] Dev cases × 3 with the Phase 3 agent; compare with the P3.2 bar and the P2.8 suites.
+- [ ] Tag the Phase 3 agent; check the held-out hash; commit the cases.
+- [ ] Held-out cases × 3 with the baseline, the P3.2 agent (`71d5304`) and the Phase 3 agent: the first time anyone sees them run. Needs `evals run` to run the agent at a given commit (a worktree, as for the baseline). *About $2.50.*
+- [ ] Changes made after seeing the held-out results are reported separately, not folded into the Phase 3 numbers.
+- [ ] Commit the tables (dev and held-out side by side) and snapshots.
 
 Moved to Phase 4: resume an interrupted run (a LangGraph checkpointer and `run.py --resume`). It matters for local models, where runs take 1–2 h.
 
@@ -622,6 +642,9 @@ PLAN.md  README.md
 | 2026-11-09 | Phase 3 adds harder cases, real and synthetic; its conditional items wait for them | P2.8: 98% findings, no false claims, no failed runs on the 7 cases, so nothing left to measure there. Real data (penguins, Pima, bike sharing) brings realistic mess and credibility; synthetic keeps exact truth where it matters (non-linear, small sample) |
 | 2026-11-09 | Task scripts run in a network namespace (`unshare -rn`), not Docker | Blocks exfiltration and downloads, the worst a prompt-injected script can do; no root, no daemon, a few lines. Files stay readable and writable: bubblewrap is the optional next step |
 | 2026-11-09 | Phase 3's speed target is time per run (−⅓ at equal findings), not cost | Wall time matters for the demo and local runs; the current agent's cost ($0.08 a run on Haiku) is not a constraint |
+| 2026-11-09 | Dev and held-out eval suites: fixes are developed on the 12 dev cases and judged on held-out cases first run in P3.5, against the P3.2 agent | Fixing the bar's misses (penguins confounding, effect direction) and scoring on the same cases would measure the tuning. With 3 repeats, one item moving on one case can't be told from noise anyway |
+| 2026-11-09 | The owner writes the held-out cases; a hash is committed, the files only in P3.5; the baseline runs on them too | Claude writes the fixes, so cases it wrote would not be blind to it. The hash shows they didn't change after the fixes. The baseline run makes them a held-out check of P2.8's gap as well, which can't be re-measured on the 7 cases |
+| 2026-11-09 | No case, file or column name in a prompt, enforced by a test | Keeps fixes general; makes the rule checkable instead of a promise |
 | 2026-10-31 | Tracing: **LangSmith only**; MLflow removed | Built for agents; clearer traces. Tracing is opt-in via env, because when it's on, prompts and data samples leave the machine (relevant to the local-first pitch) |
 | 2026-10-31 | Delete untracked `todo.md`, `docs/`, `notebooks/`, and the `multi-specialist` branch | Confirmed by owner; superseded by this plan / `feature/new-flow` |
 | 2026-10-31 | New Phase 1 (agent quality) before the eval harness | The baseline review shows structural failures; the tagged baseline keeps the before/after story measurable |

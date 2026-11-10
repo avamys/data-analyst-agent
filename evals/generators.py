@@ -134,6 +134,35 @@ def datetime_trend(seed: int) -> pd.DataFrame:
     )
 
 
+def u_shape(seed: int) -> pd.DataFrame:
+    """Binary target: feat_a has a strong U-shaped effect (high at both ends, low
+    in the middle) with a linear correlation near zero; feat_b is linear and
+    moderate; feat_c has none"""
+    rng = np.random.default_rng(seed)
+    n = 1000
+    a, b, c = rng.normal(size=(3, n))
+    outcome = rng.random(n) < _logistic(-1.6 + 1.1 * a**2 + 0.6 * b)
+    return pd.DataFrame(
+        {
+            "feat_a": a.round(3),
+            "feat_b": b.round(3),
+            "feat_c": c.round(3),
+            "outcome": outcome.astype(int),
+        }
+    )
+
+
+def small_sample(seed: int) -> pd.DataFrame:
+    """60 rows, numeric target: feat_1 has a real positive effect, feat_2 to
+    feat_6 none (one of them close to p = 0.05 by chance)"""
+    rng = np.random.default_rng(seed)
+    n = 60
+    x = rng.normal(size=(n, 6))
+    df = pd.DataFrame(x.round(2), columns=[f"feat_{i}" for i in range(1, 7)])
+    df["score"] = (50 + 6 * x[:, 0] + rng.normal(0, 10, n)).round(1)
+    return df
+
+
 GENERATORS = {
     "planted_effects": planted_effects,
     "pure_noise": pure_noise,
@@ -141,4 +170,6 @@ GENERATORS = {
     "regression_outliers": regression_outliers,
     "string_target": string_target,
     "datetime_trend": datetime_trend,
+    "u_shape": u_shape,
+    "small_sample": small_sample,
 }

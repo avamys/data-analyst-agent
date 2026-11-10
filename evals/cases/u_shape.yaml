@@ -1,0 +1,18 @@
+description: >
+  Trap: feat_a has a strong U-shaped effect on outcome (rates about 60% at both
+  ends of its range, 16% in the middle) and a linear correlation near zero, so a
+  correlation or a t-test of means misses it. feat_b has a moderate linear effect,
+  feat_c none.
+# The agents see the file name, so it must not hint at the answer
+file: readings.csv
+target: outcome
+data: {generator: u_shape, seed: 4}
+facts:
+  - {name: outcome_rate, value: 0.38, near: [outcome, target]}
+must_find:
+  - feat_a has a strong non-linear (U-shaped) association with outcome; outcome is more common at both low and high feat_a than in the middle.
+  - feat_b is positively associated with outcome.
+  - feat_c shows no meaningful association with outcome.
+must_not_claim:
+  - feat_a has no association with outcome, concluded from a linear test (correlation, t-test of means or a linear model).
+  - feat_c is a significant or important predictor of outcome.

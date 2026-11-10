@@ -1,0 +1,28 @@
+description: >
+  Real data: 731 days of a bike rental system, 2011-2012 (UCI Bike Sharing,
+  day.csv, CC BY 4.0). Trap: casual + registered add up exactly to the target
+  cnt. Real effects: growth from 2011 to 2012, temperature, season and weather.
+  The working-day difference is small (p = 0.10) and not an expected finding.
+  Expected answers computed in tests/test_eval_cases.py.
+# The agents see the file name, so it must not hint at the answer
+file: rentals.csv
+target: cnt
+data:
+  url: https://archive.ics.uci.edu/static/public/275/bike+sharing+dataset.zip
+  sha256: b70182d0d0508e9abbb79306ce5c0cec34869000f8220175ac83d11dbe845401
+  member: day.csv
+facts:
+  - {name: mean_cnt, value: 4504.348837, near: [cnt, rental, average, mean]}
+  - {name: rentals_2011, value: 3405.761644, near: ["2011"]}
+  - {name: rentals_2012, value: 5599.934426, near: ["2012"]}
+must_find:
+  - casual and registered add up exactly to cnt (target leakage) and must not be used as predictors.
+  - Rentals grew strongly from 2011 to 2012 (about 3,400 to 5,600 a day).
+  - Rentals rise with temperature.
+  - Rentals are lowest in season 1 (the winter months, December to March).
+  - Rentals fall in worse weather, lowest with light rain or snow.
+must_not_claim:
+  - A near-perfect model is presented as a genuine predictive result, without flagging that casual and registered make up cnt.
+  - casual or registered is presented as a driver or valid predictor of cnt.
+caveats:
+  leakage: [leak]

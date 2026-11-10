@@ -39,6 +39,7 @@ Results: [baseline](../../evals/results/20261105-134725_baseline_claude-haiku-5-
 - **The judge may flatter the baseline.** On the fresh baseline report it gives hedged statements ("Supported, but unverified", "Probably not supported") `partly`, where the owner labels them `no`: 70% findings by the judge, 40% by the owner. If anything, the gap is larger than 53% → 98%.
 - **The cases are near the ceiling for the current agent.** A change that helps it (Phase 3) can show up only on `datetime_trend`, as fewer unresolved objections, or as lower cost and time. Harder cases are needed to measure more.
 - **One model, 3 repeats.** Not re-run on qwen3.5.
+- **Not a held-out measurement.** Phase 1 was developed on titanic, one of the 7 cases; the other 6 were written after it, by people who knew the design. The one agent change made after seeing these cases is the step.jinja2 line above. No prompt names a case or its traps (checked 2026-11-09). Phase 3 adds held-out cases, written by the owner, that nothing is tuned on, and runs the baseline on them too.
 
 ## Per suite
 
