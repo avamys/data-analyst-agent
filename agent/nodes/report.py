@@ -48,15 +48,25 @@ def write_report_node(state: HierarchicalState) -> dict:
         )
 
     writer = BaseAgent(agent_type="reporter")
-    # text(): with thinking on (Claude), content is a list of blocks
-    report = writer.invoke(prompt()).text().strip()
+
+    def write(**draft) -> str:
+        response = writer.invoke(prompt(**draft))
+        # text(): with thinking on (Claude), content is a list of blocks
+        text = response.text().strip()
+        if not text:
+            # e.g. the whole output cap spent thinking: fail, not an empty report
+            stop = response.response_metadata.get("stop_reason")
+            raise RuntimeError(f"The report writer returned no text (stop: {stop})")
+        return text
+
+    report = write()
     unmatched = unmatched_numbers(report, values)
     for _ in range(settings.max_report_rewrites):
         if not unmatched:
             break
         logger.warning(f"Numbers matching no fact, sent back: {unmatched}")
         listed = "\n".join(f'- {n} in: "{line}"' for n, line in unmatched)
-        report = writer.invoke(prompt(draft=report, unmatched=listed)).text().strip()
+        report = write(draft=report, unmatched=listed)
         unmatched = unmatched_numbers(report, values)
     if unmatched:
         logger.warning(f"Numbers still matching no fact: {unmatched}")

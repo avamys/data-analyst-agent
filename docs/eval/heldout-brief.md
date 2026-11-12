@@ -74,10 +74,9 @@ Then tell Claude the hash file is in. It gets committed. From then on, don't cha
 1. The Phase 3 agent is tagged. Nothing changes after this point.
 2. You re-run the `tar … | sha256sum` line and check that it matches `evals/heldout.sha256`.
 3. The cases go into git: remove the `evals/heldout/` line from `.gitignore`.
-4. Three agents run on them, 3 repeats each:
+4. Two agents run on them, 3 repeats each:
    - the baseline (`--version baseline`);
-   - the P3.2 agent (`71d5304`);
    - the Phase 3 agent.
 
-   Runs use `evals run --suite heldout`; then judge and report as usual. *About $2.50.*
+   Runs use `evals run --suite heldout`; then judge and report as usual. *About $1.90.* (The P3.2 agent, `71d5304`, was dropped on 2026-11-12 to stay within the $10 API budget.)
 5. The held-out results are reported next to the dev ones. Changes made after seeing them are reported separately.

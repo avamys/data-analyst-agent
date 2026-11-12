@@ -1,5 +1,6 @@
 import pytest
 from conftest import ScriptedLLM
+from langchain_core.messages import AIMessage
 from test_lead import _brief, _plan, accept
 from test_specialist import finish, run_cell
 
@@ -70,6 +71,16 @@ def test_numbers_still_unmatched_are_listed_under_limitations(write):
     assert state["unverified_numbers"] == ["41"]
     limitations = state["report"].split("## Limitations")[1].split("## Open")[0]
     assert '- 41 in: "The data has 41 rows."' in limitations
+
+
+def test_a_report_with_no_text_fails_the_run(write):
+    # The writer spent its whole output cap thinking (diabetes r1, 2026-11-10)
+    thinking_only = AIMessage(
+        content=[{"type": "thinking", "thinking": "...", "signature": "x"}],
+        response_metadata={"stop_reason": "max_tokens"},
+    )
+    with pytest.raises(RuntimeError, match="no text.*max_tokens"):
+        write(thinking_only)
 
 
 def test_images_whose_file_is_missing_are_removed(write):
