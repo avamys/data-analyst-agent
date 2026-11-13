@@ -98,7 +98,8 @@ class LLMManager:
         )
 
         llm = init_chat_model(
-            model_name, **{"temperature": temperature, **cls._provider_kwargs()}
+            model_name,
+            **{"temperature": temperature, **cls._provider_kwargs(agent_type)},
         )
 
         # Cache it
@@ -169,7 +170,7 @@ class LLMManager:
         )
 
     @staticmethod
-    def _provider_kwargs() -> dict[str, Any]:
+    def _provider_kwargs(agent_type: str = "") -> dict[str, Any]:
         """Provider-specific options passed to init_chat_model"""
         if settings.model_provider == "openrouter":
             if settings.openrouter_api_key is None:
@@ -191,7 +192,9 @@ class LLMManager:
                 "api_key": settings.anthropic_api_key,
                 # Current Claude models reject sampling parameters
                 "temperature": None,
-                "max_tokens": settings.anthropic_max_tokens,
+                "max_tokens": settings.anthropic_report_max_tokens
+                if agent_type == "reporter"
+                else settings.anthropic_max_tokens,
                 "timeout": settings.llm_timeout_s,
             }
         return {

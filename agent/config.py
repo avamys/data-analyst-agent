@@ -72,6 +72,9 @@ class Settings(BaseSettings):
     llm_max_tokens: int = 4096
     # Thinking counts against the cap, and an unused cap costs nothing
     anthropic_max_tokens: int = 16000
+    # The report writer's: long reports reach 12-15k tokens with the thinking.
+    # Above ~21k the SDK wants streaming, unless a timeout is set (llm_timeout_s)
+    anthropic_report_max_tokens: int = 32000
     # Effort on Claude (output_config.effort), which sets how much it thinks:
     # thinking is most of the output. None: the model's default (medium on
     # Haiku 5.5). Lead: plan, reviews and report; specialists: their steps.

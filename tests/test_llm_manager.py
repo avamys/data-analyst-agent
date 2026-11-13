@@ -84,6 +84,16 @@ def test_anthropic_sends_no_temperature(monkeypatch):
     LLMManager.clear_cache()
 
 
+def test_anthropic_report_writer_gets_a_larger_output_cap(monkeypatch):
+    # Long reports reached 12-15k tokens, and one spent the 16k cap thinking
+    monkeypatch.setattr(settings, "model_provider", "anthropic")
+    monkeypatch.setattr(settings, "anthropic_api_key", SecretStr("sk-ant-test"))
+    LLMManager.clear_cache()
+    assert LLMManager.get_llm("reporter").max_tokens == 32000
+    assert LLMManager.get_llm("lead").max_tokens == 16000
+    LLMManager.clear_cache()
+
+
 def test_anthropic_without_key_fails_early(monkeypatch):
     monkeypatch.setattr(settings, "model_provider", "anthropic")
     monkeypatch.setattr(settings, "anthropic_api_key", None)
