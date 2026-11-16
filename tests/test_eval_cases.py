@@ -328,7 +328,12 @@ def test_a_case_needs_exactly_one_source():
         Source()
 
 
-def test_held_out_cases_load_from_their_own_directory(monkeypatch, tmp_path):
+@pytest.mark.parametrize(
+    "suite, attribute", [("heldout", "HELDOUT_DIR"), ("heldout2", "HELDOUT2_DIR")]
+)
+def test_held_out_cases_load_from_their_own_directory(
+    monkeypatch, tmp_path, suite, attribute
+):
     (tmp_path / "cases").mkdir()
     (tmp_path / "generators.py").write_text(
         "import pandas as pd\n"
@@ -338,8 +343,8 @@ def test_held_out_cases_load_from_their_own_directory(monkeypatch, tmp_path):
         "description: d\nfile: hidden.csv\ntarget: y\n"
         "data: {generator: hidden, seed: 3}\nmust_find: [x]\n"
     )
-    monkeypatch.setattr(cases_module, "HELDOUT_DIR", tmp_path)
-    assert [c.name for c in all_cases("heldout")] == ["secret"]
+    monkeypatch.setattr(cases_module, attribute, tmp_path)
+    assert [c.name for c in all_cases(suite)] == ["secret"]
     assert "secret" not in {c.name for c in all_cases()}
     case = load_case("secret")  # results name the case, so grading finds it
     assert pd.read_csv(dataset(case, tmp_path / "data")).y.tolist() == [3]

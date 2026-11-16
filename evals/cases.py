@@ -7,7 +7,8 @@ see that path, so file names are neutral: "pure_noise.csv" gave the answer away.
 
 Held-out cases live in evals/heldout/ (cases/<name>.yaml, and generators.py with
 its own GENERATORS), kept out of git until they are first run: see
-docs/eval/heldout-brief.md.
+docs/eval/heldout-brief.md. A second round, written after the first ran, lives in
+evals/heldout2/ the same way (docs/eval/heldout2-brief.md).
 """
 
 import hashlib
@@ -25,17 +26,26 @@ from evals.generators import GENERATORS
 CASES_DIR = Path(__file__).parent / "cases"
 DATA_DIR = Path(__file__).parent / "data"
 HELDOUT_DIR = Path(__file__).parent / "heldout"
+HELDOUT2_DIR = Path(__file__).parent / "heldout2"
+SUITES = ["dev", "heldout", "heldout2"]
+
+
+def _heldout_dirs() -> dict[str, Path]:
+    return {"heldout": HELDOUT_DIR, "heldout2": HELDOUT2_DIR}
 
 
 def generators() -> dict:
     """The dev generators, plus the held-out ones when they are present"""
-    path = HELDOUT_DIR / "generators.py"
-    if not path.exists():
-        return GENERATORS
-    spec = importlib.util.spec_from_file_location("heldout_generators", path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return GENERATORS | module.GENERATORS
+    found = dict(GENERATORS)
+    for suite, directory in _heldout_dirs().items():
+        path = directory / "generators.py"
+        if not path.exists():
+            continue
+        spec = importlib.util.spec_from_file_location(f"{suite}_generators", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        found |= module.GENERATORS
+    return found
 
 
 class Source(BaseModel):
@@ -80,13 +90,12 @@ class Case(BaseModel):
 
 
 def _cases_dir(suite: str) -> Path:
-    return CASES_DIR if suite == "dev" else HELDOUT_DIR / "cases"
+    return CASES_DIR if suite == "dev" else _heldout_dirs()[suite] / "cases"
 
 
 def load_case(name: str) -> Case:
-    path = CASES_DIR / f"{name}.yaml"
-    if not path.exists():
-        path = _cases_dir("heldout") / f"{name}.yaml"
+    paths = [_cases_dir(suite) / f"{name}.yaml" for suite in SUITES]
+    path = next((p for p in paths if p.exists()), paths[0])
     return Case(name=name, **yaml.safe_load(path.read_text()))
 
 

@@ -21,7 +21,7 @@ load_dotenv(".env")
 
 from agent.config import PRESETS, settings  # noqa: E402
 from evals.calibration import agreement, calibrate  # noqa: E402
-from evals.cases import all_cases, load_case  # noqa: E402
+from evals.cases import SUITES, all_cases, load_case  # noqa: E402
 from evals.judge import PROMPT_VERSION, judge_results  # noqa: E402
 from evals.report import compare, report  # noqa: E402
 from evals.runner import ROOT, Config, regrade, run_suite, snapshot  # noqa: E402
@@ -39,9 +39,9 @@ def main() -> int:
     run.add_argument("--cases", help="Comma-separated case names (default: all)")
     run.add_argument(
         "--suite",
-        choices=["dev", "heldout"],
+        choices=SUITES,
         default="dev",
-        help="Which cases 'all' means (held-out: evals/heldout/)",
+        help="Which cases 'all' means (held-out: evals/heldout/, evals/heldout2/)",
     )
     run.add_argument("--provider", default=settings.model_provider)
     run.add_argument("--model", help="Default: the provider's model in the settings")

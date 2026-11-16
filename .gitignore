@@ -181,3 +181,4 @@ evals/data/
 evals/runs/
 evals/worktrees/
 evals/heldout/__pycache__/
+evals/heldout2/
