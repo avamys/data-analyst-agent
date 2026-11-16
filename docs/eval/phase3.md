@@ -48,7 +48,21 @@ Specialists at `low` effort on dev, × 1: findings 95% against 96%, false claims
 
 ## After the run
 
-No agent change. `evals/heldout/` was committed byte-for-byte (the hash still matches) and excluded from ruff, which would reformat two files. Any fix for h3 is post-held-out work and is reported separately from these numbers.
+`evals/heldout/` was committed byte-for-byte (the hash still matches) and excluded from ruff, which would reformat two files.
+
+**One change, made after seeing h3** (`8a83b62`). It isn't part of the numbers above, and h3 is no longer unseen evidence for it. The cause of h3's failure was in our own dataset profile: it told every agent "Missing values: none", because it counts empty cells only, and r2's report repeated that. The profile now says "Empty cells". It also gives every numeric column its min, 1st percentile, median, max and, when it covers at least 1% of rows, its most common value. These are facts with no judgement: h3's weight reads "min 0, 1st pct 0, median 3.735, max 35.12; most common 0 (150 of 1,000)". The same lines show the zeros in Pima's columns, Titanic's zero fares and one bike-sharing day at 0% humidity. Standardized columns show nothing unusual.
+
+h3 × 3 with the change ([results](../../evals/results/20261116-154250_current_claude-haiku-5-5.jsonl), $0.31, outside the $10 budget):
+
+| h3 | Before | After |
+|---|---|---|
+| Findings | 42% | 75% (62–88%) |
+| False claims a run | 0.8 | 0 |
+| Facts | 0% | 100% |
+| Weight effect among recorded weights found | 0 of 3 (1 partly) | 2 of 3 (1 partly) |
+| Zero-weight parcels ~30 h slower | 0 of 3 (1 partly) | 3 of 3 |
+
+All three lead plans now mention the 150 zeros from the profile; none did before. The reports still hedge on calling the zeros missing (`partly` in all 3). Not checked: the other cases. The change alters what the agent sees on titanic, diabetes and bike_sharing, and those weren't re-run.
 
 ## Caveats
 
