@@ -1,0 +1,23 @@
+description: >
+  Regression to the mean. The 250 students with the lowest pre_score got
+  extra_sessions, which have no true effect; their raw gain is still ~8 points
+  above everyone else's, because low pre-scores were partly bad luck.
+  score_gain falls steeply with pre_score. Adjusted for pre_score, the session
+  effect is ~0. attendance_pct has a real positive effect (+0.2 points per
+  percentage point); age and class_size have none.
+file: students.csv
+target: score_gain
+data: {generator: ho_students, seed: 4104}
+facts:
+  - {name: extra_sessions_students, value: 250, near: [session]}
+must_find:
+  - In a raw comparison, students with extra sessions gained about 8 points more than other students.
+  - Extra sessions went only to the students with the lowest pre_score (the bottom quarter).
+  - score_gain falls as pre_score rises; low scorers gain points and high scorers lose them.
+  - After accounting for pre_score, extra sessions show little or no effect on score_gain.
+  - Higher attendance_pct goes with a larger score_gain.
+must_not_claim:
+  - Extra sessions raised students' scores, presented as an effect of the sessions.
+caveats:
+  regression_to_mean: [regression to the mean, measurement error, luck]
+  assignment: [random, selection, assigned]
