@@ -30,6 +30,8 @@ class DatasetProfile(BaseModel):
     # Columns that alone predict the target almost perfectly: column -> score
     # (accuracy of predicting by the column's groups, or |correlation|)
     leakage_suspects: dict[str, float] = Field(default_factory=dict)
+    # Numeric columns and a numeric target: min, p1, median, max, mode, mode_count
+    distributions: dict[str, dict[str, float]] = Field(default_factory=dict)
 
 
 class Output(BaseModel):

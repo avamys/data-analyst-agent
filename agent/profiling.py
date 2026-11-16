@@ -118,6 +118,15 @@ def auto_profile_dataset(
             df, target_column, target_type, feature_types
         )
 
+    # A code standing in for "unknown" (0, -1, 999) fills the cell, so it
+    # isn't counted as missing; it shows as a repeated value or a gap
+    numeric_columns = numeric_features + (
+        [target_column] if target_type == "regression" else []
+    )
+    distributions = {
+        col: _distribution(df[col]) for col in numeric_columns if df[col].notna().any()
+    }
+
     profile = DatasetProfile(
         n_rows=n_rows,
         n_cols=n_cols,
@@ -135,6 +144,7 @@ def auto_profile_dataset(
         has_temporal=has_temporal,
         class_shares=class_shares,
         leakage_suspects=leakage_suspects,
+        distributions=distributions,
     )
 
     logger.info(f"Dataset Profile: {n_rows} rows, {n_cols} cols")
@@ -186,6 +196,20 @@ def _leakage_suspects(
     return suspects
 
 
+def _distribution(series: pd.Series) -> dict[str, float]:
+    """Where a numeric column's values lie, and its most common value"""
+    values = series.dropna()
+    counts = values.value_counts()
+    return {
+        "min": float(values.min()),
+        "p1": float(values.quantile(0.01)),
+        "median": float(values.median()),
+        "max": float(values.max()),
+        "mode": float(counts.index[0]),
+        "mode_count": int(counts.iloc[0]),
+    }
+
+
 def profile_summary(profile: DatasetProfile) -> str:
     """The profile as text for the lead's prompts"""
 
@@ -210,7 +234,21 @@ def profile_summary(profile: DatasetProfile) -> str:
     missing = ", ".join(
         f"{col} ({pct:.1f}%)" for col, pct in profile.missing_percentages.items()
     )
-    lines.append(f"- Missing values: {missing or 'none'}")
+    lines.append(f"- Empty cells: {missing or 'none'}")
+    if profile.distributions:
+        lines.append("- Numeric columns:")
+    for col, d in profile.distributions.items():
+        line = (
+            f"  - {col}: min {d['min']:.4g}, 1st pct {d['p1']:.4g}, "
+            f"median {d['median']:.4g}, max {d['max']:.4g}"
+        )
+        # A few repeats in a continuous column are rounding, not a spike
+        if d["mode_count"] > 1 and d["mode_count"] >= 0.01 * profile.n_rows:
+            line += (
+                f"; most common {d['mode']:.4g} "
+                f"({int(d['mode_count']):,} of {profile.n_rows:,})"
+            )
+        lines.append(line)
     if profile.leakage_suspects:
         suspects = ", ".join(
             f"{col} ({score})" for col, score in profile.leakage_suspects.items()

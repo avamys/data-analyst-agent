@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from agent.profiling import auto_profile_dataset, detect_target
+from agent.profiling import auto_profile_dataset, detect_target, profile_summary
 
 
 def test_string_target_is_binary():
@@ -94,3 +94,35 @@ def test_near_copies_of_a_numeric_target_are_leakage_suspects():
     profile = auto_profile_dataset(df, "x.csv")
     assert profile.target_type == "regression"
     assert list(profile.leakage_suspects) == ["copy"]
+
+
+def _summary(df: pd.DataFrame, target: str | None = None) -> str:
+    return profile_summary(auto_profile_dataset(df, "x.csv", target))
+
+
+def test_summary_says_empty_cells_not_missing_values(small_df):
+    # A code like 0 for "unknown" fills the cell, so "no missing values" would
+    # claim more than the check does
+    summary = _summary(small_df.dropna())
+    assert "- Empty cells: none" in summary
+    assert "Missing values" not in summary
+
+
+def test_numeric_columns_show_spread_and_a_repeated_value():
+    rng = np.random.default_rng(0)
+    weight = np.concatenate([np.zeros(150), rng.uniform(0.8, 12, 850)]).round(2)
+    df = pd.DataFrame(
+        {
+            "weight": weight,
+            "code": np.where(rng.random(1000) < 0.1, -1, rng.integers(20, 90, 1000)),
+            "standardized": rng.normal(0, 1, 1000),
+            "hours": rng.uniform(10, 60, 1000).round(1),
+        }
+    )
+    summary = _summary(df, "hours")
+    lines = {line.split(":")[0].strip(" -"): line for line in summary.splitlines()}
+    assert "min 0, 1st pct 0, median" in lines["weight"]
+    assert "most common 0 (150 of 1,000)" in lines["weight"]
+    assert "min -1," in lines["code"] and "most common -1 (" in lines["code"]
+    assert "most common" not in lines["standardized"]  # no value repeats
+    assert "most common" not in lines["hours"]  # rounding repeats, under 1%
