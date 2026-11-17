@@ -64,9 +64,29 @@ h3 × 3 with the change ([results](../../evals/results/20261116-154250_current_c
 
 All three lead plans now mention the 150 zeros from the profile; none did before. The reports still hedge on calling the zeros missing (`partly` in all 3). Not checked: the other cases. The change alters what the agent sees on titanic, diabetes and bike_sharing, and those weren't re-run.
 
+## A second held-out round (`v0.3.1`)
+
+h3 can't judge a fix built while looking at it, so one more case, **h5**, was written blind after the fix ([brief](heldout2-brief.md), hash `257dac41…` committed in `68056dc` before any run). The agent with the fix is tagged `v0.3.1` (`8a83b62`). It ran on h5 and, to check the fix broke nothing, on h1, h2 and h4; the baseline ran on h5. Results: [`v0.3.1`](../../evals/results/20261117-160331_current_claude-haiku-5-5.jsonl), [baseline](../../evals/results/20261117-163817_baseline_claude-haiku-5-5.jsonl).
+
+| Case | Phase 3 findings | `v0.3.1` findings | `v0.3.1` false claims a run | Baseline findings |
+|---|---|---|---|---|
+| h1 | 83% (75–100%) | 75% (62–88%) | 0 | 12% |
+| h2 | 100% | 96% (88–100%) | 0 | 17% |
+| h3 *(seen, from the run above)* | 42% (25–62%) | 75% (62–88%) | 0 | 12% |
+| h4 | 87% (70–100%) | 83% (60–100%) | 0 | 33% |
+| h5 *(new)* | not run | 96% (88–100%) | 0 | 25% (0–62%) |
+
+- **No false claims in any of the 15 `v0.3.1` runs**, h3's included, and more findings than the baseline on every case.
+- **h5:** a 1–10 stay rating where 99 means "no rating", on 125 of 900 stays, mostly agency bookings. With the 99s left in, agency guests look far happier (~36 against ~12); among rated stays they rate about a point lower. All 3 runs found the 125 stays, the agency concentration (32% against 5–7%) and both rated-stay gaps, and none claimed the agency guests were happier. One run called the missing-rating reading "a hypothesis the data do not confirm" (`partly`).
+- **What h5 does not show.** The rating has 9 distinct values, so the profile treats it as a classification target and gives it no numeric line. The 99 showed instead as a class share ("99: 13.9%"), a line the Phase 3 profile also had. So h5 shows the agent handles a visible placeholder in a case it hasn't seen; it doesn't show that the profile's new numeric lines carry over to other placeholders. The Phase 3 agent wasn't run on h5.
+- **h1, h2 and h4** scored a little lower, within each case's run-to-run range. h1 misses what it missed before: the fall within each tier is `partly` in all 3 runs, and the mix is given as the cause in 1 of 3 (2 of 3 before).
+
+Cost: $1.47 ($1.15 agent, $0.32 judge). $8.18 of the $10 budget spent.
+
 ## Caveats
 
 - **Held-out is 4 cases × 3.** One case moves the overall score by about 12 points, and h3's 0.8 false claims a run is 2.5 claims in 3 runs.
 - **Caveats are scored on case-specific terms.** The held-out cases ask for domain caveats the dev cases don't, such as an engagement proxy (h2) and regression to the mean (h4). 58% partly reflects that.
 - **Times are at 4 runs at a time**, as for the dev suites. The two held-out suites ran one after the other, not side by side.
-- **Cost:** dev × 3 $3.87, `low` × 1 $1.13, held-out $1.71 (Phase 3 $1.22, baseline $0.49), all including the judge. That makes $6.71 of the $10 budget.
+- **Cost:** dev × 3 $3.87, `low` × 1 $1.13, held-out $1.71 (Phase 3 $1.22, baseline $0.49), all including the judge. That makes $6.71 of the $10 budget. The second round added $1.47: $8.18.
+- **`v0.3.1` wasn't re-run on dev.** Its profile adds lines on titanic, diabetes and bike_sharing; a regression there is unchecked.
