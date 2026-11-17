@@ -171,6 +171,9 @@ def run_one(
                 "tasks_completed",
                 "tasks_failed",
                 "unverified_numbers",
+                "calls_cut_off",
+                "calls_empty",
+                "ollama",
                 "run_id",
                 "trace_url",
             )

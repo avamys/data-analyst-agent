@@ -92,3 +92,93 @@ def test_eval_metadata_comes_from_the_runners_environment(monkeypatch):
     monkeypatch.setenv("EVAL_CASE", "leakage")
     monkeypatch.setenv("EVAL_REPEAT", "3")
     assert eval_metadata() == {"case": "leakage", "repeat": "3"}
+
+
+def _record_one(tmp_path, message):
+    llm = GenericFakeChatModel(messages=iter([message]))
+    recorder = LLMCallRecorder(tmp_path / "llm_calls.jsonl")
+    llm.invoke([HumanMessage(content="hi")], config={"callbacks": [recorder]})
+    [record] = [json.loads(line) for line in (tmp_path / "llm_calls.jsonl").open()]
+    return recorder, record
+
+
+def test_recorder_splits_an_ollama_call_into_load_prompt_and_generation(tmp_path):
+    # As ChatOllama returns them: nanoseconds, and "length" at num_predict
+    meta = {
+        "done_reason": "length",
+        "load_duration": 2_000_000_000,
+        "prompt_eval_count": 3000,
+        "prompt_eval_duration": 10_000_000_000,
+        "eval_count": 120,
+        "eval_duration": 12_000_000_000,
+    }
+    usage = {"input_tokens": 3000, "output_tokens": 120, "total_tokens": 3120}
+    recorder, record = _record_one(
+        tmp_path,
+        AIMessage(content="cut", response_metadata=meta, usage_metadata=usage),
+    )
+    assert record["stop_reason"] == "length"
+    assert (record["load_seconds"], record["prompt_seconds"]) == (2.0, 10.0)
+    assert record["generation_seconds"] == 12.0
+    assert (record["prompt_tok_s"], record["generation_tok_s"]) == (300.0, 10.0)
+    assert recorder.cut_off == 1 and recorder.empty == 0
+    assert recorder.ollama == {
+        "load_seconds": 2.0,
+        "prompt_seconds": 10.0,
+        "generation_seconds": 12.0,
+        "generation_tokens": 120,
+    }
+
+
+def test_recorder_counts_an_anthropic_reply_with_only_thinking_as_cut_off_and_empty(
+    tmp_path,
+):
+    # The P3.5 failure: the writer spent its whole cap thinking
+    message = AIMessage(
+        content=[{"type": "thinking", "thinking": "...", "signature": "s"}],
+        response_metadata={"stop_reason": "max_tokens"},
+    )
+    recorder, record = _record_one(tmp_path, message)
+    assert record["stop_reason"] == "max_tokens" and record["empty"] is True
+    assert "load_seconds" not in record
+    assert (recorder.cut_off, recorder.empty, recorder.ollama) == (1, 1, {})
+
+
+def test_recorder_leaves_out_what_the_provider_does_not_return(tmp_path):
+    recorder, record = _record_one(tmp_path, AIMessage(content="fine"))
+    assert "stop_reason" not in record and "empty" not in record
+    assert (recorder.cut_off, recorder.empty) == (0, 0)
+
+
+def test_ollama_snapshot_gives_the_share_of_each_model_on_the_gpu(monkeypatch):
+    from agent import run_store
+
+    class Response:
+        def json(self):
+            return {
+                "models": [
+                    {
+                        "name": "qwen3.5:9b",
+                        "size": 6_000_000_000,
+                        "size_vram": 1_500_000_000,
+                        "context_length": 16384,
+                    }
+                ]
+            }
+
+    monkeypatch.setattr(run_store.httpx, "get", lambda *a, **k: Response())
+    assert run_store.ollama_snapshot("http://ollama") == [
+        {
+            "model": "qwen3.5:9b",
+            "size_gb": 6.0,
+            "vram_gb": 1.5,
+            "on_gpu": 0.25,
+            "context_length": 16384,
+        }
+    ]
+
+    def unreachable(*a, **k):
+        raise run_store.httpx.ConnectError("refused")
+
+    monkeypatch.setattr(run_store.httpx, "get", unreachable)
+    assert run_store.ollama_snapshot("http://ollama") is None

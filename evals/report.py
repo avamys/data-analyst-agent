@@ -4,12 +4,16 @@ Per case: the mean over repeats, with min–max when they differ. The
 overall row is the mean over cases within each repeat, then the mean and
 min–max of those over repeats. A run without a report found nothing: its
 findings and caveats count as 0, and its false claims aren't counted.
+
+A local run whose generation speed is below half the suite's median (host asleep,
+hot, GPU shared) is flagged and left out of the Minutes column, so it doesn't
+skew it. Runs with calls cut off at the output cap or empty are flagged too.
 """
 
 import json
 from collections import defaultdict
 from pathlib import Path
-from statistics import mean
+from statistics import mean, median
 
 from evals.cases import load_case
 from evals.judge import PROMPT_VERSION
@@ -26,10 +30,26 @@ METRICS = {
     "minutes": ("Minutes", lambda v: f"{v:.1f}", False),
 }
 QUALITY = [m for m in METRICS if m not in ("cost_usd", "minutes")]
+SLOW = 0.5  # Of the suite's median generation speed
+
+
+def generation_speed(line: dict) -> float | None:
+    """Tokens a second generated over the run (Ollama runs only)"""
+    ollama = line.get("ollama") or {}
+    if not ollama.get("generation_seconds"):
+        return None
+    return ollama["generation_tokens"] / ollama["generation_seconds"]
 
 
 def load(path: Path) -> list[dict]:
-    return [json.loads(line) for line in path.read_text().splitlines()]
+    """The result lines, each marked "slow" when its generation speed is below
+    SLOW × the suite's median"""
+    lines = [json.loads(line) for line in path.read_text().splitlines()]
+    speeds = [s for line in lines if (s := generation_speed(line)) is not None]
+    for line in lines:
+        speed = generation_speed(line)
+        line["slow"] = speed is not None and speed < SLOW * median(speeds)
+    return lines
 
 
 def values(line: dict) -> dict[str, float | None]:
@@ -48,7 +68,11 @@ def values(line: dict) -> dict[str, float | None]:
         "caveat_coverage": scores.get("caveat_coverage"),
         "unverified_numbers": grades.get("unverified_numbers"),
         "cost_usd": grades.get("cost_usd"),
-        "minutes": line["seconds"] / 60 if line.get("seconds") is not None else None,
+        "minutes": (
+            line["seconds"] / 60
+            if line.get("seconds") is not None and not line.get("slow")
+            else None
+        ),
     }
 
 
@@ -134,6 +158,33 @@ def _judged_with(lines: list[dict]) -> str:
     return text
 
 
+def flagged(lines: list[dict]) -> str:
+    """Runs whose calls hit the output cap or came back empty, and slow runs"""
+    notes = []
+    for key, text in (
+        ("calls_cut_off", "calls cut off at the output cap"),
+        ("calls_empty", "empty replies"),
+    ):
+        runs = [
+            f"{line['case']} r{line['repeat']} ({line[key]})"
+            for line in lines
+            if line.get(key)
+        ]
+        if runs:
+            notes.append(f"Runs with {text}: {', '.join(runs)}.")
+    slow = [
+        f"{line['case']} r{line['repeat']} ({generation_speed(line):.1f} tok/s)"
+        for line in lines
+        if line.get("slow")
+    ]
+    if slow:
+        notes.append(
+            f"Generating below {SLOW:.0%} of the suite's median speed, left out "
+            f"of Minutes: {', '.join(slow)}."
+        )
+    return " ".join(notes)
+
+
 def suite_table(lines: list[dict], name: str) -> str:
     """Markdown table of one suite: a row per case and an overall row"""
     header = ["Case", *[METRICS[m][0] for m in METRICS], "Traces"]
@@ -153,13 +204,14 @@ def suite_table(lines: list[dict], name: str) -> str:
     cells = [f"**{_cell(m, totals[m])}**" for m in METRICS]
     rows.append("| **Overall** | " + " | ".join(cells) + " | |")
     cost = sum(v for line in lines if (v := values(line)["cost_usd"]) is not None)
-    return "\n\n".join(
-        [
-            _title(lines, name),
-            "\n".join(rows),
-            f"Total cost ${cost:.2f}. {_judged_with(lines)}",
-        ]
-    )
+    parts = [
+        _title(lines, name),
+        "\n".join(rows),
+        f"Total cost ${cost:.2f}. {_judged_with(lines)}",
+    ]
+    if notes := flagged(lines):
+        parts.append(notes)
+    return "\n\n".join(parts)
 
 
 def report(paths: list[Path]) -> str:

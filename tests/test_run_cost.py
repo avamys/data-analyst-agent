@@ -40,14 +40,15 @@ def test_totals_per_node_and_overall(tmp_path):
     )
     nodes = summarize_calls(log)
     assert list(nodes) == ["plan", "run_task", "review", "total"]
-    assert nodes["run_task"] == {
+    tokens = ("calls", "input", "output", "reasoning", "seconds")
+    assert {k: nodes["run_task"][k] for k in tokens} == {
         "calls": 2,
         "input": 700,
         "output": 150,
         "reasoning": 0,
         "seconds": 7.0,
     }
-    assert nodes["total"] == {
+    assert {k: nodes["total"][k] for k in tokens} == {
         "calls": 4,
         "input": 800,
         "output": 200,
@@ -55,6 +56,29 @@ def test_totals_per_node_and_overall(tmp_path):
         "seconds": 10.0,
     }
     assert run_model(log) == "m"
+
+
+def test_ollama_time_split_and_cut_off_calls_per_node(tmp_path):
+    log = write_calls(
+        tmp_path / "llm_calls.jsonl",
+        [
+            {
+                "node": "report",
+                "stop_reason": "length",
+                "load_seconds": 20.0,
+                "prompt_seconds": 300.0,
+                "generation_seconds": 600.0,
+            },
+            {"node": "report", "stop_reason": "stop", "generation_seconds": 50.0},
+            {"node": "plan", "stop_reason": "max_tokens", "empty": True},
+        ],
+    )
+    nodes = summarize_calls(log)
+    assert nodes["report"]["load_seconds"] == 20.0
+    assert nodes["report"]["prompt_seconds"] == 300.0
+    assert nodes["report"]["generation_seconds"] == 650.0
+    assert (nodes["report"]["cut_off"], nodes["report"]["empty"]) == (1, 0)
+    assert (nodes["total"]["cut_off"], nodes["total"]["empty"]) == (2, 1)
 
 
 def test_cost_uses_per_token_prices():

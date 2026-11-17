@@ -3,7 +3,7 @@ import json
 import pytest
 
 from evals.judge import PROMPT_VERSION
-from evals.report import compare, overall, per_case, suite_table, values
+from evals.report import compare, load, overall, per_case, suite_table, values
 
 
 def line(case="leakage", repeat=1, findings=1.0, claims=0.0, facts=1.0, **extra):
@@ -80,3 +80,34 @@ def test_compare_shows_deltas_and_the_cases_that_got_worse(tmp_path):
     assert "- leakage: Findings 100% → 80%" in text
     assert "- leakage: False claims 0.0 → 1.0" in text
     assert "titanic:" not in text  # better, not worse
+
+
+def test_slow_local_runs_and_cut_off_calls_are_flagged(tmp_path):
+    def local(repeat, tok_s, **extra):
+        ollama = {"generation_tokens": tok_s * 100, "generation_seconds": 100}
+        return line(repeat=repeat, ollama=ollama, **extra)
+
+    path = write(
+        tmp_path / "r.jsonl",
+        [
+            local(1, 10),
+            local(2, 11),
+            {**local(3, 3), "seconds": 6000},  # asleep: 3 tok/s < half of 10
+            local(4, 10, calls_cut_off=2, calls_empty=1),
+        ],
+    )
+    lines = load(path)
+    assert [x["slow"] for x in lines] == [False, False, True, False]
+    assert values(lines[2])["minutes"] is None  # left out, so it doesn't skew
+    table = suite_table(lines, "suite")
+    assert "| 10.0 |" in table  # the Minutes cell: 600 s for the three others
+    assert "calls cut off at the output cap: leakage r4 (2)" in table
+    assert "empty replies: leakage r4 (1)" in table
+    assert "left out of Minutes: leakage r3 (3.0 tok/s)" in table
+
+
+def test_hosted_runs_are_never_slow(tmp_path):
+    [hosted] = load(write(tmp_path / "r.jsonl", [line()]))
+    assert hosted["slow"] is False and "Generating below" not in suite_table(
+        [hosted], "suite"
+    )

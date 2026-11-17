@@ -1,7 +1,9 @@
 """Token usage and cost of runs, from their llm_calls.jsonl.
 
-Shows tokens per node and prices each run at OpenRouter list prices: at the model
-it ran with, and at any models given with --price-as. Projecting a run onto
+Shows tokens and seconds per node (on Ollama split into model loading, prompt
+processing and generation) and calls cut off at the output cap or empty. Prices
+each run at OpenRouter list prices: at the model it ran with, and at any models
+given with --price-as. Projecting a run onto
 another model is an estimate: tokenizers differ (often by 10-20%), and reasoning
 models add output tokens. A real run on the model gives the firm number.
 
@@ -19,8 +21,13 @@ from pathlib import Path
 
 import httpx
 
+from agent.run_store import CUT_OFF
+
 MODELS_URL = "https://openrouter.ai/api/v1/models"
 FIELDS = ("calls", "input", "output", "reasoning", "seconds")
+# Ollama only: where a call's seconds went
+PHASES = ("load_seconds", "prompt_seconds", "generation_seconds")
+HEALTH = ("cut_off", "empty")
 
 
 def summarize_calls(path: Path) -> dict[str, dict[str, float]]:
@@ -28,13 +35,21 @@ def summarize_calls(path: Path) -> dict[str, dict[str, float]]:
     nodes: dict[str, dict[str, float]] = {}
     for line in path.open():
         call = json.loads(line)
-        row = nodes.setdefault(call.get("node") or "?", dict.fromkeys(FIELDS, 0))
+        row = nodes.setdefault(
+            call.get("node") or "?", dict.fromkeys(FIELDS + PHASES + HEALTH, 0)
+        )
         row["calls"] += 1
         row["input"] += call.get("input_tokens") or 0
         row["output"] += call.get("output_tokens") or 0
         row["reasoning"] += call.get("reasoning_tokens") or 0
         row["seconds"] += call.get("seconds") or 0
-    nodes["total"] = {f: sum(row[f] for row in nodes.values()) for f in FIELDS}
+        for phase in PHASES:
+            row[phase] += call.get(phase) or 0
+        row["cut_off"] += call.get("stop_reason") in CUT_OFF
+        row["empty"] += bool(call.get("empty"))
+    nodes["total"] = {
+        f: sum(row[f] for row in nodes.values()) for f in FIELDS + PHASES + HEALTH
+    }
     return nodes
 
 
@@ -79,13 +94,26 @@ def main() -> int:
             return 1
         nodes = summarize_calls(log)
         model = run_model(log)
+        local = nodes["total"]["generation_seconds"] > 0
         print(f"\n## {run.resolve().name} ({model})\n")
-        print("| node | calls | input | output | of which reasoning | seconds |")
-        print("|---|---:|---:|---:|---:|---:|")
+        header = "| node | calls | input | output | of which reasoning | seconds |"
+        if local:
+            header += " load s | prompt s | generation s |"
+        print(header)
+        print("|---|" + "---:|" * (header.count("|") - 2))
         for node, row in nodes.items():
-            print(
+            line = (
                 f"| {node} | {row['calls']} | {row['input']:,} | {row['output']:,} "
                 f"| {row['reasoning']:,} | {row['seconds']:,.0f} |"
+            )
+            if local:
+                line += "".join(f" {row[p]:,.0f} |" for p in PHASES)
+            print(line)
+        total = nodes["total"]
+        if total["cut_off"] or total["empty"]:
+            print(
+                f"\n**{total['cut_off']} calls cut off at the output cap, "
+                f"{total['empty']} empty.**"
             )
 
         print("\n| priced as | $/M input | $/M output | cost (USD) |")

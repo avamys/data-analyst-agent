@@ -21,7 +21,7 @@ from agent.data_loader import generate_dataset_info, load_dataset  # noqa: E402
 from agent.execution.runner import network_blocked  # noqa: E402
 from agent.graph import build_hierarchical_graph  # noqa: E402
 from agent.logging_config import setup_logging  # noqa: E402
-from agent.run_store import LLMCallRecorder, RunStore  # noqa: E402
+from agent.run_store import LLMCallRecorder, RunStore, ollama_snapshot  # noqa: E402
 from agent.tracing import eval_metadata, trace_url, tracing_enabled  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -156,6 +156,9 @@ def main():
             llm_calls=recorder.calls,
             input_tokens=recorder.input_tokens,
             output_tokens=recorder.output_tokens,
+            # Replies that hit the output cap, and replies with nothing in them
+            calls_cut_off=recorder.cut_off,
+            calls_empty=recorder.empty,
             tasks_completed=len(result.get("completed_tasks", [])),
             tasks_failed=len(result.get("failed_tasks", [])),
             unverified_numbers=result.get("unverified_numbers"),
@@ -168,6 +171,12 @@ def main():
             },
             trace_url=trace_url(run_id),
         )
+        if recorder.ollama:
+            # Where local time went, and how the model sat in VRAM at the end
+            meta["ollama"] = {
+                **recorder.ollama,
+                "loaded": ollama_snapshot(settings.ollama_base_url),
+            }
         store.write_json("run_meta.json", meta)
         if meta["trace_url"]:
             logger.info(f"LangSmith trace: {meta['trace_url']}")
