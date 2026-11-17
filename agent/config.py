@@ -68,7 +68,9 @@ class Settings(BaseSettings):
     # Thinking mode and the 4k default context make local Ollama runs hang or
     # silently truncate prompts, so both are set explicitly.
     llm_reasoning: bool = False  # Ollama only; OpenRouter uses openrouter_reasoning
-    llm_num_ctx: int = 16384  # 8k cut off reports once task reports got complete
+    # 8k cut off reports once task reports got complete; 16k cut off a
+    # statistical task's late steps (P4.2). 32k fits a 4 GB GPU at no speed cost
+    llm_num_ctx: int = 32768
     llm_max_tokens: int = 4096
     # Thinking counts against the cap, and an unused cap costs nothing
     anthropic_max_tokens: int = 16000

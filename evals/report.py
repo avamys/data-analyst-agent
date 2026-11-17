@@ -7,7 +7,8 @@ findings and caveats count as 0, and its false claims aren't counted.
 
 A local run whose generation speed is below half the suite's median (host asleep,
 hot, GPU shared) is flagged and left out of the Minutes column, so it doesn't
-skew it. Runs with calls cut off at the output cap or empty are flagged too.
+skew it. Runs with calls cut off at the output cap, calls that filled the
+context window, or empty replies are flagged too.
 """
 
 import json
@@ -159,10 +160,12 @@ def _judged_with(lines: list[dict]) -> str:
 
 
 def flagged(lines: list[dict]) -> str:
-    """Runs whose calls hit the output cap or came back empty, and slow runs"""
+    """Runs whose calls hit the output cap, filled the context window or came
+    back empty, and slow runs"""
     notes = []
     for key, text in (
         ("calls_cut_off", "calls cut off at the output cap"),
+        ("calls_window_full", "calls that filled the context window"),
         ("calls_empty", "empty replies"),
     ):
         runs = [

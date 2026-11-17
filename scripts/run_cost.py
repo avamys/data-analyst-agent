@@ -1,7 +1,8 @@
 """Token usage and cost of runs, from their llm_calls.jsonl.
 
 Shows tokens and seconds per node (on Ollama split into model loading, prompt
-processing and generation) and calls cut off at the output cap or empty. Prices
+processing and generation) and calls cut off at the output cap, that filled the
+context window, or empty. Prices
 each run at OpenRouter list prices: at the model it ran with, and at any models
 given with --price-as. Projecting a run onto
 another model is an estimate: tokenizers differ (often by 10-20%), and reasoning
@@ -27,7 +28,7 @@ MODELS_URL = "https://openrouter.ai/api/v1/models"
 FIELDS = ("calls", "input", "output", "reasoning", "seconds")
 # Ollama only: where a call's seconds went
 PHASES = ("load_seconds", "prompt_seconds", "generation_seconds")
-HEALTH = ("cut_off", "empty")
+HEALTH = ("cut_off", "window_full", "empty")
 
 
 def summarize_calls(path: Path) -> dict[str, dict[str, float]]:
@@ -45,7 +46,10 @@ def summarize_calls(path: Path) -> dict[str, dict[str, float]]:
         row["seconds"] += call.get("seconds") or 0
         for phase in PHASES:
             row[phase] += call.get(phase) or 0
-        row["cut_off"] += call.get("stop_reason") in CUT_OFF
+        row["window_full"] += bool(call.get("window_full"))
+        row["cut_off"] += call.get("stop_reason") in CUT_OFF and not call.get(
+            "window_full"
+        )
         row["empty"] += bool(call.get("empty"))
     nodes["total"] = {
         f: sum(row[f] for row in nodes.values()) for f in FIELDS + PHASES + HEALTH
@@ -110,9 +114,10 @@ def main() -> int:
                 line += "".join(f" {row[p]:,.0f} |" for p in PHASES)
             print(line)
         total = nodes["total"]
-        if total["cut_off"] or total["empty"]:
+        if total["cut_off"] or total["window_full"] or total["empty"]:
             print(
                 f"\n**{total['cut_off']} calls cut off at the output cap, "
+                f"{total['window_full']} filled the context window, "
                 f"{total['empty']} empty.**"
             )
 

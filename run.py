@@ -80,7 +80,10 @@ def main():
     }
 
     commit = _git("rev-parse", "--short", "HEAD")
-    recorder = LLMCallRecorder(store.path / "llm_calls.jsonl")
+    recorder = LLMCallRecorder(
+        store.path / "llm_calls.jsonl",
+        num_ctx=settings.llm_num_ctx if settings.model_provider == "ollama" else None,
+    )
     run_id = uuid4()
     config = {
         "run_id": run_id,
@@ -156,8 +159,10 @@ def main():
             llm_calls=recorder.calls,
             input_tokens=recorder.input_tokens,
             output_tokens=recorder.output_tokens,
-            # Replies that hit the output cap, and replies with nothing in them
+            # Replies that hit the output cap or (Ollama) filled the context
+            # window, and replies with nothing in them
             calls_cut_off=recorder.cut_off,
+            calls_window_full=recorder.window_full,
             calls_empty=recorder.empty,
             tasks_completed=len(result.get("completed_tasks", [])),
             tasks_failed=len(result.get("failed_tasks", [])),

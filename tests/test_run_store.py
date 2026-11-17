@@ -94,9 +94,9 @@ def test_eval_metadata_comes_from_the_runners_environment(monkeypatch):
     assert eval_metadata() == {"case": "leakage", "repeat": "3"}
 
 
-def _record_one(tmp_path, message):
+def _record_one(tmp_path, message, num_ctx=None):
     llm = GenericFakeChatModel(messages=iter([message]))
-    recorder = LLMCallRecorder(tmp_path / "llm_calls.jsonl")
+    recorder = LLMCallRecorder(tmp_path / "llm_calls.jsonl", num_ctx=num_ctx)
     llm.invoke([HumanMessage(content="hi")], config={"callbacks": [recorder]})
     [record] = [json.loads(line) for line in (tmp_path / "llm_calls.jsonl").open()]
     return recorder, record
@@ -130,6 +130,15 @@ def test_recorder_splits_an_ollama_call_into_load_prompt_and_generation(tmp_path
     }
 
 
+def test_recorder_tells_a_full_context_window_from_the_output_cap(tmp_path):
+    # Ollama says "length" for both; P4.2's stat_1 filled 16,384 tokens exactly
+    meta = {"done_reason": "length", "prompt_eval_count": 14166, "eval_count": 2218}
+    message = AIMessage(content="cut", response_metadata=meta)
+    recorder, record = _record_one(tmp_path, message, num_ctx=16384)
+    assert record["window_full"] is True
+    assert (recorder.cut_off, recorder.window_full) == (0, 1)
+
+
 def test_recorder_counts_an_anthropic_reply_with_only_thinking_as_cut_off_and_empty(
     tmp_path,
 ):
@@ -147,7 +156,8 @@ def test_recorder_counts_an_anthropic_reply_with_only_thinking_as_cut_off_and_em
 def test_recorder_leaves_out_what_the_provider_does_not_return(tmp_path):
     recorder, record = _record_one(tmp_path, AIMessage(content="fine"))
     assert "stop_reason" not in record and "empty" not in record
-    assert (recorder.cut_off, recorder.empty) == (0, 0)
+    assert "window_full" not in record
+    assert (recorder.cut_off, recorder.empty, recorder.window_full) == (0, 0, 0)
 
 
 def test_ollama_snapshot_gives_the_share_of_each_model_on_the_gpu(monkeypatch):

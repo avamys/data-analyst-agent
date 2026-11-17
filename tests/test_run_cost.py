@@ -71,6 +71,8 @@ def test_ollama_time_split_and_cut_off_calls_per_node(tmp_path):
             },
             {"node": "report", "stop_reason": "stop", "generation_seconds": 50.0},
             {"node": "plan", "stop_reason": "max_tokens", "empty": True},
+            # Ollama's "length" for a full context window isn't the output cap
+            {"node": "plan", "stop_reason": "length", "window_full": True},
         ],
     )
     nodes = summarize_calls(log)
@@ -79,6 +81,7 @@ def test_ollama_time_split_and_cut_off_calls_per_node(tmp_path):
     assert nodes["report"]["generation_seconds"] == 650.0
     assert (nodes["report"]["cut_off"], nodes["report"]["empty"]) == (1, 0)
     assert (nodes["total"]["cut_off"], nodes["total"]["empty"]) == (2, 1)
+    assert nodes["total"]["window_full"] == 1
 
 
 def test_cost_uses_per_token_prices():

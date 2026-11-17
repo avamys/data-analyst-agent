@@ -26,7 +26,8 @@ from pydantic_core import to_jsonable_python
 logger = logging.getLogger(__name__)
 
 # Stop reasons of a reply that hit the output cap: Ollama and OpenAI-style
-# providers say "length" (num_predict / max_tokens), Anthropic "max_tokens"
+# providers say "length" (num_predict / max_tokens), Anthropic "max_tokens".
+# Ollama also says "length" when prompt and reply fill num_ctx: see window_full
 CUT_OFF = {"length", "max_tokens"}
 
 # Ollama's timings (nanoseconds) -> the seconds recorded per call
@@ -37,9 +38,10 @@ OLLAMA_SECONDS = {
 }
 
 
-def call_health(message) -> dict:
+def call_health(message, num_ctx: int | None = None) -> dict:
     """Why a call stopped and, on Ollama, where its time went; a field is
-    absent when the provider doesn't return it"""
+    absent when the provider doesn't return it. window_full: an Ollama reply
+    stopped because prompt and reply filled num_ctx, not at the output cap"""
     meta = message.response_metadata or {}
     health = {}
     stop = (
@@ -47,6 +49,9 @@ def call_health(message) -> dict:
     )
     if stop:
         health["stop_reason"] = stop
+    used = (meta.get("prompt_eval_count") or 0) + (meta.get("eval_count") or 0)
+    if stop == "length" and num_ctx and used >= num_ctx:
+        health["window_full"] = True
     for key, name in OLLAMA_SECONDS.items():
         if meta.get(key) is not None:
             health[name] = round(meta[key] / 1e9, 2)
@@ -121,13 +126,15 @@ class RunStore:
 class LLMCallRecorder(BaseCallbackHandler):
     """Appends one JSON line per LLM call (prompt, response, tokens, timing)"""
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, num_ctx: int | None = None):
         self.path = path
+        self.num_ctx = num_ctx  # Ollama's context window, to tell it from the cap
         self.calls = 0
         self.input_tokens = 0
         self.output_tokens = 0
         self.max_input_tokens = 0  # The largest prompt of the run
         self.cut_off = 0  # Replies that hit the output cap
+        self.window_full = 0  # Ollama replies that filled the context window
         self.empty = 0  # Replies with neither text nor a tool call
         # Ollama only: seconds per phase, and tokens generated
         self.ollama: dict[str, float] = {}
@@ -146,7 +153,7 @@ class LLMCallRecorder(BaseCallbackHandler):
     def on_llm_end(self, response, *, run_id, **kwargs):
         message = response.generations[0][0].message
         usage = message.usage_metadata or {}
-        health = call_health(message)
+        health = call_health(message, self.num_ctx)
         empty = not message.tool_calls and not message.text().strip()
         with self._lock:
             self.input_tokens += usage.get("input_tokens", 0)
@@ -154,7 +161,10 @@ class LLMCallRecorder(BaseCallbackHandler):
                 self.max_input_tokens, usage.get("input_tokens", 0)
             )
             self.output_tokens += usage.get("output_tokens", 0)
-            self.cut_off += health.get("stop_reason") in CUT_OFF
+            self.window_full += health.get("window_full", False)
+            self.cut_off += (
+                health.get("stop_reason") in CUT_OFF and "window_full" not in health
+            )
             self.empty += empty
             if "generation_seconds" in health:
                 for name in OLLAMA_SECONDS.values():
