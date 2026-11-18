@@ -3,7 +3,7 @@
 > **This is the main plan for the project.** It replaces `todo.md`; everything still useful from there is folded in below (see [Appendix: todo.md mapping](#appendix-todomd-mapping)).
 > Update the checkboxes and the **Status** block as work lands. Record decisions in the [Decision log](#decision-log).
 
-**Status:** Phase 1 done on `phase-1` (P1.1–P1.5). Measured on the Titanic reference run: wrong claims 7 → 0, unsupported 6 → 0, baseline findings absent 7 → 0, charts in the report 0 → 5 ([P1.5 check](docs/progress/p1.5/annotations.md)). The exit criteria were met on Claude Haiku 5.5 (9 min, $0.08 a run); not yet re-run on qwen3.5. Hosted providers (OpenRouter, Anthropic) and a cost report added. Phase 2 planned (eval harness; both versions on Haiku 5.5, Sonnet 5.5 as judge). P2.0 (central configuration, presets) and P2.1 (baseline on Haiku, `v0.1.1-baseline-hosted`) done; P2.2 (7 eval cases with known answers) done; P2.3 (runner) done; first suite, judged by hand: current 30/30 findings, baseline 16/30 ([first look](docs/eval/first-look.md)). P2.3a: task scripts no longer see API keys; Ollama prompts are checked against the context window. P2.4 (deterministic graders) done; P2.5 (LLM judge) done: on the first suite it agrees with the hand labels on 87% of findings exactly, 100% within ½. P2.6 calibration: 12 labelled reports, 93–96% exact agreement, 100% within ½; the judge agrees with itself on 95%; labels spot-checked by the owner. P2.7: `evals report` / `compare`, eval traces tagged, CI regrades the committed suites. P2.8 [before/after](docs/eval/before-after.md), 7 cases × 3 repeats on Haiku 5.5: findings 53% → 98%, false claims 0.1 → 0 a run, $0.024 → $0.076 a run; the `hosted` preset adds no findings at 1.8× the cost. Phase 2 done. Phase 3 planned: network block, 5–6 harder cases (real and synthetic), faster runs. P3.1 done (network block). P3.2: 5 new cases; the current agent scores 96% findings on them, no false claims (the bar). Fixes will be developed on these and the original cases, and judged on held-out cases nothing is tuned on. P3.2b: 4 held-out cases written by the owner ([brief](docs/eval/heldout-brief.md)), their hash committed. P3.3: time measured, parallel tasks (−13%), effort setting. P3.4 narrowed to one bug fix (findings that cite no fact); the bar's two weaknesses are measured on the held-out cases, not fixed. API spend capped at $10 for everything left (2026-11-12): the remaining plan is cut to fit. An empty report now fails the run; the writer's cap is 32k. P3.5 dev × 3: findings 96%, one half false claim in 36 runs, 9.5 min a run; on the original 7, −37% time at 98% → 96% findings. `low` effort × 1: findings 95%, −15% cost, −12% time; no large difference. $5.00 of $10 spent. Agent tagged `v0.3.0-phase3`. Held-out ([results](docs/eval/phase3.md)): findings 78% vs the baseline's 19%, but 0.2 false claims a run, all in h3 (zeros that mean "missing"; its dev twin, Pima, scored 100%, likely from memory). After it, a profile fix (numeric columns' spread; "empty cells") took h3 to 75% findings and no false claims ($0.31, outside the budget). A new blind case, h5, then checked the fix (`v0.3.1`): no false claims in 15 held-out runs, h5 96% vs the baseline's 25%. Phase 3 closed with every exit criterion met. $8.18 of $10 spent. Phase 4 planned (timings, first local run, resume, matrix). P4.1 done: every call records why it stopped and, on Ollama, where its time went; runs count calls cut off and empty replies. P4.2: the first local run (qwen3.5:9b, titanic) failed after 2 h on a prompt too long for 16k; a replay picked 32k (same speed, 3.81 of 4 GB on the GPU). Next: re-run titanic at 32k · **Last updated:** 2026-11-17
+**Status:** Phase 1 done on `phase-1` (P1.1–P1.5). Measured on the Titanic reference run: wrong claims 7 → 0, unsupported 6 → 0, baseline findings absent 7 → 0, charts in the report 0 → 5 ([P1.5 check](docs/progress/p1.5/annotations.md)). The exit criteria were met on Claude Haiku 5.5 (9 min, $0.08 a run); not yet re-run on qwen3.5. Hosted providers (OpenRouter, Anthropic) and a cost report added. Phase 2 planned (eval harness; both versions on Haiku 5.5, Sonnet 5.5 as judge). P2.0 (central configuration, presets) and P2.1 (baseline on Haiku, `v0.1.1-baseline-hosted`) done; P2.2 (7 eval cases with known answers) done; P2.3 (runner) done; first suite, judged by hand: current 30/30 findings, baseline 16/30 ([first look](docs/eval/first-look.md)). P2.3a: task scripts no longer see API keys; Ollama prompts are checked against the context window. P2.4 (deterministic graders) done; P2.5 (LLM judge) done: on the first suite it agrees with the hand labels on 87% of findings exactly, 100% within ½. P2.6 calibration: 12 labelled reports, 93–96% exact agreement, 100% within ½; the judge agrees with itself on 95%; labels spot-checked by the owner. P2.7: `evals report` / `compare`, eval traces tagged, CI regrades the committed suites. P2.8 [before/after](docs/eval/before-after.md), 7 cases × 3 repeats on Haiku 5.5: findings 53% → 98%, false claims 0.1 → 0 a run, $0.024 → $0.076 a run; the `hosted` preset adds no findings at 1.8× the cost. Phase 2 done. Phase 3 planned: network block, 5–6 harder cases (real and synthetic), faster runs. P3.1 done (network block). P3.2: 5 new cases; the current agent scores 96% findings on them, no false claims (the bar). Fixes will be developed on these and the original cases, and judged on held-out cases nothing is tuned on. P3.2b: 4 held-out cases written by the owner ([brief](docs/eval/heldout-brief.md)), their hash committed. P3.3: time measured, parallel tasks (−13%), effort setting. P3.4 narrowed to one bug fix (findings that cite no fact); the bar's two weaknesses are measured on the held-out cases, not fixed. API spend capped at $10 for everything left (2026-11-12): the remaining plan is cut to fit. An empty report now fails the run; the writer's cap is 32k. P3.5 dev × 3: findings 96%, one half false claim in 36 runs, 9.5 min a run; on the original 7, −37% time at 98% → 96% findings. `low` effort × 1: findings 95%, −15% cost, −12% time; no large difference. $5.00 of $10 spent. Agent tagged `v0.3.0-phase3`. Held-out ([results](docs/eval/phase3.md)): findings 78% vs the baseline's 19%, but 0.2 false claims a run, all in h3 (zeros that mean "missing"; its dev twin, Pima, scored 100%, likely from memory). After it, a profile fix (numeric columns' spread; "empty cells") took h3 to 75% findings and no false claims ($0.31, outside the budget). A new blind case, h5, then checked the fix (`v0.3.1`): no false claims in 15 held-out runs, h5 96% vs the baseline's 25%. Phase 3 closed with every exit criterion met. $8.18 of $10 spent. Phase 4 planned (timings, first local run, resume, matrix). P4.1 done: every call records why it stopped and, on Ollama, where its time went; runs count calls cut off and empty replies. P4.2: the first local run (qwen3.5:9b, titanic) failed after 2 h on a prompt too long for 16k; a replay picked 32k (same speed, 3.81 of 4 GB on the GPU). Re-scoped 2026-11-18: the goal is a well-designed agentic system, local is an option; Phase 4 ends here, and one local run next to Claude goes into Phase 6. Next: Phase 5 · **Last updated:** 2026-11-18
 
 ---
 
@@ -11,20 +11,20 @@
 
 Turn the prototype into a portfolio project that shows off **agent engineering**, not just "agents talking to each other":
 
-> *A local-first data analyst agent. Point it at a CSV and a lead analyst plans the analysis, delegates tasks to specialists who iterate on what their code actually printed, reviews their work, follows up on findings, and writes a report with charts in which **every number traces back to code that actually ran**. An eval harness measures how often it is right.*
+> *A data analyst agent, built as a well-designed agentic system. Point it at a CSV and a lead analyst plans the analysis, delegates tasks to specialists who iterate on what their code actually printed, reviews their work, follows up on findings, and writes a report with charts in which **every number traces back to code that actually ran**. An eval harness measures how often it is right.*
 
 The story this project tells:
 1. **The prototype was a pipeline, not a team.** Agents ran once, never saw their own results, and nobody reviewed anybody. The reports got numbers backwards (the legacy "61.62% survived"), or, with a better model, dropped the strongest findings and called overfitting "healthy" ([review](docs/baseline/review.md)).
 2. **I redesigned it around delegation, feedback loops, and synthesis:** specialists iterate on their own output, a lead analyst reviews every task and digs deeper where it matters, and the report is written from complete, recorded results.
 3. **I built an eval harness**, including trap datasets, that measures these failures.
-4. **Here are the before/after numbers** (tagged baseline vs. redesign), across local and hosted models.
+4. **Here are the before/after numbers** (tagged baseline vs. redesign), plus one run of the same agent on a local model next to Claude.
 
 ### Principles
 - **Measure every change.** Until the eval harness exists (Phase 2), every Phase 1 step is checked by re-running the reference run and repeating the claim-by-claim annotation. No "it feels better."
 - **Numbers come from code, never from the LLM.** Code records facts; the writer works from them, and every number in the report is checked against them.
 - **Look before you conclude.** Interpretations are written only after seeing real output, by whoever ran the code, and reviewed by someone else.
 - **Deterministic before LLM.** Use plain Python for profiling, graders, and sanity rules. Use the LLM only where judgment is needed.
-- **Local-first, provider-agnostic.** It runs fully on Ollama. Hosted models are optional and used for comparison.
+- **Provider-agnostic.** The provider is a setting: Claude (and OpenRouter) or a local model on Ollama. Local is an option, not the goal; it's shown by one comparison run, not tuned for. *(Changed 2026-11-18; was "local-first".)*
 - **Small, finished, honest.** A narrow scope that works and is measured beats a wide scope that demos once.
 
 ### Definition of done (v1.0)
@@ -33,7 +33,7 @@ The story this project tells:
 - [ ] Generated code runs in a sandbox (timeout, no network, isolated working directory), and each task's code is a runnable `.py` script.
 - [ ] Every numeric claim in the report resolves to a recorded fact from executed code; the report includes charts.
 - [ ] The eval suite (≥6 cases, including adversarial "trap" datasets) runs with one command and produces a comparison table.
-- [ ] README shows the before/after eval table, a local vs. hosted model comparison, an architecture diagram, and a demo GIF.
+- [ ] README shows the before/after eval table, one local vs. hosted comparison run, an architecture diagram, and a demo GIF.
 - [ ] CI runs lint, unit tests, and a deterministic eval smoke test (graders over a committed eval run) on every push.
 - [ ] A short UI (upload CSV → watch progress → read report) exists and is shown in the demo.
 - [ ] Tagged `v1.0.0`. Optional write-up / blog post.
@@ -556,9 +556,11 @@ Sizes: **S** ≈ an evening, **M** ≈ a few sessions, **L** ≈ a week+ of even
 
 Moved to Phase 4: resume an interrupted run (a LangGraph checkpointer and `run.py --resume`). It matters for local models, where runs take 1–2 h.
 
-### Phase 4: Models & providers (M), detailed
+### Phase 4: Models & providers (S), detailed
 
-**Goal:** the agent runs on local models; every run says where its time went and whether a call was cut off; and a table compares ≥ 2 local models with Claude Haiku 5.5 on findings, false claims, time and cost, with the hardware.
+**Goal:** the agent runs on Claude or on a local Ollama model by a setting, and every run says where its time went and whether a call was cut off.
+
+**Re-scoped 2026-11-18 (owner):** the project's aim is a well-designed agentic system, not a local one. The first local run took 2 h to get two-thirds through titanic (Haiku: ~8 min), so a model matrix (~2 days of GPU time a model) doesn't fit. Local stays an option; one local run next to Claude goes into Phase 6 as the only comparison. Dropped: the eval matrix, a second local model, mixed role models, a recommended local default. Resume moved to Phase 7.
 
 **Starting point (measured 2026-11-14)**
 - Only `qwen3.5:9b` (Q4_K_M, 6.6 GB) is usable here (the other pulled models are an OCR model and an unknown 4B). The GPU has 4 GB of dedicated memory, so the model runs partly on CPU: ~12 tok/s with `LLM_NUM_GPU=18` (P0.5). The Phase 1+ agent has never run on it; the last local run was Phase 0's (25 min, 6 tasks).
@@ -566,13 +568,9 @@ Moved to Phase 4: resume an interrupted run (a LangGraph checkpointer and `run.p
 - **The report writer's prompt doesn't fit the local window:** 25k tokens at the median, up to 76k; over the 12k left for input at `num_ctx=16384` in 63 of 64 report calls. Specialists and reviews fit (26 of 1,370 and 9 of 433 calls over). P0.5 found context size barely costs VRAM on this model (8 of 32 layers use full attention), so a larger window is the first thing to try.
 - Budget: local runs cost GPU time only; judging costs ~$0.02 a run. Phase 4 has $0.50 of the $10 (~24 judged runs).
 
-**Decided 2026-11-14 (owner):** the second local model is chosen after the first qwen3.5 run (P4.2), which shows whether the agent works locally and what fits.
-
 **Exit criteria**
 - [x] Every call records its stop reason; local calls also their load, prompt and generation time; a run counts calls cut off at the cap and empty replies (tests) *(P4.1, 2026-11-17)*
-- [ ] An interrupted run resumes from its last finished step (a test interrupts one)
-- [ ] ≥ 2 local models on the dev cases next to Haiku 5.5's P3.5 run: runs ok, findings, false claims, minutes, tokens a second, hardware; committed with snapshots
-- [ ] A recommended local default chosen from the table; the open decision on the default local model closed
+- [x] The local window fits the agent's prompts on this machine *(P4.2: 32k, 2026-11-17)*
 
 **Done earlier**
 - [x] Provider config: `ollama`, `openrouter`, `anthropic` via `init_chat_model` (`MODEL_PROVIDER` / `--provider`, one model setting per provider). Done early, 2026-11-02, because local runs were the bottleneck. `openai` dropped: OpenRouter serves those models.
@@ -588,36 +586,17 @@ Moved to Phase 4: resume an interrupted run (a LangGraph checkpointer and `run.p
   - Also covers the case P3.3 left open: a report cut off at the cap that still has text is counted, not silent.
 
 **P4.2 First local run** (S). No API spend except judging (~$0.02).
-- [ ] `scripts/llm_smoke.py`, then qwen3.5:9b on titanic × 1 with the Phase 3 agent. Record: whether it finishes; every failure and where (parse failures, retries, prompt cuts, calls cut off); the time split from P4.1.
+- [x] `scripts/llm_smoke.py`, then qwen3.5:9b on titanic × 1 with the Phase 3 agent. Record: whether it finishes; every failure and where (parse failures, retries, prompt cuts, calls cut off); the time split from P4.1.
   - First run (2026-11-17, 16k, `8bb917f`): failed after 2 h 6 min, no report, $0. 36 calls; eda_1 and eda_2 done, stat_1 stopped in its revision: its closing prompt (59.5k characters, ≥13.2k tokens) couldn't fit the 12,288 left, and the guard stopped the run. Before that, two of its steps filled the 16,384-token window (prompt + reply = 16,384: Ollama says "length", which P4.1 counted as the output cap; now counted apart as `window_full`). The reviewer hit the 4,096-token cap once. eda_1 spent 8 attempts on one pandas error (`isna`/`notna`/`notnull` on a `SeriesGroupBy`). No parse failures; prompt cuts: dataset description 1, review script 2. Time: generation 98% (7,272 s), prompt 142 s, load 0.2 s; generation 9.7 tok/s at 1k-token prompts, 4.2 at 14k; 51% of the model on the GPU. Haiku on titanic: ~8 min.
 - [x] The writer's window: replay the run's report prompt at `num_ctx` 16k and 32k (one call each, no full re-run): VRAM, speed, prompt cuts. Pick the local `num_ctx`.
   - The run never reached the report, so the replay used the stat_1 step that filled the window (14,166-token prompt). 16k: cut at 2,218 tokens, as in the run. 32k: finished at 2,427 tokens; same speed (prompt 706 tok/s, generation 4.4 tok/s); GPU 3.39 → 3.81 GB of 4 GB. **`llm_num_ctx` is 32k** (Ollama only). The local `.env` timeout is 1,800 s: a full 4k reply at ~3 tok/s (prompts near 25k) needs ~23 min.
-- Decides: the second model (one that fits this GPU, candidates named then), the matrix size, and whether P4.4 is needed.
+- A re-run at 32k was started on 2026-11-17 and stopped after 12 calls (owner): it becomes Phase 6's comparison run.
+- A prompt that can't fit the window now ends its task, not the run (2026-11-18): a first run fails; a revision keeps the last report with its objection unresolved; neither is reviewed again. Tests in `tests/test_lead.py`.
 - If the agent fails locally, fixes go behind Ollama-only settings (prompt caps, budgets) or are shown by tests not to change what Haiku sees. A change that does would make the P3.5 numbers stale, and the budget has no room to re-run them.
 
-**P4.3 Resume an interrupted run** (M). *(Moved from Phase 3.)*
-- [ ] A LangGraph checkpointer (SQLite in the run directory) and `run.py --resume <run dir>`. Matters for local runs (1.5–2 h); the stalls seen so far were the host sleeping (a host setting may be enough for that; resume also covers crashes and outages like P3.3's DNS one).
-- [ ] Checkpoints fall at node boundaries: a node cut off midway runs again, with its parallel task threads, and its calls are paid again on hosted providers. `run_meta.json` records the resume.
-- [ ] `evals run --resume <suite id>` runs again only the runs of a suite that didn't finish ok, so an overnight suite survives one bad run.
-- [ ] Tests: a run interrupted after its first task resumes and finishes with the same tasks; a finished run can't be resumed.
+**Dropped 2026-11-18 (owner):** P4.3 resume (moved to Phase 7), P4.4 mixed role models, P4.5 eval matrix, P4.6 recommended local defaults. See the re-scope note above.
 
-**P4.4 Mixed role models** (S), only if P4.2 calls for it
-- E.g. a smaller model for specialists and qwen3.5 for the lead and writer. On Ollama, two models that don't fit in VRAM together reload at every role switch; P4.1's `load_duration` shows the cost before anything is decided.
-
-**P4.5 Eval matrix** (M)
-- [ ] The second local model chosen from P4.2, pulled, smoke-tested.
-- [ ] Each local model on the 12 dev cases × 1, one run at a time (one GPU): ~18–24 h a model, overnight in parts with P4.3's suite resume. *Judging ~$0.25 a model.* × 1 shows large differences only, which is what tells models apart; Haiku's row is P3.5's × 3, no new hosted runs (Sonnet 5.5 at × 3 would be $65–100).
-- [ ] `docs/eval/models.md`: the table (runs ok, findings, false claims, facts, unverified numbers, minutes, generation and prompt tok/s, load time a run, cost), the hardware, and what each model misses; snapshots committed.
-
-**P4.6 Recommended defaults** (S)
-- [ ] The local default (model, `num_ctx`, `num_gpu`, role models if any) in `config.py`, `.env.example` and the README, from the table; the open decision closed.
-
-**Phase 4 risks**
-- The agent may not work on a 9B model at all (structured outputs, revision loops, long prompts). P4.2 finds out first, before anything is built for the matrix.
-- Run time: ~2 days of GPU time for two models. Suite resume, overnight runs; the matrix is sized after P4.2's measured time.
-- Local scores may be far below Haiku's. Then the table shows the gap more than a ranking, and that is the result to report.
-
-**Exit:** model comparison table committed.
+**Exit:** the provider is a setting, local runs fit their window, and every run records where its time went.
 
 ### Phase 5: Product surface (M)
 - [ ] HTML report (single self-contained file, charts embedded) + Markdown.
@@ -630,13 +609,14 @@ Moved to Phase 4: resume an interrupted run (a LangGraph checkpointer and `run.p
 - [ ] The UI shows each run's grades next to the report.
 - Not planned: an online LLM judge on real runs (the eval judge needs `expected.yaml`; a reference-free claim check is Phase 3's, if the eval shows the need); OpenTelemetry (see the decision log).
 
-*Budget (2026-11-12): developed and tested on local models; paid runs only for the demo, on Haiku with `SPECIALIST_EFFORT=low` and `MAX_REVISIONS=0` where quality isn't the point.*
+*Budget (2026-11-12; local part changed 2026-11-18): developed against unit tests and committed runs, not local runs; paid runs only for the demo, on Haiku with `SPECIALIST_EFFORT=low` and `MAX_REVISIONS=0` where quality isn't the point.*
 
 **Exit:** a demo-able app on a fresh dataset.
 
 ### Phase 6: Showcase (M)
 - [ ] README rewrite: pitch, architecture diagram, before/after + model comparison tables, quickstart, design decisions, limitations.
 - [ ] Demo GIF/video (UI on a non-Titanic dataset).
+- [ ] One local vs. hosted comparison: qwen3.5:9b (32k) on titanic × 1 next to Haiku's titanic runs (P3.5 and the `v0.3.1` dev check): finished or not, findings, false claims, minutes, where the time went. One run (~3–4 h, ~$0.02 judging); if it fails, the failure is the result.
 - [ ] Example reports in `examples/` (2–3 datasets, including a trap case). *Taken from runs already made (P3.5) where possible; ~$0.60 in all for Phases 5–6.*
 - [ ] Clean history/branches; LICENSE check; `.env.example`.
 - [ ] Tag `v1.0.0`.
@@ -644,6 +624,7 @@ Moved to Phase 4: resume an interrupted run (a LangGraph checkpointer and `run.p
 
 ### Phase 7: Stretch (post-v1.0)
 - Natural-language questions ("why did survival differ by class?") → targeted plan.
+- Resume an interrupted run: a LangGraph checkpointer and `run.py --resume`; `evals run --resume` for suites (was P4.3; moved 2026-11-18).
 - Human-in-the-loop plan approval (LangGraph interrupt).
 - Time-series and clustering specialists (`datetime_trend` case becomes a real target).
 - Parallel execution tuning; larger datasets (sampling / DuckDB).
@@ -736,6 +717,8 @@ PLAN.md  README.md
 | 2026-11-16 | The h3 fix is judged on one new blind case (h5) plus h1, h2, h4, not on h3; no dev re-run (owner) | h3 can't judge a fix built while looking at it. A new case tests the fix on unseen data; h1, h2, h4 check it broke nothing there. The dev re-run (~$1.15) didn't fit next to Phase 4–6's reserve |
 | 2026-11-17 | The held-out criterion is ticked for `v0.3.1` (no false claims in 15 runs, h5 96% vs 25%); Phase 3 closed | It's met with the fix, and h3's run is labelled as seen. h5's placeholder showed in a line the Phase 3 profile already had, so the result covers handling a visible placeholder, not the new lines carrying over |
 | 2026-11-17 | Ollama's context window 16k → 32k; local call timeout 1,800 s (`.env`) | The first local run failed when a statistical task's prompt outgrew 16k. A replay at 32k finished the cut reply at the same speed, with 3.81 of 4 GB on the GPU. Only Ollama reads `llm_num_ctx`, so Haiku's numbers stand |
+| 2026-11-18 | The goal is a well-designed agentic system, not a local-first one; local stays a setting. Phase 4 cut to P4.1–P4.2; one local run next to Claude in Phase 6 (owner) | The first local run took 2 h for two-thirds of titanic (Haiku ~8 min); a matrix of ~2 days of GPU time a model doesn't fit the time left. Replaces the 2026-10-29 local-first decision |
+| 2026-11-18 | Default provider Ollama → Anthropic; a prompt too long for Ollama's window ends its task, not the run (owner) | Follows the re-scope: Claude is the main path, `--provider ollama` the option. The first local run lost 2 h to one oversized prompt. The overflow check only runs on Ollama, so hosted runs are unchanged |
 | 2026-10-31 | Tracing: **LangSmith only**; MLflow removed | Built for agents; clearer traces. Tracing is opt-in via env, because when it's on, prompts and data samples leave the machine (relevant to the local-first pitch) |
 | 2026-10-31 | Delete untracked `todo.md`, `docs/`, `notebooks/`, and the `multi-specialist` branch | Confirmed by owner; superseded by this plan / `feature/new-flow` |
 | 2026-10-31 | New Phase 1 (agent quality) before the eval harness | The baseline review shows structural failures; the tagged baseline keeps the before/after story measurable |
@@ -750,7 +733,7 @@ PLAN.md  README.md
 - [ ] **Project name / package name** (`agent` is too generic for a portfolio repo).
 - [ ] **UI:** Streamlit (recommended, fastest) vs FastAPI + small frontend.
 - [ ] **Sandbox backend default:** subprocess (recommended for v1) vs Docker.
-- [ ] **Default local model:** `qwen3.5:9b` for now; final choice decided by the Phase 4 eval.
+- [x] **Default local model:** `qwen3.5:9b`; no comparison of local models (closed 2026-11-18).
 
 ---
 
@@ -769,7 +752,7 @@ PLAN.md  README.md
 | Human-in-the-loop | Phase 7 |
 | Memory/history | Phase 7 |
 | Web interface | Phase 5 |
-| Model selection | Phase 4 |
+| Model selection | Phase 4 (provider setting); one local comparison in Phase 6 |
 | Parallel analysis | Phase 3 (`Send` fan-out) + Phase 7 tuning |
 | PDF/HTML export | Phase 5 (HTML; PDF not planned) |
 | Unit tests | Phase 0 onward |
