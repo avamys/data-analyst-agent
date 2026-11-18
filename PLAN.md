@@ -3,7 +3,7 @@
 > **This is the main plan for the project.** It replaces `todo.md`; everything still useful from there is folded in below (see [Appendix: todo.md mapping](#appendix-todomd-mapping)).
 > Update the checkboxes and the **Status** block as work lands. Record decisions in the [Decision log](#decision-log).
 
-**Status:** Phase 1 done on `phase-1` (P1.1–P1.5). Measured on the Titanic reference run: wrong claims 7 → 0, unsupported 6 → 0, baseline findings absent 7 → 0, charts in the report 0 → 5 ([P1.5 check](docs/progress/p1.5/annotations.md)). The exit criteria were met on Claude Haiku 5.5 (9 min, $0.08 a run); not yet re-run on qwen3.5. Hosted providers (OpenRouter, Anthropic) and a cost report added. Phase 2 planned (eval harness; both versions on Haiku 5.5, Sonnet 5.5 as judge). P2.0 (central configuration, presets) and P2.1 (baseline on Haiku, `v0.1.1-baseline-hosted`) done; P2.2 (7 eval cases with known answers) done; P2.3 (runner) done; first suite, judged by hand: current 30/30 findings, baseline 16/30 ([first look](docs/eval/first-look.md)). P2.3a: task scripts no longer see API keys; Ollama prompts are checked against the context window. P2.4 (deterministic graders) done; P2.5 (LLM judge) done: on the first suite it agrees with the hand labels on 87% of findings exactly, 100% within ½. P2.6 calibration: 12 labelled reports, 93–96% exact agreement, 100% within ½; the judge agrees with itself on 95%; labels spot-checked by the owner. P2.7: `evals report` / `compare`, eval traces tagged, CI regrades the committed suites. P2.8 [before/after](docs/eval/before-after.md), 7 cases × 3 repeats on Haiku 5.5: findings 53% → 98%, false claims 0.1 → 0 a run, $0.024 → $0.076 a run; the `hosted` preset adds no findings at 1.8× the cost. Phase 2 done. Phase 3 planned: network block, 5–6 harder cases (real and synthetic), faster runs. P3.1 done (network block). P3.2: 5 new cases; the current agent scores 96% findings on them, no false claims (the bar). Fixes will be developed on these and the original cases, and judged on held-out cases nothing is tuned on. P3.2b: 4 held-out cases written by the owner ([brief](docs/eval/heldout-brief.md)), their hash committed. P3.3: time measured, parallel tasks (−13%), effort setting. P3.4 narrowed to one bug fix (findings that cite no fact); the bar's two weaknesses are measured on the held-out cases, not fixed. API spend capped at $10 for everything left (2026-11-12): the remaining plan is cut to fit. An empty report now fails the run; the writer's cap is 32k. P3.5 dev × 3: findings 96%, one half false claim in 36 runs, 9.5 min a run; on the original 7, −37% time at 98% → 96% findings. `low` effort × 1: findings 95%, −15% cost, −12% time; no large difference. $5.00 of $10 spent. Agent tagged `v0.3.0-phase3`. Held-out ([results](docs/eval/phase3.md)): findings 78% vs the baseline's 19%, but 0.2 false claims a run, all in h3 (zeros that mean "missing"; its dev twin, Pima, scored 100%, likely from memory). After it, a profile fix (numeric columns' spread; "empty cells") took h3 to 75% findings and no false claims ($0.31, outside the budget). A new blind case, h5, then checked the fix (`v0.3.1`): no false claims in 15 held-out runs, h5 96% vs the baseline's 25%. Phase 3 closed with every exit criterion met. $8.18 of $10 spent. Phase 4 planned (timings, first local run, resume, matrix). P4.1 done: every call records why it stopped and, on Ollama, where its time went; runs count calls cut off and empty replies. P4.2: the first local run (qwen3.5:9b, titanic) failed after 2 h on a prompt too long for 16k; a replay picked 32k (same speed, 3.81 of 4 GB on the GPU). Re-scoped 2026-11-18: the goal is a well-designed agentic system, local is an option; Phase 4 ends here, and one local run next to Claude goes into Phase 6. Phase 5 planned in detail (CLI and live progress, run grades, HTML report, Streamlit app, one demo run). P5.1 done (`analyst run`); P5.2 done (live progress, `progress.jsonl`); P5.3 done (grades in every run); P5.4 done (`report.html`); P5.5 done (Streamlit app); P5.6 done (demo on WHO life expectancy, $0.11; two app fixes). $8.49 of $10 spent (a second demo run with the `hosted` preset, $0.20). Phase 5b planned (questions after a finished run: from recorded facts or 1–2 new tasks, answers checked). Q1 done (a finished run's state rebuilt from its folder). Q2 done (ask and answer nodes, a question graph). Q3 done (`analyst ask`; answers in the run and on the page). Q4 done (the question box in the app); Q5: three real questions on the hosted demo run, all answered correctly ($0.03). Phase 5b done. $8.52 of $10 spent. Next: Phase 6 · **Last updated:** 2026-11-18
+**Status:** Phase 1 done on `phase-1` (P1.1–P1.5). Measured on the Titanic reference run: wrong claims 7 → 0, unsupported 6 → 0, baseline findings absent 7 → 0, charts in the report 0 → 5 ([P1.5 check](docs/progress/p1.5/annotations.md)). The exit criteria were met on Claude Haiku 5.5 (9 min, $0.08 a run); not yet re-run on qwen3.5. Hosted providers (OpenRouter, Anthropic) and a cost report added. Phase 2 planned (eval harness; both versions on Haiku 5.5, Sonnet 5.5 as judge). P2.0 (central configuration, presets) and P2.1 (baseline on Haiku, `v0.1.1-baseline-hosted`) done; P2.2 (7 eval cases with known answers) done; P2.3 (runner) done; first suite, judged by hand: current 30/30 findings, baseline 16/30 ([first look](docs/eval/first-look.md)). P2.3a: task scripts no longer see API keys; Ollama prompts are checked against the context window. P2.4 (deterministic graders) done; P2.5 (LLM judge) done: on the first suite it agrees with the hand labels on 87% of findings exactly, 100% within ½. P2.6 calibration: 12 labelled reports, 93–96% exact agreement, 100% within ½; the judge agrees with itself on 95%; labels spot-checked by the owner. P2.7: `evals report` / `compare`, eval traces tagged, CI regrades the committed suites. P2.8 [before/after](docs/eval/before-after.md), 7 cases × 3 repeats on Haiku 5.5: findings 53% → 98%, false claims 0.1 → 0 a run, $0.024 → $0.076 a run; the `hosted` preset adds no findings at 1.8× the cost. Phase 2 done. Phase 3 planned: network block, 5–6 harder cases (real and synthetic), faster runs. P3.1 done (network block). P3.2: 5 new cases; the current agent scores 96% findings on them, no false claims (the bar). Fixes will be developed on these and the original cases, and judged on held-out cases nothing is tuned on. P3.2b: 4 held-out cases written by the owner ([brief](docs/eval/heldout-brief.md)), their hash committed. P3.3: time measured, parallel tasks (−13%), effort setting. P3.4 narrowed to one bug fix (findings that cite no fact); the bar's two weaknesses are measured on the held-out cases, not fixed. API spend capped at $10 for everything left (2026-11-12): the remaining plan is cut to fit. An empty report now fails the run; the writer's cap is 32k. P3.5 dev × 3: findings 96%, one half false claim in 36 runs, 9.5 min a run; on the original 7, −37% time at 98% → 96% findings. `low` effort × 1: findings 95%, −15% cost, −12% time; no large difference. $5.00 of $10 spent. Agent tagged `v0.3.0-phase3`. Held-out ([results](docs/eval/phase3.md)): findings 78% vs the baseline's 19%, but 0.2 false claims a run, all in h3 (zeros that mean "missing"; its dev twin, Pima, scored 100%, likely from memory). After it, a profile fix (numeric columns' spread; "empty cells") took h3 to 75% findings and no false claims ($0.31, outside the budget). A new blind case, h5, then checked the fix (`v0.3.1`): no false claims in 15 held-out runs, h5 96% vs the baseline's 25%. Phase 3 closed with every exit criterion met. $8.18 of $10 spent. Phase 4 planned (timings, first local run, resume, matrix). P4.1 done: every call records why it stopped and, on Ollama, where its time went; runs count calls cut off and empty replies. P4.2: the first local run (qwen3.5:9b, titanic) failed after 2 h on a prompt too long for 16k; a replay picked 32k (same speed, 3.81 of 4 GB on the GPU). Re-scoped 2026-11-18: the goal is a well-designed agentic system, local is an option; Phase 4 ends here, and one local run next to Claude goes into Phase 6. Phase 5 planned in detail (CLI and live progress, run grades, HTML report, Streamlit app, one demo run). P5.1 done (`analyst run`); P5.2 done (live progress, `progress.jsonl`); P5.3 done (grades in every run); P5.4 done (`report.html`); P5.5 done (Streamlit app); P5.6 done (demo on WHO life expectancy, $0.11; two app fixes). $8.49 of $10 spent (a second demo run with the `hosted` preset, $0.20). Phase 5b planned (questions after a finished run: from recorded facts or 1–2 new tasks, answers checked). Q1 done (a finished run's state rebuilt from its folder). Q2 done (ask and answer nodes, a question graph). Q3 done (`analyst ask`; answers in the run and on the page). Q4 done (the question box in the app); Q5: three real questions on the hosted demo run, all answered correctly ($0.03). Phase 5b done. $8.52 of $10 spent. Phase 6 planned in detail (clean clone, writer wording, one local run, examples, README, merge and `v1.0.0`; demo GIF deferred). Next: P6.1 · **Last updated:** 2026-11-18
 
 ---
 
@@ -735,14 +735,75 @@ load run → ask ─┬─ answerable from recorded facts ───────�
 
 **Exit:** ask a question of a finished run in the app and get a checked answer.
 
-### Phase 6: Showcase (M)
-- [ ] README rewrite: pitch, architecture diagram, before/after + model comparison tables, quickstart, design decisions, limitations.
-- [ ] Demo GIF/video (UI on a non-Titanic dataset).
-- [ ] One local vs. hosted comparison: qwen3.5:9b (32k) on titanic × 1 next to Haiku's titanic runs (P3.5 and the `v0.3.1` dev check): finished or not, findings, false claims, minutes, where the time went. One run (~3–4 h, ~$0.02 judging); if it fails, the failure is the result.
-- [ ] Example reports in `examples/` (2–3 datasets, including a trap case). *Taken from runs already made (P3.5) where possible; ~$0.60 in all for Phases 5–6.*
-- [ ] Clean history/branches; LICENSE check; `.env.example`.
-- [ ] Tag `v1.0.0`.
-- [ ] Optional: write-up "Measuring and cutting hallucinated numbers in a data-analysis agent."
+### Phase 6: Showcase and v1.0 (M), detailed
+
+**Goal:** someone who finds the repo can see what the agent does and how well, run it from a clean clone, and read real reports, on `main`, tagged `v1.0.0`.
+
+**Starting point (2026-11-18)**
+- Everything since Phase 0 is on `phase-1` (85 commits); `main` has one commit of its own (the first `PLAN.md`).
+- A clean clone can't follow the README: its quickstart reads `data/titanic.csv`, but `data/` is gitignored and the file was never committed (the eval case downloads it).
+- Runs worth showing exist: the hosted WHO run with 3 questions (P5.6, Q5), Titanic and trap cases from the eval runs. A run directory is ~10 MB, mostly `llm_calls.jsonl` and `state/`; the page, report, charts and scripts are ~2.5 MB.
+- Two open decisions: the package name and the sandbox backend.
+
+**Decided (owner, 2026-11-18)**
+- The package stays `agent`; the command is `analyst`.
+- `examples/`: the hosted WHO run with its questions, a Titanic run, and one dev trap case. No held-out case, which stays blind.
+- The demo GIF is skipped for now (deferred, not dropped).
+- `phase-1` is merged into `main` by a PR; the old branches stay.
+
+**Exit criteria**
+- [ ] A fresh clone follows the README: `uv sync`, the tests, the quickstart (checked in a scratch clone)
+- [ ] The README has the architecture diagram, the results (before/after, held-out, local vs hosted), the quickstart, the main design decisions and the limitations
+- [ ] `examples/` holds 3 runs that read on GitHub (`report.md` with its charts) and as a downloaded page
+- [ ] One local run next to Claude's, written up, finished or not
+- [ ] `main` has everything, CI passes there, `v1.0.0` is tagged; the definition of done is ticked except the demo GIF
+
+**P6.1 A clean clone works** (S). *$0.*
+- [ ] Quickstart data: the README downloads Titanic from the eval case's URL before the first run.
+- [ ] `.env.example` covers what a user sets (provider, keys, model, tracing, GPU layers).
+- [ ] A scan of the whole history for API keys and tokens before `main` gets it. If one is found: stop, rotate it, and the owner decides about rewriting history.
+- [ ] Open decisions closed: the package name (kept); the sandbox stays a subprocess with the network blocked for v1, Docker in Phase 7.
+- *Check:* clone into the scratchpad; `uv sync --locked`, the tests, `analyst --help`, the quickstart's download, and a run that fails at once and clearly (Ollama, a model that doesn't exist: free).
+
+**P6.2 Open objections worded as limits of the data** (S). *~$0.03.*
+- [ ] The writer's prompt: an unresolved review issue goes under Limitations as what it means for the findings, not as review process ("The lead's objection stands").
+- *Check:* the report rewritten for a copy of the hosted WHO run (the report node only, one writer call); its Limitations compared with the original. The example keeps the report its run wrote. Not re-run on the eval suite (budget); CI's regrade is unaffected.
+
+**P6.3 One local run next to Claude** (S of work; ~3–4 h of the owner's GPU). *~$0.02 to judge.*
+- [ ] qwen3.5:9b at 32k on the eval case titanic × 1, through the eval runner with the judge, started in the background with the owner's go-ahead. After P6.2, so it runs the v1.0 code.
+- [ ] `docs/eval/local-vs-hosted.md`: next to Haiku's titanic runs (P3.5 × 3 and the `v0.3.1` dev check): finished or not, findings, false claims, minutes, where the time went (prompt vs generation, P4.1), cost. If it fails, the failure and where it happened are the result.
+
+**P6.4 `examples/`** (S). *$0.*
+- [ ] `scripts/export_example.py <run dir> <dest>`: copies `report.md`, `questions.md`, `report.html`, `run_meta.json` (without local paths) and per task `analysis.py`, `result.json` and its charts; not `llm_calls.jsonl`, `state/`, logs or published objects. Older runs get their `report.html` from `analyst report` first.
+- [ ] Three examples: the hosted WHO run with its 3 questions; a Titanic run (the latest current-version Haiku run); a dev trap case (leakage or pure noise: the run that best shows the agent declining to overclaim, picked by reading the candidates).
+- [ ] `examples/README.md`: per example the dataset, its source and licence (the data itself isn't included), target, model, time, cost, grades, and what to look at.
+
+**P6.5 README rewrite** (M). *$0.*
+- [ ] What it is, in a few sentences, with a link to the lead example.
+- [ ] How it works: a Mermaid diagram of the graph (profile → plan → run_task ⇄ review → report; questions: ask → tasks → answer); the roles; the sandbox; facts and the number check.
+- [ ] Results: before/after ([before-after.md](docs/eval/before-after.md)), held-out ([phase3.md](docs/eval/phase3.md)), local vs hosted (P6.3), time and cost per run.
+- [ ] Quickstart (P6.1), the app, asking questions, presets, the CLI.
+- [ ] The main design decisions (6–8, linked to the decision log) and the limitations: datasets the model may remember, the trap fixed after the held-out run, an answer that missed a fact (Q5), slow local runs, a single-user app, open objections.
+- [ ] Layout, development, the eval harness, licence. The "under active rebuild" status goes.
+
+**P6.6 Merge and release** (S). *$0.*
+- [ ] A PR `phase-1` → `main` (likely conflict in `PLAN.md`: `phase-1`'s version wins), merged; CI passes on `main`. The old branches stay (owner).
+- [ ] The definition of done ticked; `v1.0.0` tagged on `main`; a GitHub release with a short summary and the results.
+- Each push, merge, tag and release is confirmed with the owner when it happens.
+
+**Deferred:** the demo GIF (owner, 2026-11-18): a ~60 s recording of a past run and a live question (~$0.01–0.02), when there is time. **Optional, after v1.0:** the write-up "Measuring and cutting hallucinated numbers in a data-analysis agent."
+
+**Order:** P6.1 → P6.2 → P6.3 (runs in the background for hours) alongside P6.4 and P6.5 → P6.6.
+
+**Budget:** $1.48 left. P6.2 ~$0.03, P6.3 ~$0.02: ~$0.05 in all.
+
+**Phase 6 risks**
+- A key in the history would have to be rotated, and maybe the history rewritten, before the merge: checked first, in P6.1.
+- The local run may fail after hours, as in P4.2; then the failure is the comparison.
+- Dataset licences: the examples link to their data instead of including it.
+- The `PLAN.md` conflict in the merge: resolved by taking `phase-1`'s version (`main`'s is its first draft).
+
+**Exit:** `v1.0.0` on `main`, with a README and examples that show the agent and its numbers.
 
 ### Phase 7: Stretch (post-v1.0)
 - Resume an interrupted run: a LangGraph checkpointer and `run.py --resume`; `evals run --resume` for suites (was P4.3; moved 2026-11-18).
@@ -843,6 +904,7 @@ PLAN.md  README.md
 | 2026-11-18 | Phase 5: Streamlit UI; LangSmith stays (no Langfuse); monitoring = run-level grades in each run and the UI, no trace feedback or review queue; an `analyst` console script, `agent` package kept (owner) | Langfuse's draw was traces that never leave the machine, which matters less now that Claude is the default. The grades already exist in the eval graders; a review queue has little to show in a demo |
 | 2026-11-18 | The app runs hosted providers with the `hosted` preset (2 revisions, 5 follow-ups); the CLI and evals keep `local` as the default (owner) | The demo run on Haiku left 2 review objections open at the `local` limit of 1 revision. Changing the default everywhere would make new eval runs incomparable with the stored ones. ~2× the time and cost (~$0.18 a run) |
 | 2026-11-18 | Questions after the report built now, as Phase 5b (was Phase 7); answers sit next to the report, never change it; the lead may answer from recorded facts with no new task (owner) | The strongest agentic feature for the demo, and most of it exists: a question is a follow-up task after the report. ~3 days; ~$0.10–0.20 to check, within the budget left after Phase 6's ~$0.65 |
+| 2026-11-18 | Phase 6: the package stays `agent`; `examples/` = the hosted WHO run with its questions, a Titanic run and a dev trap case; the demo GIF is skipped for now; `phase-1` merged into `main` by a PR, old branches kept (owner) | A rename touches every import for no change in behaviour, and old tags keep the old name. The examples come from runs already made ($0) and show a real dataset, a familiar one and the checks at work; held-out cases stay blind |
 | 2026-10-31 | Tracing: **LangSmith only**; MLflow removed | Built for agents; clearer traces. Tracing is opt-in via env, because when it's on, prompts and data samples leave the machine (relevant to the local-first pitch) |
 | 2026-10-31 | Delete untracked `todo.md`, `docs/`, `notebooks/`, and the `multi-specialist` branch | Confirmed by owner; superseded by this plan / `feature/new-flow` |
 | 2026-10-31 | New Phase 1 (agent quality) before the eval harness | The baseline review shows structural failures; the tagged baseline keeps the before/after story measurable |
@@ -854,9 +916,9 @@ PLAN.md  README.md
 | 2026-10-31 | Prompts give rules and an output contract, never example pipelines | The baseline copied the examples verbatim (all 6 ML attempts used the example's model and split) |
 
 ### Open decisions
-- [ ] **Project name / package name** (`agent` is too generic for a portfolio repo).
+- [x] **Project name / package name:** the package stays `agent`, the command is `analyst` (decided 2026-11-18).
 - [x] **UI:** Streamlit (decided 2026-11-18).
-- [ ] **Sandbox backend default:** subprocess (recommended for v1) vs Docker.
+- [x] **Sandbox backend default:** a subprocess with the network blocked for v1; Docker in Phase 7 (decided 2026-11-18).
 - [x] **Default local model:** `qwen3.5:9b`; no comparison of local models (closed 2026-11-18).
 
 ---
