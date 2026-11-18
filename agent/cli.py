@@ -18,6 +18,7 @@ from agent.costs import fetch_prices
 from agent.data_loader import generate_dataset_info, load_dataset
 from agent.execution.runner import network_blocked
 from agent.graph import build_hierarchical_graph
+from agent.html_report import write_html
 from agent.logging_config import setup_logging
 from agent.progress import Progress
 from agent.run_grades import run_grades
@@ -53,6 +54,10 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument(
         "--verbose", action="store_true", help="Show the full log, not just progress"
     )
+    report = commands.add_parser(
+        "report", help="Write report.html for an existing run directory"
+    )
+    report.add_argument("run_dir", type=Path, help="A run directory under runs/")
     return parser
 
 
@@ -121,6 +126,7 @@ def run_analysis(
     meta = {
         "status": "running",
         "run_id": str(run_id),
+        "dataset": dataset,
         "started": datetime.now().isoformat(timespec="seconds"),
         "command": sys.argv,
         "commit": commit,
@@ -216,10 +222,14 @@ def run_analysis(
         prices = fetch_prices() if settings.model_provider != "ollama" else None
         meta["grades"] = run_grades(store.path, prices)
         store.write_json("run_meta.json", meta)
+        try:
+            write_html(store.path)
+        except Exception as e:  # never hides the run's own error
+            logger.warning(f"Could not write report.html: {e!r}")
         if meta["trace_url"]:
             logger.info(f"LangSmith trace: {meta['trace_url']}")
         logger.info(f"Run {meta['status']} in {meta['seconds']}s: {store.path}")
-        report = store.path / "report.md"
+        report = store.path / "report.html"
         progress.event(
             {
                 "event": "run_done",
@@ -238,6 +248,11 @@ def main(argv: list[str] | None = None) -> int:
     load_dotenv(".env")
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.command == "report":
+        if not (args.run_dir / "run_meta.json").exists():
+            parser.error(f"Not a run directory: {args.run_dir}")
+        print(write_html(args.run_dir))
+        return 0
     if not args.csv_path.exists():
         parser.error(f"Dataset not found: {args.csv_path}")
     apply_flags(args)

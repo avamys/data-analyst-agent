@@ -46,6 +46,7 @@ def test_a_run_returns_its_directory_with_the_report(monkeypatch, tmp_path, smal
     run_dir = run_analysis(Path(small_csv), target="target")
     assert run_dir.parent == tmp_path / "runs"
     assert (run_dir / "report.md").read_text() == "the report"
+    assert "<p>the report</p>" in (run_dir / "report.html").read_text()
     meta = json.loads((run_dir / "run_meta.json").read_text())
     assert (meta["status"], meta["tasks_completed"]) == ("ok", 1)
     grades = meta["grades"]

@@ -55,7 +55,7 @@ def test_a_run_writes_its_progress_in_order(monkeypatch, tmp_path, small_csv, ca
     assert events[6]["error"] == "KeyError: 'missing'"
     assert (events[8]["status"], events[8]["findings"]) == ("complete", 1)
     assert events[9]["outcome"] == "completed"
-    assert events[-1]["report"] == str(run_dir / "report.md")
+    assert events[-1]["report"] == str(run_dir / "report.html")
 
     printed = capsys.readouterr().out
     assert "↺ eda_1 sent back: Also record m." in printed
