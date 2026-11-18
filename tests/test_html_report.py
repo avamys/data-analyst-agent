@@ -4,7 +4,7 @@ import re
 import pytest
 
 from agent.cli import main
-from agent.html_report import render_html
+from agent.html_report import render_html, render_questions
 
 # A 1×1 PNG
 PIXEL = bytes.fromhex(
@@ -113,3 +113,16 @@ def test_analyst_report_writes_the_page(run_dir, capsys):
     assert main(["report", str(run_dir)]) == 0
     assert capsys.readouterr().out.strip() == str(run_dir / "report.html")
     assert (run_dir / "report.html").read_text().startswith("<!doctype html>")
+
+
+def test_questions_show_on_the_page_and_alone(run_dir):
+    assert render_questions(run_dir) is None
+    (run_dir / "questions.md").write_text(
+        "## Questions after the report\n\n### Q1. Why?\n\n"
+        "![By sex](tasks/eda_1/charts/by_sex.png)\n"
+    )
+    page = render_html(run_dir)
+    assert page.index("<h3>Q1. Why?</h3>") < page.index("Appendix")
+    assert "Q1. Why?" not in render_html(run_dir, with_questions=False)
+    alone = render_questions(run_dir)
+    assert "<h3>Q1. Why?</h3>" in alone and "data:image/png;base64," in alone

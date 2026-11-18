@@ -56,8 +56,9 @@ details { margin: 0.5rem 0 1rem; } summary { cursor: pointer; color: var(--muted
 """
 
 
-def render_html(run_dir: Path) -> str:
-    """The page for a run directory, finished or failed"""
+def render_html(run_dir: Path, with_questions: bool = True) -> str:
+    """The page for a run directory, finished or failed. The app shows the
+    questions apart from it (render_questions), below the report."""
     meta = _json(run_dir / "run_meta.json")
     grades = meta.get("grades") or run_grades(run_dir)  # older runs: no cost
     report_file = run_dir / "report.md"
@@ -71,13 +72,26 @@ def render_html(run_dir: Path) -> str:
         )
     title = re.search(r"<h1>(.*?)</h1>", body)
     title = re.sub(r"<[^>]+>", "", title[1]) if title else "Analysis report"
+    questions = _questions(run_dir, meta) if with_questions else ""
+    return _page(
+        title,
+        f"{_header(run_dir, meta, grades)}\n{body}\n{questions}\n{_appendix(run_dir)}",
+    )
+
+
+def render_questions(run_dir: Path) -> str | None:
+    """The questions and answers alone, as a page; None when none was asked"""
+    meta = _json(run_dir / "run_meta.json")
+    body = _questions(run_dir, meta)
+    return _page("Questions", body) if body else None
+
+
+def _page(title: str, body: str) -> str:
     return (
         '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
         f"<title>{title}</title><style>{CSS}</style></head><body>\n"
-        f"{_header(run_dir, meta, grades)}\n{body}\n{_questions(run_dir, meta)}\n"
-        f"{_appendix(run_dir)}\n"
-        "</body></html>\n"
+        f"{body}\n</body></html>\n"
     )
 
 

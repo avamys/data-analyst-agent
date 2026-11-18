@@ -1,10 +1,11 @@
-"""Streamlit app: upload a CSV, watch the analysis, read its report.
+"""Streamlit app: upload a CSV, watch the analysis, read its report, ask about it.
 
     uv run --group ui streamlit run app/streamlit_app.py
 
 Each analysis runs as its own process (`analyst run`), so a crash can't take
 the page down and per-run counters stay per run (agent/context.py); the page
-only reads the files the run writes. Past runs open the same way.
+only reads the files the run writes. Past runs open the same way. A question
+about a finished run runs as `analyst ask`, recorded in that run.
 """
 
 import json
@@ -19,7 +20,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from agent.config import settings
-from agent.html_report import render_html
+from agent.html_report import render_html, render_questions
 from app.runs import list_runs, read_events, stage, task_rows
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -141,6 +142,11 @@ def watch(launched: dict):
         return
     minutes = (time.time() - launched["started"]) / 60
     st.info(f"Running for {minutes:.0f} min… {run_dir or ''}")
+    _progress(events)
+
+
+def _progress(events: list[dict]):
+    """What the lead is doing, and a row per task"""
     if now := stage(events):
         st.write(now)
     rows = task_rows(events)
@@ -174,15 +180,90 @@ def past_runs(runs_root: Path):
 
 
 def show_run(run_dir: Path):
-    """A finished run: its grades, trace link, report and a download"""
-    page = render_html(run_dir)
+    """A finished run: its grades, trace link, report and a download, then the
+    questions asked about it and a box to ask another"""
     meta = json.loads((run_dir / "run_meta.json").read_text())
     if meta.get("trace_url"):
         st.link_button("LangSmith trace", meta["trace_url"])
     st.download_button(
-        "Download report.html", page, file_name=f"{run_dir.name}.html", mime="text/html"
+        "Download report.html",
+        render_html(run_dir),  # with the questions
+        file_name=f"{run_dir.name}.html",
+        mime="text/html",
     )
-    components.html(page, height=1100, scrolling=True)
+    components.html(
+        render_html(run_dir, with_questions=False), height=1100, scrolling=True
+    )
+    if answers := render_questions(run_dir):
+        components.html(answers, height=600, scrolling=True)
+    if meta.get("status") == "ok" and (run_dir / "report.md").exists():
+        questions(run_dir)
+
+
+def questions(run_dir: Path):
+    """Ask about the run; one question at a time per run"""
+    asking = st.session_state.setdefault("asking", {})
+    current = asking.get(str(run_dir))
+    if current and not current.get("ended"):
+        watch_question(current)
+        return
+    if current:  # ended without answering: its console output, once
+        del asking[str(run_dir)]
+        st.error("The question stopped before it was answered. Its console output:")
+        st.code(current["log"].read_text()[-3000:] or "(empty)")
+    with st.form(f"ask {run_dir}", clear_on_submit=True):
+        text = st.text_area(
+            "Ask a question about this data",
+            placeholder="Does the effect hold within each group?",
+        )
+        if st.form_submit_button("Ask") and text.strip():
+            asking[str(run_dir)] = ask(run_dir, text.strip())
+            st.rerun()
+    st.caption(
+        "The lead answers from the recorded facts, or first runs up to 2 new tasks "
+        "(a few minutes). It uses the run's provider and model."
+    )
+
+
+def ask(run_dir: Path, text: str) -> dict:
+    """Start `analyst ask` in its own process; its console output goes to a log"""
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    log = run_dir / "questions" / f"{stamp}_console.log"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    offset = len(read_events(run_dir))  # this question's events come after
+    command = [sys.executable, "-m", "agent.cli", "ask", str(run_dir.resolve()), text]
+    with log.open("w") as out:
+        process = subprocess.Popen(
+            command, cwd=ROOT, stdout=out, stderr=subprocess.STDOUT
+        )
+    return {
+        "process": process,
+        "log": log,
+        "run_dir": run_dir,
+        "offset": offset,
+        "started": time.time(),
+    }
+
+
+@st.fragment(run_every=3)
+def watch_question(current: dict):
+    """Refreshes itself every few seconds until the question ends"""
+    events = read_events(current["run_dir"])[current["offset"] :]
+    if any(e["event"] == "question_done" for e in events):
+        del st.session_state["asking"][str(current["run_dir"])]
+        st.rerun()  # the whole page, which then shows the answer
+    if current["process"].poll() is not None:  # died before it could record its end
+        current["ended"] = True
+        st.rerun()
+    minutes = (time.time() - current["started"]) / 60
+    question = next((e for e in events if e["event"] == "question"), None)
+    if question is None:
+        st.info("Loading the run…")
+        return
+    st.info(
+        f"Answering for {minutes:.0f} min… Q{question['number']}: {question['question']}"
+    )
+    _progress(events)
 
 
 def _name(path: Path | None) -> str:

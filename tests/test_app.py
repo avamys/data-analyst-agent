@@ -97,3 +97,45 @@ def test_hosted_runs_get_the_hosted_preset(monkeypatch, tmp_path):
         streamlit_app.launch(tmp_path / "a.csv", None, provider, "m", tmp_path)
     assert commands[0][-2:] == ["--preset", "hosted"]
     assert "--preset" not in commands[1]
+
+
+def test_a_questions_tasks_and_stages():
+    asked = {"event": "asked", "number": 1, "facts": [], "tasks": [_brief("q1_eda_1")]}
+    question = {"event": "question", "number": 1, "question": "q"}
+    assert "reading the question" in stage([question])
+    done = {"event": "reviewed", "task": "q1_eda_1", "outcome": "completed"}
+    assert [r["task"] for r in task_rows([question, asked])] == ["q1_eda_1"]
+    assert "writing the answer" in stage([question, asked, done])
+    from_facts = {**asked, "facts": ["eda_1.n"], "tasks": []}
+    assert "recorded facts answer it" in stage([question, from_facts])
+
+
+def test_the_app_shows_answers_and_asks_a_question(monkeypatch, tmp_path):
+    run = _run(tmp_path, "20261118-120000_small_m", "2026-11-18T12:00:00")
+    (run / "report.md").write_text("# The report\n\nSurvival was 38%.")
+    (run / "questions.md").write_text(
+        "## Questions after the report\n\n### Q1. Why?\n\nBecause.\n"
+    )
+    monkeypatch.setattr(settings, "runs_directory", str(tmp_path))
+    testing = pytest.importorskip("streamlit.testing.v1")
+    import subprocess
+
+    commands = []
+
+    class Running:
+        def poll(self):
+            return None
+
+    def popen(command, **_):
+        commands.append(command)
+        return Running()
+
+    monkeypatch.setattr(subprocess, "Popen", popen)
+    app = testing.AppTest.from_file("../app/streamlit_app.py", default_timeout=30)
+    app.run()
+    app.sidebar.radio[0].set_value("Past runs").run()
+    app.text_area[0].input("Does it hold for women?")
+    app.button[0].click().run()  # the form's Ask button
+    assert not app.exception
+    assert commands[0][-3:] == ["ask", str(run.resolve()), "Does it hold for women?"]
+    assert app.info[0].value == "Loading the run…"

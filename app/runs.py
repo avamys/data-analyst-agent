@@ -1,5 +1,6 @@
 """What the app reads from run directories: the runs under a folder, a run's
-progress events (agent/progress.py) and the state of each task so far"""
+progress events (agent/progress.py) and the state of each task so far. For a
+question after the report, the events from its "question" event on."""
 
 import json
 from pathlib import Path
@@ -41,7 +42,7 @@ def task_rows(events: list[dict]) -> list[dict]:
 
     for e in events:
         kind = e["event"]
-        if kind == "plan":
+        if kind in ("plan", "asked"):
             for brief in e["tasks"]:
                 add(brief)
         elif kind == "task_started" and e["task"] in tasks:
@@ -67,9 +68,18 @@ def task_rows(events: list[dict]) -> list[dict]:
 
 
 def stage(events: list[dict]) -> str | None:
-    """What the run is doing when no task is: before the plan, and after the last
-    review while the lead writes the report"""
+    """What the run or question is doing when no task is: before the plan, and
+    after the last review while the lead writes the report or the answer"""
+    kinds = {e["event"] for e in events}
     rows = task_rows(events)
+    if "question" in kinds:
+        if "asked" not in kinds:
+            return "The lead is reading the question and the recorded facts…"
+        if not rows:
+            return "The recorded facts answer it. The lead is writing the answer…"
+        if all(r["state"] in ("accepted", "failed") for r in rows):
+            return "All tasks are done. The lead is writing the answer…"
+        return None
     if not rows:
         return "Profiling the data and planning the analysis…"
     if all(r["state"] in ("accepted", "failed") for r in rows):
