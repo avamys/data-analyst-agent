@@ -12,6 +12,8 @@ Requires [uv](https://docs.astral.sh/uv/) and an [Anthropic](https://platform.cl
 uv sync
 cp .env.example .env              # pick the provider and model; LangSmith tracing; GPU layers
 uv run python scripts/llm_smoke.py   # checks the model setup (about a minute)
+mkdir -p data && curl -sSLo data/titanic.csv \
+  https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv
 uv run analyst run data/titanic.csv --target Survived
 ```
 
