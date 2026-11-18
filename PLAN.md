@@ -3,7 +3,7 @@
 > **This is the main plan for the project.** It replaces `todo.md`; everything still useful from there is folded in below (see [Appendix: todo.md mapping](#appendix-todomd-mapping)).
 > Update the checkboxes and the **Status** block as work lands. Record decisions in the [Decision log](#decision-log).
 
-**Status:** Phase 1 done on `phase-1` (P1.1–P1.5). Measured on the Titanic reference run: wrong claims 7 → 0, unsupported 6 → 0, baseline findings absent 7 → 0, charts in the report 0 → 5 ([P1.5 check](docs/progress/p1.5/annotations.md)). The exit criteria were met on Claude Haiku 5.5 (9 min, $0.08 a run); not yet re-run on qwen3.5. Hosted providers (OpenRouter, Anthropic) and a cost report added. Phase 2 planned (eval harness; both versions on Haiku 5.5, Sonnet 5.5 as judge). P2.0 (central configuration, presets) and P2.1 (baseline on Haiku, `v0.1.1-baseline-hosted`) done; P2.2 (7 eval cases with known answers) done; P2.3 (runner) done; first suite, judged by hand: current 30/30 findings, baseline 16/30 ([first look](docs/eval/first-look.md)). P2.3a: task scripts no longer see API keys; Ollama prompts are checked against the context window. P2.4 (deterministic graders) done; P2.5 (LLM judge) done: on the first suite it agrees with the hand labels on 87% of findings exactly, 100% within ½. P2.6 calibration: 12 labelled reports, 93–96% exact agreement, 100% within ½; the judge agrees with itself on 95%; labels spot-checked by the owner. P2.7: `evals report` / `compare`, eval traces tagged, CI regrades the committed suites. P2.8 [before/after](docs/eval/before-after.md), 7 cases × 3 repeats on Haiku 5.5: findings 53% → 98%, false claims 0.1 → 0 a run, $0.024 → $0.076 a run; the `hosted` preset adds no findings at 1.8× the cost. Phase 2 done. Phase 3 planned: network block, 5–6 harder cases (real and synthetic), faster runs. P3.1 done (network block). P3.2: 5 new cases; the current agent scores 96% findings on them, no false claims (the bar). Fixes will be developed on these and the original cases, and judged on held-out cases nothing is tuned on. P3.2b: 4 held-out cases written by the owner ([brief](docs/eval/heldout-brief.md)), their hash committed. P3.3: time measured, parallel tasks (−13%), effort setting. P3.4 narrowed to one bug fix (findings that cite no fact); the bar's two weaknesses are measured on the held-out cases, not fixed. API spend capped at $10 for everything left (2026-11-12): the remaining plan is cut to fit. An empty report now fails the run; the writer's cap is 32k. P3.5 dev × 3: findings 96%, one half false claim in 36 runs, 9.5 min a run; on the original 7, −37% time at 98% → 96% findings. `low` effort × 1: findings 95%, −15% cost, −12% time; no large difference. $5.00 of $10 spent. Agent tagged `v0.3.0-phase3`. Held-out ([results](docs/eval/phase3.md)): findings 78% vs the baseline's 19%, but 0.2 false claims a run, all in h3 (zeros that mean "missing"; its dev twin, Pima, scored 100%, likely from memory). After it, a profile fix (numeric columns' spread; "empty cells") took h3 to 75% findings and no false claims ($0.31, outside the budget). A new blind case, h5, then checked the fix (`v0.3.1`): no false claims in 15 held-out runs, h5 96% vs the baseline's 25%. Phase 3 closed with every exit criterion met. $8.18 of $10 spent. Phase 4 planned (timings, first local run, resume, matrix). P4.1 done: every call records why it stopped and, on Ollama, where its time went; runs count calls cut off and empty replies. P4.2: the first local run (qwen3.5:9b, titanic) failed after 2 h on a prompt too long for 16k; a replay picked 32k (same speed, 3.81 of 4 GB on the GPU). Re-scoped 2026-11-18: the goal is a well-designed agentic system, local is an option; Phase 4 ends here, and one local run next to Claude goes into Phase 6. Next: Phase 5 · **Last updated:** 2026-11-18
+**Status:** Phase 1 done on `phase-1` (P1.1–P1.5). Measured on the Titanic reference run: wrong claims 7 → 0, unsupported 6 → 0, baseline findings absent 7 → 0, charts in the report 0 → 5 ([P1.5 check](docs/progress/p1.5/annotations.md)). The exit criteria were met on Claude Haiku 5.5 (9 min, $0.08 a run); not yet re-run on qwen3.5. Hosted providers (OpenRouter, Anthropic) and a cost report added. Phase 2 planned (eval harness; both versions on Haiku 5.5, Sonnet 5.5 as judge). P2.0 (central configuration, presets) and P2.1 (baseline on Haiku, `v0.1.1-baseline-hosted`) done; P2.2 (7 eval cases with known answers) done; P2.3 (runner) done; first suite, judged by hand: current 30/30 findings, baseline 16/30 ([first look](docs/eval/first-look.md)). P2.3a: task scripts no longer see API keys; Ollama prompts are checked against the context window. P2.4 (deterministic graders) done; P2.5 (LLM judge) done: on the first suite it agrees with the hand labels on 87% of findings exactly, 100% within ½. P2.6 calibration: 12 labelled reports, 93–96% exact agreement, 100% within ½; the judge agrees with itself on 95%; labels spot-checked by the owner. P2.7: `evals report` / `compare`, eval traces tagged, CI regrades the committed suites. P2.8 [before/after](docs/eval/before-after.md), 7 cases × 3 repeats on Haiku 5.5: findings 53% → 98%, false claims 0.1 → 0 a run, $0.024 → $0.076 a run; the `hosted` preset adds no findings at 1.8× the cost. Phase 2 done. Phase 3 planned: network block, 5–6 harder cases (real and synthetic), faster runs. P3.1 done (network block). P3.2: 5 new cases; the current agent scores 96% findings on them, no false claims (the bar). Fixes will be developed on these and the original cases, and judged on held-out cases nothing is tuned on. P3.2b: 4 held-out cases written by the owner ([brief](docs/eval/heldout-brief.md)), their hash committed. P3.3: time measured, parallel tasks (−13%), effort setting. P3.4 narrowed to one bug fix (findings that cite no fact); the bar's two weaknesses are measured on the held-out cases, not fixed. API spend capped at $10 for everything left (2026-11-12): the remaining plan is cut to fit. An empty report now fails the run; the writer's cap is 32k. P3.5 dev × 3: findings 96%, one half false claim in 36 runs, 9.5 min a run; on the original 7, −37% time at 98% → 96% findings. `low` effort × 1: findings 95%, −15% cost, −12% time; no large difference. $5.00 of $10 spent. Agent tagged `v0.3.0-phase3`. Held-out ([results](docs/eval/phase3.md)): findings 78% vs the baseline's 19%, but 0.2 false claims a run, all in h3 (zeros that mean "missing"; its dev twin, Pima, scored 100%, likely from memory). After it, a profile fix (numeric columns' spread; "empty cells") took h3 to 75% findings and no false claims ($0.31, outside the budget). A new blind case, h5, then checked the fix (`v0.3.1`): no false claims in 15 held-out runs, h5 96% vs the baseline's 25%. Phase 3 closed with every exit criterion met. $8.18 of $10 spent. Phase 4 planned (timings, first local run, resume, matrix). P4.1 done: every call records why it stopped and, on Ollama, where its time went; runs count calls cut off and empty replies. P4.2: the first local run (qwen3.5:9b, titanic) failed after 2 h on a prompt too long for 16k; a replay picked 32k (same speed, 3.81 of 4 GB on the GPU). Re-scoped 2026-11-18: the goal is a well-designed agentic system, local is an option; Phase 4 ends here, and one local run next to Claude goes into Phase 6. Phase 5 planned in detail (CLI and live progress, run grades, HTML report, Streamlit app, one demo run). Next: P5.1 · **Last updated:** 2026-11-18
 
 ---
 
@@ -598,18 +598,65 @@ Moved to Phase 4: resume an interrupted run (a LangGraph checkpointer and `run.p
 
 **Exit:** the provider is a setting, local runs fit their window, and every run records where its time went.
 
-### Phase 5: Product surface (M)
-- [ ] HTML report (single self-contained file, charts embedded) + Markdown.
-- [ ] CLI polish: `analyst run <csv> [--target] [--model] [--out]`, live progress output (stream graph events).
-- [ ] Minimal UI (Streamlit recommended): upload CSV → live task progress → rendered report + run artifacts.
-- [ ] Structured logging.
-- [ ] Choose the tracing backend at the start of this phase: self-hosted Langfuse (MIT, docker compose; tracing can be on by default because nothing leaves the machine) vs LangSmith (opt-in, as today). Decide on: whether always-on local tracing is part of the demo, and whether the machine has the RAM for Langfuse's services (Postgres, ClickHouse, Redis, object store) next to Ollama. Switching is about ½–1 day (`agent/tracing.py`, the eval runner's env, `.env.example`, tests).
-- [ ] Monitoring reuses the eval graders: every run gets its run-level grades from `evals/graders.py` (run success, failed tasks, unverified numbers, revisions, cost, tokens) in `run_meta.json` and on its trace as feedback.
-- [ ] One trace per analysis, linked from the run dir and the UI; root metadata (commit, preset, model, the grades above) for the tracing backend's dashboards. One rule: runs with unverified numbers or failed tasks go to a review queue.
-- [ ] The UI shows each run's grades next to the report.
-- Not planned: an online LLM judge on real runs (the eval judge needs `expected.yaml`; a reference-free claim check is Phase 3's, if the eval shows the need); OpenTelemetry (see the decision log).
+### Phase 5: Product surface (M), detailed
 
-*Budget (2026-11-12; local part changed 2026-11-18): developed against unit tests and committed runs, not local runs; paid runs only for the demo, on Haiku with `SPECIALIST_EFFORT=low` and `MAX_REVISIONS=0` where quality isn't the point.*
+**Goal:** one command, or a small web page, takes a CSV to a report you can open anywhere: live progress while it runs, a self-contained HTML report with its charts, and the run's own grades (failed tasks, unchecked numbers, cost) next to it.
+
+**Starting point (2026-11-18)**
+- `run.py <csv>` runs the graph and streams its node updates, but only into log lines; the console shows the full INFO log.
+- A run writes `report.md` with charts as PNG files under `tasks/<id>/charts/`, linked by relative path, so the report doesn't open correctly anywhere else. No HTML.
+- Run-level grades (run ok, failed tasks, unverified numbers, revisions, unresolved objections, follow-ups, cost) exist only in `evals/graders.py`, mixed with the case-specific ones (facts, caveats).
+- Prompt cuts and window warnings are counted in module globals, one run per process (`agent/context.py`). The UI must run each analysis in its own process.
+- Stored Haiku runs (P3.5, the `v0.3.1` dev check) have full reports with charts: the HTML report and the UI are built and checked on them, with no paid runs.
+
+**Decided 2026-11-18 (owner):** UI in Streamlit; LangSmith stays the tracing backend; monitoring is the run-level grades in each run and in the UI, with no trace feedback or review queue; an `analyst` console script, with the `agent` package kept.
+
+**Exit criteria**
+- [ ] `uv run analyst run data.csv` shows live progress and writes `report.md` and `report.html`; `analyst report <run dir>` renders an existing run (tests)
+- [ ] `report.html` is one file: charts embedded, no external requests, readable offline (test)
+- [ ] Every run's `run_meta.json` has its run-level grades; the eval graders use the same code (CI's regrade of the committed suites unchanged)
+- [ ] The Streamlit app: upload a CSV → progress per task → report and grades; opens past runs (a smoke test)
+- [ ] One demo run on a dataset the agent has never seen, through the app, on Haiku
+
+**P5.1 One entry point for a run** (S–M)
+- [ ] `agent/cli.py`: `run_analysis(csv, target=None, ...) -> Path` holds what `run.py`'s `main()` does today; `analyst run <csv> [--target] [--provider] [--model] [--preset] [--max-tasks] [--out DIR] [--verbose]` and `analyst report <run dir>`. Console script `analyst` in `pyproject.toml` (and its description: no longer "local-first").
+- [ ] `run.py` stays as a thin wrapper, so the eval runner's command and the committed suites keep working.
+- [ ] Tests: flags reach the settings; a scripted run (ScriptedLLM) returns its run directory with `report.md`.
+
+**P5.2 Live progress** (S–M)
+- [ ] `progress.jsonl` in the run directory, one line per event: plan made (tasks), task started, specialist step (run / finish, cell ok or error), review verdict, follow-ups added, report written, run done (status, minutes, cost). Node events come from the stream's `updates`; steps inside a task from LangGraph's custom stream (`get_stream_writer`).
+- [ ] The console prints one short line per event (e.g. `✓ eda_1 accepted · 3 findings · 1m12s`); the full log goes only to `run.log`, or to the console with `--verbose`.
+- [ ] Tests: a scripted run writes the expected events in order, including from a task run in parallel.
+
+**P5.3 Run grades in every run** (S–M)
+- [ ] `agent/run_grades.py`: the run-level grades from a run directory, moved out of `evals/graders.py` (which keeps facts and caveats and imports the rest), plus calls cut off, windows filled and empty replies (P4.1). Written into `run_meta.json` as `grades` when a run ends; cost at OpenRouter's list prices, None when offline or local.
+- [ ] Tests: grades of a scripted run; the committed suites regrade unchanged (the existing CI test).
+
+**P5.4 HTML report** (S)
+- [ ] `report.html` next to `report.md`, written at the end of every run and by `analyst report`: Markdown rendered (tables too), charts embedded as base64, plain CSS that prints well.
+- [ ] A header with the dataset, target, model, date, minutes, cost and the grades; any failed task or unverified number shown there, not only in Limitations.
+- [ ] An appendix per task: status, revisions, the lead's last objection if one stands, and its script in a collapsed block, so each finding's numbers can be traced to the code that printed them.
+- [ ] Tests: no external URLs or relative image paths; charts present; tables rendered; a run without a report renders its failure. Checked by eye on 2–3 stored Haiku runs.
+
+**P5.5 Streamlit app** (M)
+- [ ] `app/streamlit_app.py`; `streamlit` in an optional `ui` dependency group. `uv run --group ui streamlit run app/streamlit_app.py`.
+- [ ] New run: upload a CSV (or pick one from `data/`), the target (a column, or "detect"), provider and model (Anthropic Haiku by default; Ollama with a note on run time). Start runs `analyst run` as a subprocess (one run per process; a crash doesn't take the app down) and reads `progress.jsonl` every few seconds: plan, then one row per task with its steps and verdict.
+- [ ] Done: the report with its charts, the grades, the trace link, a download of `report.html`.
+- [ ] Past runs: pick any run directory and see its report and grades (the demo can use stored runs; no API spend).
+- [ ] Uploads are saved under the runs directory. The page says what leaves the machine: prompts and data samples go to the chosen provider and, when tracing is on, LangSmith.
+- [ ] Tests: the progress and run-listing helpers; a Streamlit `AppTest` smoke test opening a stored fixture run.
+
+**P5.6 Demo on a fresh dataset** (S). *~$0.10–0.20.*
+- [ ] A public CSV the agent has never been run or tuned on (chosen by the owner), run once through the app on Haiku. Its report is read for errors and kept for Phase 6's `examples/` if good.
+
+**Not planned** (decided 2026-11-18): Langfuse; grades on traces as LangSmith feedback and a review queue; an online LLM judge; OpenTelemetry; structured (JSON) console logging, since `run_meta.json`, `llm_calls.jsonl` and `progress.jsonl` already hold every run as data. Renaming the `agent` package stays open for Phase 6.
+
+**Budget:** $1.82 left. Phase 5 spends only the demo run (~$0.10–0.20); development uses tests with scripted models and stored runs. Phase 6 keeps ~$0.65 (example reports, judging the local comparison run).
+
+**Phase 5 risks**
+- Custom stream events from tasks started in parallel threads may not reach the stream. Checked first in P5.2; the fallback is node-level events only.
+- Streamlit reruns the whole script on every interaction, so long runs live in a subprocess and the page only reads files. Closing the tab doesn't stop a run; its directory still records it.
+- Charts embedded as base64 make the HTML ~0.3–1 MB; fine for a report.
 
 **Exit:** a demo-able app on a fresh dataset.
 
@@ -719,6 +766,7 @@ PLAN.md  README.md
 | 2026-11-17 | Ollama's context window 16k → 32k; local call timeout 1,800 s (`.env`) | The first local run failed when a statistical task's prompt outgrew 16k. A replay at 32k finished the cut reply at the same speed, with 3.81 of 4 GB on the GPU. Only Ollama reads `llm_num_ctx`, so Haiku's numbers stand |
 | 2026-11-18 | The goal is a well-designed agentic system, not a local-first one; local stays a setting. Phase 4 cut to P4.1–P4.2; one local run next to Claude in Phase 6 (owner) | The first local run took 2 h for two-thirds of titanic (Haiku ~8 min); a matrix of ~2 days of GPU time a model doesn't fit the time left. Replaces the 2026-10-29 local-first decision |
 | 2026-11-18 | Default provider Ollama → Anthropic; a prompt too long for Ollama's window ends its task, not the run (owner) | Follows the re-scope: Claude is the main path, `--provider ollama` the option. The first local run lost 2 h to one oversized prompt. The overflow check only runs on Ollama, so hosted runs are unchanged |
+| 2026-11-18 | Phase 5: Streamlit UI; LangSmith stays (no Langfuse); monitoring = run-level grades in each run and the UI, no trace feedback or review queue; an `analyst` console script, `agent` package kept (owner) | Langfuse's draw was traces that never leave the machine, which matters less now that Claude is the default. The grades already exist in the eval graders; a review queue has little to show in a demo |
 | 2026-10-31 | Tracing: **LangSmith only**; MLflow removed | Built for agents; clearer traces. Tracing is opt-in via env, because when it's on, prompts and data samples leave the machine (relevant to the local-first pitch) |
 | 2026-10-31 | Delete untracked `todo.md`, `docs/`, `notebooks/`, and the `multi-specialist` branch | Confirmed by owner; superseded by this plan / `feature/new-flow` |
 | 2026-10-31 | New Phase 1 (agent quality) before the eval harness | The baseline review shows structural failures; the tagged baseline keeps the before/after story measurable |
@@ -731,7 +779,7 @@ PLAN.md  README.md
 
 ### Open decisions
 - [ ] **Project name / package name** (`agent` is too generic for a portfolio repo).
-- [ ] **UI:** Streamlit (recommended, fastest) vs FastAPI + small frontend.
+- [x] **UI:** Streamlit (decided 2026-11-18).
 - [ ] **Sandbox backend default:** subprocess (recommended for v1) vs Docker.
 - [x] **Default local model:** `qwen3.5:9b`; no comparison of local models (closed 2026-11-18).
 
