@@ -100,6 +100,7 @@ class Settings(BaseSettings):
     max_tasks: int = 6  # Upper bound on planned tasks
     max_follow_ups: int = 2  # Tasks the lead may add during reviews, per run
     max_revisions: int = 1  # Times the lead may send one task back
+    max_question_tasks: int = 2  # Tasks one question after the report may run
     # Tasks worked at once (reviews stay one at a time). None: 3 on hosted
     # providers, 1 on Ollama, where a small GPU serves one request at a time
     max_parallel_tasks: int | None = None

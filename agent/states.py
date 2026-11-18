@@ -144,6 +144,38 @@ class TaskResult(BaseModel):
     reviews: list[Review] = Field(default_factory=list)
 
 
+class QuestionPlan(BaseModel):
+    """The lead's route to answering a question about a finished run"""
+
+    reasoning: str = Field(
+        description="Briefly: do the recorded facts answer the question, and if "
+        "not, what must be computed"
+    )
+    answer_now: bool = Field(
+        description="true: the facts above answer it, or the dataset can't answer it"
+    )
+    facts: list[str] = Field(
+        default_factory=list,
+        description="Facts above the answer needs, as task_id.fact_name",
+    )
+    briefs: list[Brief] = Field(
+        default_factory=list,
+        description="answer_now false: the tasks that compute what is missing",
+    )
+
+
+class Question(BaseModel):
+    """A question asked about a finished run, and its answer"""
+
+    number: int
+    text: str
+    reasoning: str = ""  # The lead's, when it chose how to answer
+    facts: list[str] = Field(default_factory=list)  # task_id.fact_name it relies on
+    tasks: list[str] = Field(default_factory=list)  # Ids of the tasks run for it
+    answer: str = ""
+    unverified_numbers: list[str] = Field(default_factory=list)  # Match no fact
+
+
 class HierarchicalState(BaseModel):
     """State for hierarchical multi-agent analysis workflow"""
 
@@ -167,3 +199,6 @@ class HierarchicalState(BaseModel):
     # Output
     report: str = ""
     unverified_numbers: list[str] = Field(default_factory=list)  # Match no fact
+
+    # Asked after the report, in order; the last one is being answered
+    questions: list[Question] = Field(default_factory=list)

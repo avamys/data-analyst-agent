@@ -11,6 +11,7 @@ from agent.nodes.lead import (
     review_node,
     run_task_node,
 )
+from agent.nodes.question import answer_node, ask_node
 from agent.nodes.report import write_report_node
 from agent.states import HierarchicalState
 
@@ -50,4 +51,25 @@ def build_hierarchical_graph() -> StateGraph:
 
     logger.info("Hierarchical graph built successfully")
 
+    return graph.compile()
+
+
+def build_question_graph() -> StateGraph:
+    """
+    Answer the last question in a finished run's state (agent/nodes/question.py)
+
+    START → ask → answer → END, or START → ask → run_task ⇄ review → answer → END
+    """
+    graph = StateGraph(HierarchicalState)
+    graph.add_node("ask", ask_node)
+    graph.add_node("run_task", run_task_node)
+    graph.add_node("review", review_node)
+    graph.add_node("answer", answer_node)
+
+    routes = {"run_task": "run_task", "report": "answer"}  # next_step's names
+    graph.add_edge(START, "ask")
+    graph.add_conditional_edges("ask", next_step, routes)
+    graph.add_edge("run_task", "review")
+    graph.add_conditional_edges("review", next_step, routes)
+    graph.add_edge("answer", END)
     return graph.compile()

@@ -145,7 +145,10 @@ def review_node(state: HierarchicalState) -> dict:
         return {"under_review": None, key: [*getattr(state, key), result]}
     checks = sanity_checks(brief, result, state.dataset_profile)
     can_revise = result.revisions < settings.max_revisions
-    follow_ups_left = settings.max_follow_ups - state.follow_ups_added
+    # After the report, tasks answer one question: no follow-ups
+    follow_ups_left = (
+        0 if state.questions else settings.max_follow_ups - state.follow_ups_added
+    )
     script = result.code
     if len(script) > settings.review_script_chars:
         context.record_cut("review script")

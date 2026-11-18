@@ -10,6 +10,7 @@ Limitations. Images whose file doesn't exist are removed.
 import json
 import logging
 import re
+from collections.abc import Callable
 from pathlib import Path
 
 from agent.config import settings
@@ -26,13 +27,6 @@ IMAGE = re.compile(r"!\[[^\]]*\]\(([^)\s]+)\)\n?")
 
 def write_report_node(state: HierarchicalState) -> dict:
     """The lead writes the report; numbers are checked, then images"""
-    values = recorded_values(state.dataset_profile.model_dump())
-    for result in state.completed_tasks:
-        # Names too: grouped facts are often named after their group, e.g.
-        # rate_(7.91, 14.454]. Not descriptions: those are free text.
-        facts = cited_facts(result)
-        values += recorded_values([[name, f["value"]] for name, f in facts.items()])
-        values += code_literals(result.code)
 
     def prompt(**draft) -> str:
         return prompt_templates.render(
@@ -48,32 +42,57 @@ def write_report_node(state: HierarchicalState) -> dict:
         )
 
     writer = BaseAgent(agent_type="reporter")
-
-    def write(**draft) -> str:
-        response = writer.invoke(prompt(**draft))
-        # text(): with thinking on (Claude), content is a list of blocks
-        text = response.text().strip()
-        if not text:
-            # e.g. the whole output cap spent thinking: fail, not an empty report
-            stop = response.response_metadata.get("stop_reason")
-            raise RuntimeError(f"The report writer returned no text (stop: {stop})")
-        return text
-
-    report = write()
-    unmatched = unmatched_numbers(report, values)
-    for _ in range(settings.max_report_rewrites):
-        if not unmatched:
-            break
-        logger.warning(f"Numbers matching no fact, sent back: {unmatched}")
-        listed = "\n".join(f'- {n} in: "{line}"' for n, line in unmatched)
-        report = write(draft=report, unmatched=listed)
-        unmatched = unmatched_numbers(report, values)
+    report, unmatched = write_checked(
+        lambda **draft: reply_text(writer.invoke(prompt(**draft)), "report"),
+        recorded_numbers(state),
+    )
     if unmatched:
         logger.warning(f"Numbers still matching no fact: {unmatched}")
         report = add_to_limitations(report, unmatched)
     report = drop_missing_images(report, Path(state.run_dir))
     logger.info(f"Report written: {len(report)} characters")
     return {"report": report, "unverified_numbers": [n for n, _ in unmatched]}
+
+
+def recorded_numbers(state: HierarchicalState) -> list:
+    """What a number in the text may match: the profile, the facts accepted
+    findings cite, and literals in the tasks' code"""
+    values = recorded_values(state.dataset_profile.model_dump())
+    for result in state.completed_tasks:
+        # Names too: grouped facts are often named after their group, e.g.
+        # rate_(7.91, 14.454]. Not descriptions: those are free text.
+        facts = cited_facts(result)
+        values += recorded_values([[name, f["value"]] for name, f in facts.items()])
+        values += code_literals(result.code)
+    return values
+
+
+def write_checked(
+    write: Callable[..., str], values: list
+) -> tuple[str, list[tuple[str, str]]]:
+    """Write, then send numbers that match no value back to the writer
+    (settings.max_report_rewrites times); returns the text and those left"""
+    text = write()
+    unmatched = unmatched_numbers(text, values)
+    for _ in range(settings.max_report_rewrites):
+        if not unmatched:
+            break
+        logger.warning(f"Numbers matching no fact, sent back: {unmatched}")
+        listed = "\n".join(f'- {n} in: "{line}"' for n, line in unmatched)
+        text = write(draft=text, unmatched=listed)
+        unmatched = unmatched_numbers(text, values)
+    return text, unmatched
+
+
+def reply_text(response, what: str) -> str:
+    """A writer's text; an empty one fails rather than becoming the output"""
+    # text(): with thinking on (Claude), content is a list of blocks
+    text = response.text().strip()
+    if not text:
+        # e.g. the whole output cap spent thinking
+        stop = response.response_metadata.get("stop_reason")
+        raise RuntimeError(f"The {what} writer returned no text (stop: {stop})")
+    return text
 
 
 def cited_facts(result: TaskResult) -> dict:
