@@ -3,7 +3,7 @@
 > **This is the main plan for the project.** It replaces `todo.md`; everything still useful from there is folded in below (see [Appendix: todo.md mapping](#appendix-todomd-mapping)).
 > Update the checkboxes and the **Status** block as work lands. Record decisions in the [Decision log](#decision-log).
 
-**Status:** Phase 1 done on `phase-1` (P1.1–P1.5). Measured on the Titanic reference run: wrong claims 7 → 0, unsupported 6 → 0, baseline findings absent 7 → 0, charts in the report 0 → 5 ([P1.5 check](docs/progress/p1.5/annotations.md)). The exit criteria were met on Claude Haiku 5.5 (9 min, $0.08 a run); not yet re-run on qwen3.5. Hosted providers (OpenRouter, Anthropic) and a cost report added. Phase 2 planned (eval harness; both versions on Haiku 5.5, Sonnet 5.5 as judge). P2.0 (central configuration, presets) and P2.1 (baseline on Haiku, `v0.1.1-baseline-hosted`) done; P2.2 (7 eval cases with known answers) done; P2.3 (runner) done; first suite, judged by hand: current 30/30 findings, baseline 16/30 ([first look](docs/eval/first-look.md)). P2.3a: task scripts no longer see API keys; Ollama prompts are checked against the context window. P2.4 (deterministic graders) done; P2.5 (LLM judge) done: on the first suite it agrees with the hand labels on 87% of findings exactly, 100% within ½. P2.6 calibration: 12 labelled reports, 93–96% exact agreement, 100% within ½; the judge agrees with itself on 95%; labels spot-checked by the owner. P2.7: `evals report` / `compare`, eval traces tagged, CI regrades the committed suites. P2.8 [before/after](docs/eval/before-after.md), 7 cases × 3 repeats on Haiku 5.5: findings 53% → 98%, false claims 0.1 → 0 a run, $0.024 → $0.076 a run; the `hosted` preset adds no findings at 1.8× the cost. Phase 2 done. Phase 3 planned: network block, 5–6 harder cases (real and synthetic), faster runs. P3.1 done (network block). P3.2: 5 new cases; the current agent scores 96% findings on them, no false claims (the bar). Fixes will be developed on these and the original cases, and judged on held-out cases nothing is tuned on. P3.2b: 4 held-out cases written by the owner ([brief](docs/eval/heldout-brief.md)), their hash committed. P3.3: time measured, parallel tasks (−13%), effort setting. P3.4 narrowed to one bug fix (findings that cite no fact); the bar's two weaknesses are measured on the held-out cases, not fixed. API spend capped at $10 for everything left (2026-11-12): the remaining plan is cut to fit. An empty report now fails the run; the writer's cap is 32k. P3.5 dev × 3: findings 96%, one half false claim in 36 runs, 9.5 min a run; on the original 7, −37% time at 98% → 96% findings. `low` effort × 1: findings 95%, −15% cost, −12% time; no large difference. $5.00 of $10 spent. Agent tagged `v0.3.0-phase3`. Held-out ([results](docs/eval/phase3.md)): findings 78% vs the baseline's 19%, but 0.2 false claims a run, all in h3 (zeros that mean "missing"; its dev twin, Pima, scored 100%, likely from memory). After it, a profile fix (numeric columns' spread; "empty cells") took h3 to 75% findings and no false claims ($0.31, outside the budget). A new blind case, h5, then checked the fix (`v0.3.1`): no false claims in 15 held-out runs, h5 96% vs the baseline's 25%. Phase 3 closed with every exit criterion met. $8.18 of $10 spent. Phase 4 planned (timings, first local run, resume, matrix). P4.1 done: every call records why it stopped and, on Ollama, where its time went; runs count calls cut off and empty replies. P4.2: the first local run (qwen3.5:9b, titanic) failed after 2 h on a prompt too long for 16k; a replay picked 32k (same speed, 3.81 of 4 GB on the GPU). Re-scoped 2026-11-18: the goal is a well-designed agentic system, local is an option; Phase 4 ends here, and one local run next to Claude goes into Phase 6. Phase 5 planned in detail (CLI and live progress, run grades, HTML report, Streamlit app, one demo run). P5.1 done (`analyst run`); P5.2 done (live progress, `progress.jsonl`); P5.3 done (grades in every run); P5.4 done (`report.html`); P5.5 done (Streamlit app); P5.6 done (demo on WHO life expectancy, $0.11; two app fixes). $8.29 of $10 spent. Next: Phase 6 · **Last updated:** 2026-11-18
+**Status:** Phase 1 done on `phase-1` (P1.1–P1.5). Measured on the Titanic reference run: wrong claims 7 → 0, unsupported 6 → 0, baseline findings absent 7 → 0, charts in the report 0 → 5 ([P1.5 check](docs/progress/p1.5/annotations.md)). The exit criteria were met on Claude Haiku 5.5 (9 min, $0.08 a run); not yet re-run on qwen3.5. Hosted providers (OpenRouter, Anthropic) and a cost report added. Phase 2 planned (eval harness; both versions on Haiku 5.5, Sonnet 5.5 as judge). P2.0 (central configuration, presets) and P2.1 (baseline on Haiku, `v0.1.1-baseline-hosted`) done; P2.2 (7 eval cases with known answers) done; P2.3 (runner) done; first suite, judged by hand: current 30/30 findings, baseline 16/30 ([first look](docs/eval/first-look.md)). P2.3a: task scripts no longer see API keys; Ollama prompts are checked against the context window. P2.4 (deterministic graders) done; P2.5 (LLM judge) done: on the first suite it agrees with the hand labels on 87% of findings exactly, 100% within ½. P2.6 calibration: 12 labelled reports, 93–96% exact agreement, 100% within ½; the judge agrees with itself on 95%; labels spot-checked by the owner. P2.7: `evals report` / `compare`, eval traces tagged, CI regrades the committed suites. P2.8 [before/after](docs/eval/before-after.md), 7 cases × 3 repeats on Haiku 5.5: findings 53% → 98%, false claims 0.1 → 0 a run, $0.024 → $0.076 a run; the `hosted` preset adds no findings at 1.8× the cost. Phase 2 done. Phase 3 planned: network block, 5–6 harder cases (real and synthetic), faster runs. P3.1 done (network block). P3.2: 5 new cases; the current agent scores 96% findings on them, no false claims (the bar). Fixes will be developed on these and the original cases, and judged on held-out cases nothing is tuned on. P3.2b: 4 held-out cases written by the owner ([brief](docs/eval/heldout-brief.md)), their hash committed. P3.3: time measured, parallel tasks (−13%), effort setting. P3.4 narrowed to one bug fix (findings that cite no fact); the bar's two weaknesses are measured on the held-out cases, not fixed. API spend capped at $10 for everything left (2026-11-12): the remaining plan is cut to fit. An empty report now fails the run; the writer's cap is 32k. P3.5 dev × 3: findings 96%, one half false claim in 36 runs, 9.5 min a run; on the original 7, −37% time at 98% → 96% findings. `low` effort × 1: findings 95%, −15% cost, −12% time; no large difference. $5.00 of $10 spent. Agent tagged `v0.3.0-phase3`. Held-out ([results](docs/eval/phase3.md)): findings 78% vs the baseline's 19%, but 0.2 false claims a run, all in h3 (zeros that mean "missing"; its dev twin, Pima, scored 100%, likely from memory). After it, a profile fix (numeric columns' spread; "empty cells") took h3 to 75% findings and no false claims ($0.31, outside the budget). A new blind case, h5, then checked the fix (`v0.3.1`): no false claims in 15 held-out runs, h5 96% vs the baseline's 25%. Phase 3 closed with every exit criterion met. $8.18 of $10 spent. Phase 4 planned (timings, first local run, resume, matrix). P4.1 done: every call records why it stopped and, on Ollama, where its time went; runs count calls cut off and empty replies. P4.2: the first local run (qwen3.5:9b, titanic) failed after 2 h on a prompt too long for 16k; a replay picked 32k (same speed, 3.81 of 4 GB on the GPU). Re-scoped 2026-11-18: the goal is a well-designed agentic system, local is an option; Phase 4 ends here, and one local run next to Claude goes into Phase 6. Phase 5 planned in detail (CLI and live progress, run grades, HTML report, Streamlit app, one demo run). P5.1 done (`analyst run`); P5.2 done (live progress, `progress.jsonl`); P5.3 done (grades in every run); P5.4 done (`report.html`); P5.5 done (Streamlit app); P5.6 done (demo on WHO life expectancy, $0.11; two app fixes). $8.29 of $10 spent. Phase 5b planned (questions after a finished run: from recorded facts or 1–2 new tasks, answers checked). Next: Q1 · **Last updated:** 2026-11-18
 
 ---
 
@@ -36,6 +36,7 @@ The story this project tells:
 - [ ] README shows the before/after eval table, one local vs. hosted comparison run, an architecture diagram, and a demo GIF.
 - [ ] CI runs lint, unit tests, and a deterministic eval smoke test (graders over a committed eval run) on every push.
 - [ ] A short UI (upload CSV → watch progress → read report) exists and is shown in the demo.
+- [ ] Questions after the report are answered from recorded facts or new tasks, with their numbers checked.
 - [ ] Tagged `v1.0.0`. Optional write-up / blog post.
 
 ### Non-goals (v1)
@@ -666,6 +667,68 @@ Moved to Phase 4: resume an interrupted run (a LangGraph checkpointer and `run.p
 
 **Exit:** a demo-able app on a fresh dataset.
 
+### Phase 5b: Questions after the report (M), detailed
+
+**Goal:** after a run, the owner asks questions in the app or the CLI. The lead answers from the run's recorded facts when they suffice, or sends 1–2 new tasks through the same run → review loop and answers from their results. Each answer's numbers are checked against recorded facts, like the report's.
+
+**Starting point:** a finished run already holds what a question needs, on disk: each task's `result.json` (findings, facts, reviews), its published objects (`tasks/<id>/*.pkl`, readable with `load()`), the plan (`state/02_plan.json`) and `report.md`. The final state isn't saved as one file (`state/NN_*.json` are each node's update), so it is rebuilt from these. A question is a follow-up task added after the report: `run_task` and `review` are reused unchanged.
+
+**Decided (owner, 2026-11-18)**
+- Built now, before Phase 6 (was Phase 7).
+- Answers sit next to the report: `questions/NN.md`, below the report in the app and in a "Questions" section of `report.html`. The report itself never changes.
+- The lead may answer from recorded facts alone, with no new task (fast and cheap; ~10–20 s, ~$0.01 on Haiku).
+
+**Design**
+```
+analyst ask <run_dir> "question"   (its own process, like a run)
+
+load run → ask ─┬─ answerable from recorded facts ─────────→ answer → END
+                └─ 1–2 briefs → run_task ⇄ review ─(done)─→ answer → END
+```
+
+**Exit criteria**
+- [ ] `analyst ask <run_dir> "…"` answers a question about a finished run, from its facts or from new tasks, and records it in the run (tests)
+- [ ] Every number in an answer is checked against recorded facts; unmatched ones go back once, then are flagged (test)
+- [ ] Later questions see earlier questions' answers, facts and published objects (test)
+- [ ] The app: a question box below the report, the task table while it runs, earlier questions and answers listed (smoke test)
+- [ ] 3 real questions on the P5.6 demo run (one from facts, one needing a new task, one the data can't answer), read by the owner
+
+**Q1 Open a finished run** (S). *~½ day.*
+- [ ] `load_run(run_dir) -> HierarchicalState`: profile recomputed from the CSV (deterministic), plan from `state/02_plan.json`, completed and failed tasks from `tasks/*/result.json`, report from `report.md`. A missing CSV or a run from an older state format fails with a clear message.
+- [ ] `RunStore.open(run_dir)`: writes into an existing run; `llm_calls.jsonl` and `progress.jsonl` are appended to, state files keep their numbering.
+- *Check:* the rebuilt state of a scripted run equals its real final state; the stored P5.6 run loads.
+
+**Q2 Ask and answer nodes** (M). *~1 day.*
+- [ ] `ask` node (lead): sees the question, the plan, every task's findings with their fact names, and earlier questions and answers. Returns either `answer_now` with the facts it relies on, or up to 2 briefs (ids `q<N>_<specialist>_<k>`, which may depend on existing tasks and load their outputs).
+- [ ] The new briefs run through `run_task` ⇄ `review` with the preset's revision limit; reviews add no follow-ups during a question.
+- [ ] `answer` node: a short answer from the new results and the facts `ask` picked; the number check reused from the report writer; numbers that match no fact go back once, then are flagged. A task that failed is said so in the answer.
+- [ ] A second graph for questions, next to the run graph.
+- *Check:* scripted-model tests: an answer from facts with no task; a new task with a revision; a failed task; a flagged number; a second question using the first's output.
+
+**Q3 CLI, records, HTML** (S). *~½ day.*
+- [ ] `analyst ask <run_dir> "question"`. Progress events `question` and `answer`; the console shows them like a run's.
+- [ ] `questions/NN.md` per question; `run_meta.json` gets a `questions` list, each with its question, start, seconds, tasks, cost and grades.
+- [ ] `report.html` gets a "Questions" section after the report (each answer, its charts, its tasks in the appendix).
+- *Check:* CLI and HTML tests, as for P5.1 and P5.4.
+
+**Q4 The app** (S). *~½ day.*
+- [ ] Below the report: a question box, launching `analyst ask` as its own process; the task table while it runs (reused from P5.5); earlier questions and answers listed. One question at a time per run.
+- *Check:* AppTest smoke test; a free real launch (a missing Ollama model), as in P5.5.
+
+**Q5 Real questions on the demo run** (S). *~$0.10–0.20.*
+- [ ] On the P5.6 run, on Haiku, through the app: one question the recorded facts answer, one that needs a new task, one the data can't answer. The owner reads the answers; their numbers are checked against the CSV.
+
+**Not planned:** changing the report from answers; follow-ups added during a question; questions during a run (plan approval, LangGraph interrupt) stays in Phase 7; questions across runs.
+
+**Budget:** Q5 only (~$0.10–0.20); development uses scripted models. Per question in use: ~$0.01 from facts, ~$0.02–0.06 with new tasks (1–4 min).
+
+**Risks**
+- A question too big for 2 tasks ("now build a churn model"): the cap holds; the answer says what wasn't covered.
+- The `ask` prompt holds every task's findings: fine on Claude; on Ollama at 32k a long run may overflow, which fails that question, not the run.
+- Runs whose CSV moved, or from an older state format, can't take questions; the command says so.
+
+**Exit:** ask a question of a finished run in the app and get a checked answer.
+
 ### Phase 6: Showcase (M)
 - [ ] README rewrite: pitch, architecture diagram, before/after + model comparison tables, quickstart, design decisions, limitations.
 - [ ] Demo GIF/video (UI on a non-Titanic dataset).
@@ -676,7 +739,6 @@ Moved to Phase 4: resume an interrupted run (a LangGraph checkpointer and `run.p
 - [ ] Optional: write-up "Measuring and cutting hallucinated numbers in a data-analysis agent."
 
 ### Phase 7: Stretch (post-v1.0)
-- Natural-language questions ("why did survival differ by class?") → targeted plan.
 - Resume an interrupted run: a LangGraph checkpointer and `run.py --resume`; `evals run --resume` for suites (was P4.3; moved 2026-11-18).
 - Human-in-the-loop plan approval (LangGraph interrupt).
 - Time-series and clustering specialists (`datetime_trend` case becomes a real target).
@@ -774,6 +836,7 @@ PLAN.md  README.md
 | 2026-11-18 | Default provider Ollama → Anthropic; a prompt too long for Ollama's window ends its task, not the run (owner) | Follows the re-scope: Claude is the main path, `--provider ollama` the option. The first local run lost 2 h to one oversized prompt. The overflow check only runs on Ollama, so hosted runs are unchanged |
 | 2026-11-18 | Phase 5: Streamlit UI; LangSmith stays (no Langfuse); monitoring = run-level grades in each run and the UI, no trace feedback or review queue; an `analyst` console script, `agent` package kept (owner) | Langfuse's draw was traces that never leave the machine, which matters less now that Claude is the default. The grades already exist in the eval graders; a review queue has little to show in a demo |
 | 2026-11-18 | The app runs hosted providers with the `hosted` preset (2 revisions, 5 follow-ups); the CLI and evals keep `local` as the default (owner) | The demo run on Haiku left 2 review objections open at the `local` limit of 1 revision. Changing the default everywhere would make new eval runs incomparable with the stored ones. ~2× the time and cost (~$0.18 a run) |
+| 2026-11-18 | Questions after the report built now, as Phase 5b (was Phase 7); answers sit next to the report, never change it; the lead may answer from recorded facts with no new task (owner) | The strongest agentic feature for the demo, and most of it exists: a question is a follow-up task after the report. ~3 days; ~$0.10–0.20 to check, within the budget left after Phase 6's ~$0.65 |
 | 2026-10-31 | Tracing: **LangSmith only**; MLflow removed | Built for agents; clearer traces. Tracing is opt-in via env, because when it's on, prompts and data samples leave the machine (relevant to the local-first pitch) |
 | 2026-10-31 | Delete untracked `todo.md`, `docs/`, `notebooks/`, and the `multi-specialist` branch | Confirmed by owner; superseded by this plan / `feature/new-flow` |
 | 2026-10-31 | New Phase 1 (agent quality) before the eval harness | The baseline review shows structural failures; the tagged baseline keeps the before/after story measurable |
@@ -804,7 +867,7 @@ PLAN.md  README.md
 | Streaming output | Phase 5 |
 | Enhanced retry strategy | Phase 1 (specialist loop) + Phase 3 |
 | Visualization generation | Phase 1 |
-| Human-in-the-loop | Phase 7 |
+| Human-in-the-loop | Phase 5b (questions after the report); Phase 7 (plan approval) |
 | Memory/history | Phase 7 |
 | Web interface | Phase 5 |
 | Model selection | Phase 4 (provider setting); one local comparison in Phase 6 |
