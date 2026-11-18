@@ -7,6 +7,8 @@ Layout of runs/<YYYYmmdd-HHMMSS>_<dataset>_<model>/:
     state/NN_<node>.json  graph state after each top-level node
     tasks/<task_id>/      attempt_N.py, attempt_N_output.txt, result.json
     report.md             final report
+
+load_run() rebuilds a finished run's final state from these files.
 """
 
 import json
@@ -21,7 +23,11 @@ from uuid import UUID
 
 import httpx
 from langchain_core.callbacks import BaseCallbackHandler
+from pydantic import ValidationError
 from pydantic_core import to_jsonable_python
+
+from agent.data_loader import generate_dataset_info, load_dataset
+from agent.states import HierarchicalState
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +99,14 @@ class RunStore:
         self.path.mkdir(parents=True)
         self._point_latest()
 
+    @classmethod
+    def open(cls, run_dir: str | Path) -> "RunStore":
+        """An existing run, to add to (questions after its report)"""
+        store = cls.__new__(cls)
+        store.path = Path(run_dir)
+        store.root = store.path.parent
+        return store
+
     def _point_latest(self):
         latest = self.root / "latest"
         try:
@@ -121,6 +135,44 @@ class RunStore:
                     f"{task_dir}/attempt_{a['attempt']}_output.txt", a["output"] or ""
                 )
             self.write_json(f"{task_dir}/result.json", result)
+
+
+def load_run(run_dir: str | Path) -> HierarchicalState:
+    """A finished run's final state: its starting state with every node's update
+    applied in order (each update holds whole fields, not increments)"""
+    run_dir = Path(run_dir).resolve()
+    if not (run_dir / "run_meta.json").exists():
+        raise ValueError(f"{run_dir} is not a run directory (no run_meta.json)")
+    meta = json.loads((run_dir / "run_meta.json").read_text())
+    if meta.get("status") != "ok" or not (run_dir / "report.md").exists():
+        raise ValueError(f"{run_dir.name} has no finished report to ask about")
+    csv, target = _started_with(meta)
+    if not csv or not Path(csv).exists():
+        raise ValueError(f"The CSV {run_dir.name} analysed is gone: {csv}")
+    state = {
+        "dataset_info": generate_dataset_info(load_dataset(csv), csv),
+        "dataset_path": csv,
+        "target_column": target,
+        "run_dir": str(run_dir),
+    }
+    for update in sorted((run_dir / "state").glob("*.json")):
+        state.update(json.loads(update.read_text()) or {})
+    try:
+        return HierarchicalState.model_validate(state)
+    except ValidationError as e:
+        raise ValueError(
+            f"{run_dir.name} was recorded in an older format ({e.error_count()} "
+            "fields don't match)"
+        ) from e
+
+
+def _started_with(meta: dict) -> tuple[str | None, str | None]:
+    """The CSV and target a run started with; older runs only have the command"""
+    if "dataset_path" in meta:
+        return meta["dataset_path"], meta.get("target")
+    command = meta.get("command", [])
+    after = {flag: command[i + 1] for i, flag in enumerate(command[:-1])}
+    return after.get("run"), after.get("--target")
 
 
 class LLMCallRecorder(BaseCallbackHandler):

@@ -131,6 +131,8 @@ def run_analysis(
         "status": "running",
         "run_id": str(run_id),
         "dataset": dataset,
+        "dataset_path": initial_state["dataset_path"],
+        "target": target,
         "started": datetime.now().isoformat(timespec="seconds"),
         "command": sys.argv,
         "commit": commit,

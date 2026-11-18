@@ -1,12 +1,20 @@
 import json
+from pathlib import Path
 
+import pytest
+from conftest import ScriptedLLM
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.graph import END, START, StateGraph
+from test_lead import _brief, _plan, accept, revise
+from test_specialist import finish, run_cell
 from typing_extensions import TypedDict
 
-from agent.run_store import LLMCallRecorder, RunStore
-from agent.states import TaskResult
+from agent import cli
+from agent.config import settings
+from agent.core.llm_manager import LLMManager
+from agent.run_store import LLMCallRecorder, RunStore, load_run
+from agent.states import HierarchicalState, TaskResult
 
 
 def test_recorder_captures_calls_made_inside_graph_nodes(tmp_path):
@@ -192,3 +200,56 @@ def test_ollama_snapshot_gives_the_share_of_each_model_on_the_gpu(monkeypatch):
 
     monkeypatch.setattr(run_store.httpx, "get", unreachable)
     assert run_store.ollama_snapshot("http://ollama") is None
+
+
+def test_load_run_rebuilds_the_final_state(monkeypatch, tmp_path, small_csv):
+    final = {}
+
+    class Recorded:  # the real graph, keeping the last full state it streams
+        def __init__(self, graph):
+            self.graph = graph
+
+        def stream(self, *args, **kwargs):
+            for mode, chunk in self.graph.stream(*args, **kwargs):
+                if mode == "values":
+                    final.update(chunk)
+                yield mode, chunk
+
+    graph = cli.build_hierarchical_graph
+    monkeypatch.setattr(cli, "build_hierarchical_graph", lambda: Recorded(graph()))
+    monkeypatch.setattr(settings, "runs_directory", str(tmp_path / "runs"))
+    monkeypatch.setattr(settings, "max_parallel_tasks", 1)
+    llm = ScriptedLLM(
+        [
+            _plan(_brief("eda_1"), _brief("eda_2")),
+            run_cell("record_fact('n', len(df), 'Rows')"),
+            finish("n"),
+            revise("Also record m."),
+            run_cell("record_fact('m', 2, 'Two')"),
+            finish("n", "m"),
+            accept(),
+            finish(),
+            accept(),
+            "the report",
+        ]
+    )
+    monkeypatch.setattr(LLMManager, "get_llm", lambda **_: llm)
+    run_dir = cli.run_analysis(Path(small_csv), target="target")
+
+    loaded = load_run(run_dir)
+    assert loaded.model_dump() == HierarchicalState(**final).model_dump()
+    assert [t.task_id for t in loaded.completed_tasks] == ["eda_1", "eda_2"]
+    assert loaded.completed_tasks[0].facts.keys() == {"n", "m"}
+
+    Path(small_csv).unlink()
+    with pytest.raises(ValueError, match="is gone"):
+        load_run(run_dir)
+    with pytest.raises(ValueError, match="not a run directory"):
+        load_run(tmp_path)
+
+
+def test_open_adds_to_an_existing_run(tmp_path):
+    store = RunStore.open(tmp_path)
+    store.write_text("questions/01.md", "an answer")
+    assert (tmp_path / "questions/01.md").read_text() == "an answer"
+    assert not (tmp_path.parent / "latest").exists()
