@@ -20,8 +20,9 @@ from pathlib import Path
 
 from dotenv import dotenv_values
 
+from agent.costs import fetch_prices
 from evals.cases import Case, dataset, load_case
-from evals.graders import fetch_prices, grade
+from evals.graders import grade
 
 ROOT = Path(__file__).resolve().parent.parent
 RUNS_DIR = ROOT / "evals" / "runs"

@@ -41,6 +41,24 @@ def _minutes(seconds: float) -> str:
     return f"{int(seconds // 60)}m{int(seconds % 60):02d}s"
 
 
+def _grades_line(grades: dict) -> str:
+    """The run's grades in one line, e.g. "5 tasks done, 1 failed · $0.081" """
+    if grades.get("tasks_completed") is None:
+        return ""
+    parts = [f"{_count(grades['tasks_completed'], 'task')} done"]
+    if grades.get("tasks_failed"):
+        parts[0] += f", {grades['tasks_failed']} failed"
+    if grades.get("unverified_numbers"):
+        parts.append(
+            f"{_count(grades['unverified_numbers'], 'number')} not traced to a fact"
+        )
+    if grades.get("unresolved_objections"):
+        parts.append(f"{_count(grades['unresolved_objections'], 'open objection')}")
+    if grades.get("cost_usd") is not None:
+        parts.append(f"${grades['cost_usd']:.3f}")
+    return "\n  " + " · ".join(parts)
+
+
 class Progress:
     """Writes events to progress.jsonl and prints one line per event"""
 
@@ -167,6 +185,8 @@ class Progress:
         if kind == "run_done":
             took = _minutes(event["seconds"])
             if event["status"] == "ok":
-                return f"Done in {took}: {event['report'] or 'no report'}"
-            return f"Run {event['status']} after {took}: {event.get('error') or ''}"
+                line = f"Done in {took}: {event['report'] or 'no report'}"
+            else:
+                line = f"Run {event['status']} after {took}: {event.get('error') or ''}"
+            return line + _grades_line(event.get("grades") or {})
         return None

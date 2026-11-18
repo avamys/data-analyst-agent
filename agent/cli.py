@@ -14,11 +14,13 @@ from dotenv import load_dotenv
 from agent import context
 from agent.config import PRESETS, settings
 from agent.core.llm_manager import LLMManager
+from agent.costs import fetch_prices
 from agent.data_loader import generate_dataset_info, load_dataset
 from agent.execution.runner import network_blocked
 from agent.graph import build_hierarchical_graph
 from agent.logging_config import setup_logging
 from agent.progress import Progress
+from agent.run_grades import run_grades
 from agent.run_store import LLMCallRecorder, RunStore, ollama_snapshot
 from agent.tracing import eval_metadata, trace_url, tracing_enabled
 
@@ -164,6 +166,9 @@ def run_analysis(
                 store.write_json("run_meta.json", meta)
                 progress.update(node, update)
                 node_start = time.time()
+        if result.get("report"):
+            store.write_text("report.md", result["report"])
+            logger.info(f"Report saved to: {store.path / 'report.md'}")
         meta["status"] = "ok"
     except KeyboardInterrupt:
         meta["status"] = "interrupted"
@@ -207,30 +212,25 @@ def run_analysis(
                 "loaded": ollama_snapshot(settings.ollama_base_url),
             }
         store.write_json("run_meta.json", meta)
+        # Graded from the files just written; no prices for local models
+        prices = fetch_prices() if settings.model_provider != "ollama" else None
+        meta["grades"] = run_grades(store.path, prices)
+        store.write_json("run_meta.json", meta)
         if meta["trace_url"]:
             logger.info(f"LangSmith trace: {meta['trace_url']}")
         logger.info(f"Run {meta['status']} in {meta['seconds']}s: {store.path}")
-
-        if meta["status"] != "ok":
-            progress.event(_done(meta, None))
-
-    report = None
-    if result.get("report"):
         report = store.path / "report.md"
-        store.write_text("report.md", result["report"])
-        logger.info(f"Report saved to: {report}")
-    progress.event(_done(meta, report))
+        progress.event(
+            {
+                "event": "run_done",
+                "status": meta["status"],
+                "seconds": meta["seconds"],
+                "error": meta.get("error"),
+                "report": str(report) if report.exists() else None,
+                "grades": meta["grades"],
+            }
+        )
     return store.path
-
-
-def _done(meta: dict, report: Path | None) -> dict:
-    return {
-        "event": "run_done",
-        "status": meta["status"],
-        "seconds": meta["seconds"],
-        "error": meta.get("error"),
-        "report": str(report) if report else None,
-    }
 
 
 def main(argv: list[str] | None = None) -> int:
