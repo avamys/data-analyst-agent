@@ -15,6 +15,8 @@ uv run python scripts/llm_smoke.py   # checks the model setup (about a minute)
 uv run analyst run data/titanic.csv --target Survived
 ```
 
+Or in the browser: `uv run --group ui streamlit run app/streamlit_app.py` (upload a CSV, watch each task, read the report; past runs open there too).
+
 Each run writes a directory under `runs/` with the full log, every LLM call, the state after each step, every code attempt, and `report.md`. See [docs/baseline/run/](docs/baseline/run/) for an example.
 
 All settings that change a run (provider and model, budgets, prompt caps, check thresholds) are in [agent/config.py](agent/config.py), overridable in `.env` or per run; `--preset hosted` gives hosted models a larger budget (more follow-up tasks and revisions).

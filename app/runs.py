@@ -1,0 +1,94 @@
+"""What the app reads from run directories: the runs under a folder, a run's
+progress events (agent/progress.py) and the state of each task so far"""
+
+import json
+from pathlib import Path
+
+
+def read_events(run_dir: Path) -> list[dict]:
+    """progress.jsonl so far; a line still being written is skipped"""
+    path = run_dir / "progress.jsonl"
+    if not path.exists():
+        return []
+    events = []
+    for line in path.read_text().splitlines():
+        try:
+            events.append(json.loads(line))
+        except json.JSONDecodeError:
+            break
+    return events
+
+
+def task_rows(events: list[dict]) -> list[dict]:
+    """One row per task, in plan order, then follow-ups as they're added"""
+    tasks: dict[str, dict] = {}
+
+    def add(brief: dict, follow_up=False):
+        tasks.setdefault(
+            brief["id"],
+            {
+                "task": brief["id"],
+                "specialist": brief["specialist"],
+                "question": brief["question"],
+                "state": "waiting",
+                "cells": 0,
+                "errors": 0,
+                "findings": None,
+                "revisions": 0,
+                "follow-up": follow_up,
+            },
+        )
+
+    for e in events:
+        kind = e["event"]
+        if kind == "plan":
+            for brief in e["tasks"]:
+                add(brief)
+        elif kind == "task_started" and e["task"] in tasks:
+            row = tasks[e["task"]]
+            row["state"] = "revising" if e.get("revision") else "running"
+            row["revisions"] = e.get("revision") or 0
+        elif kind == "step" and e["task"] in tasks:
+            tasks[e["task"]]["cells"] += 1
+            tasks[e["task"]]["errors"] += bool(e.get("error"))
+        elif kind == "task_finished" and e["task"] in tasks:
+            row = tasks[e["task"]]
+            row["state"] = "in review"
+            row["findings"] = e["findings"]
+        elif kind == "reviewed" and e["task"] in tasks:
+            tasks[e["task"]]["state"] = {
+                "revise": "sent back",
+                "completed": "accepted",
+                "failed": "failed",
+            }[e["outcome"]]
+            for brief in e.get("follow_ups", []):
+                add(brief, follow_up=True)
+    return list(tasks.values())
+
+
+def list_runs(root: Path) -> list[dict]:
+    """Run directories under root (at any depth), newest first"""
+    runs = []
+    for meta_file in root.rglob("run_meta.json"):
+        run_dir = meta_file.parent
+        if run_dir.is_symlink() or any(p.is_symlink() for p in run_dir.parents):
+            continue  # runs/latest points at a run listed already
+        try:
+            meta = json.loads(meta_file.read_text())
+        except (json.JSONDecodeError, OSError):
+            continue
+        cost = (meta.get("grades") or {}).get("cost_usd")
+        runs.append(
+            {
+                "run_dir": run_dir,
+                "name": run_dir.name,
+                "status": meta.get("status"),
+                "started": meta.get("started", ""),
+                "minutes": round(meta["seconds"] / 60, 1)
+                if meta.get("seconds")
+                else None,
+                "cost": cost,
+                "report": (run_dir / "report.md").exists(),
+            }
+        )
+    return sorted(runs, key=lambda r: r["started"], reverse=True)

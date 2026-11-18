@@ -92,7 +92,11 @@ def run_analysis(
     progress = Progress(store.path / "progress.jsonl", echo=not verbose)
     logger.info(f"Run directory: {store.path}")
     if not verbose:
-        print(f"Run directory: {store.path} ({settings.model_provider}, {model})")
+        # Flushed: the app finds the run by this line while the run goes on
+        print(
+            f"Run directory: {store.path} ({settings.model_provider}, {model})",
+            flush=True,
+        )
 
     df = load_dataset(str(csv_path))
     dataset_info = generate_dataset_info(df, str(csv_path))
