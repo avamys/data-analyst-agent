@@ -10,8 +10,9 @@ from langchain_core.messages import AIMessage
 from test_specialist import finish, run_cell
 
 from agent.config import settings
+from agent.context import ContextOverflowError
 from agent.core.llm_manager import LLMManager
-from agent.core.specialists import format_task_report
+from agent.core.specialists import SpecialistAgent, format_task_report
 from agent.graph import build_hierarchical_graph
 from agent.nodes.lead import PlanValidationError, validate_plan
 from agent.states import Brief, Finding, LeadPlan, Output, Review, TaskReport
@@ -197,6 +198,42 @@ def test_a_failed_task_is_recorded_and_the_run_continues(analyse):
     )
     assert [r.task_id for r in state["failed_tasks"]] == ["eda_1"]
     assert [r.task_id for r in state["completed_tasks"]] == ["eda_2"]
+
+
+def test_a_prompt_too_long_for_the_window_fails_the_task_not_the_run(
+    analyse, monkeypatch
+):
+    # P4.2: on Ollama one oversized prompt stopped a 2-hour run
+    def too_long(self, brief, state, previous=None):
+        raise ContextOverflowError("eda prompt can't fit")
+
+    monkeypatch.setattr(SpecialistAgent, "execute", too_long)
+    state, llm = analyse(_plan(_brief("eda_1")))
+    (failed,) = state["failed_tasks"]
+    assert "can't fit" in failed.error
+    assert not any("Review the report" in p for p in llm.prompts)  # nothing to review
+
+
+def test_a_revision_too_long_for_the_window_keeps_the_last_report(analyse, monkeypatch):
+    execute = SpecialistAgent.execute
+
+    def too_long_on_revision(self, brief, state, previous=None):
+        if previous is not None:
+            raise ContextOverflowError("eda prompt can't fit")
+        return execute(self, brief, state)
+
+    monkeypatch.setattr(SpecialistAgent, "execute", too_long_on_revision)
+    state, llm = analyse(
+        _plan(_brief("eda_1")),
+        run_cell("record_fact('n', len(df), 'Rows')"),
+        finish("n"),
+        revise("Also record m."),
+    )
+    # As when revisions run out: the report stands, the objection unresolved
+    (result,) = state["completed_tasks"]
+    assert set(result.facts) == {"n"}
+    assert "Unresolved review issue: Also record m." in format_task_report(result)
+    assert sum("Review the report" in p for p in llm.prompts) == 1
 
 
 def test_missing_outputs_send_the_task_back_even_if_the_lead_accepts(

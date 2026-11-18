@@ -21,7 +21,7 @@ from agent.core.base_agent import BaseAgent
 from agent.core.specialists import format_task_report, get_specialist
 from agent.core.template_manager import prompt_templates
 from agent.profiling import auto_profile_dataset, profile_summary
-from agent.states import Brief, HierarchicalState, LeadPlan, Review
+from agent.states import Brief, HierarchicalState, LeadPlan, Review, TaskResult
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ def run_task_node(state: HierarchicalState) -> dict:
         brief, backlog = previous.brief, state.backlog
         _start_ready(state, backlog)
         logger.info(f"Revising {brief.id} (revision {previous.revisions})")
-        result = get_specialist(brief.specialist).execute(brief, state, previous)
+        result = _execute(brief, state, previous)
         return {"under_review": result, "backlog": backlog}
 
     brief, backlog = state.backlog[0], state.backlog[1:]
@@ -78,8 +78,35 @@ def run_task_node(state: HierarchicalState) -> dict:
         result = started.result()
     else:
         logger.info(f"Running {brief.id} ({brief.specialist}): {brief.question}")
-        result = get_specialist(brief.specialist).execute(brief, state)
+        result = _execute(brief, state)
     return {"under_review": result, "backlog": backlog}
+
+
+def _execute(
+    brief: Brief, state: HierarchicalState, previous: TaskResult | None = None
+) -> TaskResult:
+    """
+    Run a brief. A prompt that can't fit Ollama's context window ends the task,
+    not the run, and skips its review: a first run fails; a revision keeps the
+    last report, its objection unresolved, as when revisions run out.
+    """
+    try:
+        return get_specialist(brief.specialist).execute(brief, state, previous)
+    except context.ContextOverflowError as e:
+        logger.warning(f"{brief.id} stopped: {e}")
+        if previous is not None:
+            return previous.model_copy(
+                update={"metadata": {**previous.metadata, "overflow": str(e)}}
+            )
+        return TaskResult(
+            task_id=brief.id,
+            specialist=brief.specialist,
+            description=brief.question,
+            success=False,
+            error=f"Stopped: {e}",
+            brief=brief,
+            metadata={"overflow": str(e)},
+        )
 
 
 # Briefs started ahead of their turn, by run directory and task id. The context
@@ -104,10 +131,7 @@ def _start_ready(state: HierarchicalState, waiting: list[Brief]):
         if (state.run_dir, brief.id) in _started or not set(brief.depends_on) <= done:
             continue
         logger.info(f"Starting {brief.id} ({brief.specialist}): {brief.question}")
-        specialist = get_specialist(brief.specialist)
-        _started[state.run_dir, brief.id] = _pool.submit(
-            specialist.execute, brief, state
-        )
+        _started[state.run_dir, brief.id] = _pool.submit(_execute, brief, state)
         free -= 1
 
 
@@ -115,6 +139,10 @@ def review_node(state: HierarchicalState) -> dict:
     """The lead accepts the task or sends it back, and may add follow-up briefs"""
     result = state.under_review
     brief = result.brief
+    if "overflow" in result.metadata:  # Nothing new to review (see _execute)
+        key = "completed_tasks" if result.success else "failed_tasks"
+        logger.info(f"{brief.id} done: {key.split('_')[0]}, without a review")
+        return {"under_review": None, key: [*getattr(state, key), result]}
     checks = sanity_checks(brief, result, state.dataset_profile)
     can_revise = result.revisions < settings.max_revisions
     follow_ups_left = settings.max_follow_ups - state.follow_ups_added

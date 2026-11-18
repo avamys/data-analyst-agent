@@ -31,9 +31,9 @@ class Settings(BaseSettings):
     preset: Literal["local", "hosted"] = "local"
 
     # --- Provider and models ---
-    # Where models run: local Ollama, or hosted OpenRouter / Anthropic. Each provider
+    # Where models run: hosted Anthropic / OpenRouter, or local Ollama. Each provider
     # keeps its own model, so switching is one setting (MODEL_PROVIDER or --provider).
-    model_provider: Literal["ollama", "openrouter", "anthropic"] = "ollama"
+    model_provider: Literal["ollama", "openrouter", "anthropic"] = "anthropic"
 
     # Ollama configuration
     ollama_base_url: str = "http://host.docker.internal:11434"

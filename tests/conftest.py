@@ -6,6 +6,15 @@ import pytest
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableLambda
 
+from agent.config import settings
+
+
+@pytest.fixture(autouse=True)
+def ollama_provider(monkeypatch):
+    """ScriptedLLM stands in for an Ollama model, the default until 2026-11-18;
+    tests of other providers set their own"""
+    monkeypatch.setattr(settings, "model_provider", "ollama")
+
 
 @pytest.fixture
 def small_df() -> pd.DataFrame:
