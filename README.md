@@ -12,7 +12,7 @@ Requires [uv](https://docs.astral.sh/uv/) and an [Anthropic](https://platform.cl
 uv sync
 cp .env.example .env              # pick the provider and model; LangSmith tracing; GPU layers
 uv run python scripts/llm_smoke.py   # checks the model setup (about a minute)
-uv run python run.py data/titanic.csv --target Survived
+uv run analyst run data/titanic.csv --target Survived
 ```
 
 Each run writes a directory under `runs/` with the full log, every LLM call, the state after each step, every code attempt, and `report.md`. See [docs/baseline/run/](docs/baseline/run/) for an example.
