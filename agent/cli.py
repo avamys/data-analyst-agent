@@ -18,6 +18,7 @@ from agent.data_loader import generate_dataset_info, load_dataset
 from agent.execution.runner import network_blocked
 from agent.graph import build_hierarchical_graph
 from agent.logging_config import setup_logging
+from agent.progress import Progress
 from agent.run_store import LLMCallRecorder, RunStore, ollama_snapshot
 from agent.tracing import eval_metadata, trace_url, tracing_enabled
 
@@ -47,6 +48,9 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument(
         "--out", type=Path, help="Directory for run directories (default: runs)"
     )
+    run.add_argument(
+        "--verbose", action="store_true", help="Show the full log, not just progress"
+    )
     return parser
 
 
@@ -67,13 +71,21 @@ def apply_flags(args: argparse.Namespace) -> None:
         settings.runs_directory = str(args.out)
 
 
-def run_analysis(csv_path: Path, target: str | None = None) -> Path:
-    """Run the analysis workflow; returns the run directory"""
+def run_analysis(
+    csv_path: Path, target: str | None = None, verbose: bool = False
+) -> Path:
+    """Run the analysis workflow; returns the run directory. The console shows
+    progress and warnings, or with `verbose` the full log; run.log has it all."""
     dataset = csv_path.stem
     model = LLMManager.resolve_config("lead")[0]
     store = RunStore(settings.runs_directory, dataset, model)
-    setup_logging(settings.log_level, log_file=store.path / "run.log")
+    setup_logging(
+        settings.log_level if verbose else "WARNING", log_file=store.path / "run.log"
+    )
+    progress = Progress(store.path / "progress.jsonl", echo=not verbose)
     logger.info(f"Run directory: {store.path}")
+    if not verbose:
+        print(f"Run directory: {store.path} ({settings.model_provider}, {model})")
 
     df = load_dataset(str(csv_path))
     dataset_info = generate_dataset_info(df, str(csv_path))
@@ -126,12 +138,16 @@ def run_analysis(csv_path: Path, target: str | None = None) -> Path:
     result = {}
     start = node_start = time.time()
     try:
-        # "updates" gives each node's output, "values" the full state after it
+        # "updates" gives each node's output, "values" the full state after it,
+        # "custom" the progress events sent from inside nodes (agent/progress.py)
         for mode, chunk in workflow.stream(
-            initial_state, config=config, stream_mode=["updates", "values"]
+            initial_state, config=config, stream_mode=["updates", "values", "custom"]
         ):
             if mode == "values":
                 result = chunk
+                continue
+            if mode == "custom":
+                progress.event(chunk)
                 continue
             for node, update in chunk.items():
                 # Save each task as soon as it has run or been reviewed
@@ -146,6 +162,7 @@ def run_analysis(csv_path: Path, target: str | None = None) -> Path:
                 )
                 store.write_json(f"state/{step:02d}_{node}.json", update)
                 store.write_json("run_meta.json", meta)
+                progress.update(node, update)
                 node_start = time.time()
         meta["status"] = "ok"
     except KeyboardInterrupt:
@@ -194,10 +211,26 @@ def run_analysis(csv_path: Path, target: str | None = None) -> Path:
             logger.info(f"LangSmith trace: {meta['trace_url']}")
         logger.info(f"Run {meta['status']} in {meta['seconds']}s: {store.path}")
 
+        if meta["status"] != "ok":
+            progress.event(_done(meta, None))
+
+    report = None
     if result.get("report"):
+        report = store.path / "report.md"
         store.write_text("report.md", result["report"])
-        logger.info(f"Report saved to: {store.path / 'report.md'}")
+        logger.info(f"Report saved to: {report}")
+    progress.event(_done(meta, report))
     return store.path
+
+
+def _done(meta: dict, report: Path | None) -> dict:
+    return {
+        "event": "run_done",
+        "status": meta["status"],
+        "seconds": meta["seconds"],
+        "error": meta.get("error"),
+        "report": str(report) if report else None,
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -208,7 +241,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.csv_path.exists():
         parser.error(f"Dataset not found: {args.csv_path}")
     apply_flags(args)
-    run_analysis(args.csv_path, args.target)
+    run_analysis(args.csv_path, args.target, verbose=args.verbose)
     return 0
 
 

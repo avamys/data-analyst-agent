@@ -13,6 +13,7 @@ from agent.core.base_agent import BaseAgent
 from agent.core.template_manager import prompt_templates
 from agent.execution.cells import join_cells, split_cells
 from agent.execution.runner import SCRIPT, ScriptResult, prepare_task_dir, run_script
+from agent.progress import emit
 from agent.states import (
     Brief,
     HierarchicalState,
@@ -135,6 +136,13 @@ class SpecialistAgent(BaseAgent):
         previous: TaskResult | None = None,
     ) -> TaskResult:
         """Work a brief; with `previous`, revise it after the lead's last review"""
+        emit(
+            "task_started",
+            task=task.id,
+            specialist=self.specialist_type,
+            question=task.question,
+            revision=previous.revisions if previous else 0,
+        )
         task_dir = prepare_task_dir(
             Path(state.run_dir) / "tasks" / task.id,
             state.dataset_path,
@@ -205,6 +213,7 @@ class SpecialistAgent(BaseAgent):
                     }
                 )
                 observation = f"Your cell has a syntax error and was not run:\n{error}"
+                emit("step", task=task.id, step=step, error="SyntaxError")
                 continue
             if last is not None and not last.ok:
                 cells[-1] = code  # Replace the cell that failed
@@ -230,6 +239,7 @@ class SpecialistAgent(BaseAgent):
                 + (f"\nError:\n{cell.error}" if cell.error else "")
             )
             observation = self._observe(last, len(cells) - 1)
+            emit("step", task=task.id, step=step, error=_last_line(cell.error))
 
         # Budget spent without finishing: report what was found
         self.logger.warning(f"{task.id}: step budget spent, asking for a final report")
@@ -374,6 +384,12 @@ class SpecialistAgent(BaseAgent):
             revisions=previous.revisions if previous else 0,
             reviews=previous.reviews if previous else [],
         )
+
+
+def _last_line(error: str | None) -> str | None:
+    """The exception line of a traceback, e.g. "KeyError: 'Embarked'" """
+    lines = (error or "").strip().splitlines()
+    return lines[-1][:120] if lines else None
 
 
 def _read_json(path: Path) -> dict:
