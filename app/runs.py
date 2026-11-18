@@ -66,6 +66,17 @@ def task_rows(events: list[dict]) -> list[dict]:
     return list(tasks.values())
 
 
+def stage(events: list[dict]) -> str | None:
+    """What the run is doing when no task is: before the plan, and after the last
+    review while the lead writes the report"""
+    rows = task_rows(events)
+    if not rows:
+        return "Profiling the data and planning the analysis…"
+    if all(r["state"] in ("accepted", "failed") for r in rows):
+        return "All tasks are done. The lead is writing the report…"
+    return None
+
+
 def list_runs(root: Path) -> list[dict]:
     """Run directories under root (at any depth), newest first"""
     runs = []

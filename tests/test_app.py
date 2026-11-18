@@ -4,7 +4,7 @@ import os
 import pytest
 
 from agent.config import settings
-from app.runs import list_runs, read_events, task_rows
+from app.runs import list_runs, read_events, stage, task_rows
 
 
 def _brief(task_id):
@@ -44,6 +44,14 @@ def test_task_rows_follow_each_task_through_review():
     assert rows["eda_3"]["follow-up"] is True
 
 
+def test_stage_names_the_steps_without_a_task():
+    assert stage([]).startswith("Profiling")
+    plan = {"event": "plan", "tasks": [_brief("eda_1")]}
+    assert stage([plan]) is None
+    done = {"event": "reviewed", "task": "eda_1", "outcome": "completed"}
+    assert "writing the report" in stage([plan, done])
+
+
 def _run(root, name, started, **meta):
     run = root / name
     run.mkdir(parents=True)
@@ -73,3 +81,19 @@ def test_the_app_opens_a_past_run(monkeypatch, tmp_path):
     app.sidebar.radio[0].set_value("Past runs").run()
     assert not app.exception
     assert app.selectbox[0].value == run
+
+
+def test_hosted_runs_get_the_hosted_preset(monkeypatch, tmp_path):
+    pytest.importorskip("streamlit")
+    import subprocess
+
+    from app import streamlit_app
+
+    commands = []
+    monkeypatch.setattr(
+        subprocess, "Popen", lambda command, **_: commands.append(command)
+    )
+    for provider in ("anthropic", "ollama"):
+        streamlit_app.launch(tmp_path / "a.csv", None, provider, "m", tmp_path)
+    assert commands[0][-2:] == ["--preset", "hosted"]
+    assert "--preset" not in commands[1]

@@ -46,7 +46,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["agent*"]
+include = ["agent*", "app*"]
 
 [tool.ruff]
 line-length = 88

@@ -20,7 +20,7 @@ import streamlit.components.v1 as components
 
 from agent.config import settings
 from agent.html_report import render_html
-from app.runs import list_runs, read_events, task_rows
+from app.runs import list_runs, read_events, stage, task_rows
 
 ROOT = Path(__file__).resolve().parent.parent
 PROVIDERS = {
@@ -85,7 +85,7 @@ def new_analysis(runs_root: Path):
     provider = st.selectbox("Provider", list(PROVIDERS))
     model = st.text_input("Model", getattr(settings, PROVIDERS[provider]))
     if provider == "ollama":
-        st.warning("A local run takes hours on a small GPU (Claude: ~10 minutes).")
+        st.warning("A local run takes hours on a small GPU (Claude: ~10-20 minutes).")
 
     if st.button("Start the analysis", type="primary"):
         if upload is not None:
@@ -107,6 +107,8 @@ def launch(csv: Path, target, provider: str, model: str, runs_root: Path) -> dic
     log.parent.mkdir(parents=True, exist_ok=True)
     command = [sys.executable, "-m", "agent.cli", "run", str(csv.resolve())]
     command += ["--provider", provider, "--model", model, "--out", str(runs_root)]
+    if provider != "ollama":  # more revisions and follow-ups than the local default
+        command += ["--preset", "hosted"]
     if target:
         command += ["--target", target]
     with log.open("w") as out:
@@ -139,9 +141,10 @@ def watch(launched: dict):
         return
     minutes = (time.time() - launched["started"]) / 60
     st.info(f"Running for {minutes:.0f} min… {run_dir or ''}")
+    if now := stage(events):
+        st.write(now)
     rows = task_rows(events)
     if not rows:
-        st.write("Profiling the data and planning the analysis…")
         return
     st.dataframe(
         pd.DataFrame(
