@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -5,11 +6,19 @@ from conftest import ScriptedLLM
 from test_lead import _brief, _plan, accept, revise
 from test_specialist import finish, run_cell
 
-from agent.cli import run_analysis
+from agent.cli import (
+    RUN_SETTINGS,
+    apply_flags,
+    build_parser,
+    main,
+    run_analysis,
+    use_run_settings,
+)
 from agent.config import settings
 from agent.core.llm_manager import LLMManager
 from agent.graph import build_question_graph
 from agent.nodes.question import question_briefs
+from agent.run_grades import run_grades
 from agent.run_store import load_run
 from agent.states import Brief, HierarchicalState, Question, QuestionPlan
 
@@ -142,3 +151,106 @@ def test_question_briefs_get_ids_and_known_dependencies(finished):
     assert briefs[0].depends_on == ["eda_1"]  # not a later brief, not unknowns
     assert briefs[1].depends_on == ["q3_eda_1"]  # by its output's name
     assert [o.name for o in briefs[0].outputs] == ["split"]
+
+
+def _events(run_dir: Path) -> list[dict]:
+    return [json.loads(line) for line in (run_dir / "progress.jsonl").open()]
+
+
+def _cli_ask(monkeypatch, run_dir: Path, text: str, *responses) -> dict:
+    llm = ScriptedLLM(responses)
+    monkeypatch.setattr(LLMManager, "get_llm", lambda **_: llm)
+    assert main(["ask", str(run_dir), text]) == 0
+    return json.loads((run_dir / "run_meta.json").read_text())
+
+
+def test_analyst_ask_records_the_question_in_its_run(monkeypatch, finished, capsys):
+    run_dir = Path(finished.run_dir)
+    grades_before = run_grades(run_dir)
+    states_before = len(list((run_dir / "state").glob("*.json")))
+    count = "record_fact('m', len(load('eda_1/frame')), 'Rows in the head')"
+    meta = _cli_ask(
+        monkeypatch,
+        run_dir,
+        "How many rows does the head have?",
+        new_tasks(_brief("head", deps=["eda_1"])),
+        run_cell(count),
+        finish("m"),
+        accept(),
+        "The head has 5 rows.",
+    )
+    (entry,) = meta["questions"]
+    assert (entry["number"], entry["status"], entry["tasks"]) == (1, "ok", ["q1_eda_1"])
+    assert entry["grades"]["tasks_completed"] == 1  # (scripted calls go uncounted)
+    assert (run_dir / "tasks/q1_eda_1/result.json").exists()
+    assert run_grades(run_dir) == grades_before  # the run's own grades
+    states = sorted(int(p.name.split("_")[0]) for p in (run_dir / "state").glob("*"))
+    assert states == list(range(1, states_before + 5))  # ask, run_task, review, answer
+    assert (run_dir / "questions.md").read_text() == (
+        "## Questions after the report\n"
+        "\n### Q1. How many rows does the head have?\n\nThe head has 5 rows.\n"
+    )
+    events = [e["event"] for e in _events(run_dir)]
+    assert events[events.index("question") :] == [
+        "question",
+        "asked",
+        "task_started",
+        "step",
+        "task_finished",
+        "reviewed",
+        "answered",
+        "question_done",
+    ]
+    page = (run_dir / "report.html").read_text()
+    assert "<h3>Q1. How many rows does the head have?</h3>" in page
+    assert "<dt>Questions</dt><dd>1 answered</dd>" in page
+    assert page.index("<b>eda_1</b>") < page.index("<b>q1_eda_1</b>")
+    printed = capsys.readouterr().out
+    assert "Q1: How many rows" in printed and printed.rstrip().endswith("5 rows.")
+
+    meta = _cli_ask(
+        monkeypatch, run_dir, "And in all?", answer_now("eda_1.n"), "40 rows."
+    )
+    assert [q["number"] for q in meta["questions"]] == [1, 2]
+    assert "### Q2. And in all?\n\n40 rows.\n" in (run_dir / "questions.md").read_text()
+    assert load_run(run_dir).questions[0].answer == "The head has 5 rows."
+
+
+def test_a_failed_question_is_recorded_and_the_next_one_works(monkeypatch, finished):
+    run_dir = Path(finished.run_dir)
+    with pytest.raises(RuntimeError, match="StopIteration"):  # no more replies
+        _cli_ask(monkeypatch, run_dir, "Broken?", new_tasks(_brief("a")), finish())
+    (entry,) = json.loads((run_dir / "run_meta.json").read_text())["questions"]
+    assert entry["status"] == "failed" and "StopIteration" in entry["error"]
+    assert _events(run_dir)[-1]["event"] == "question_done"
+    assert "Q1. Broken?: no answer" in (run_dir / "report.html").read_text()
+
+    # Left half done (a task in review), it doesn't carry over to the next one
+    meta = _cli_ask(monkeypatch, run_dir, "Rows?", answer_now("eda_1.n"), "40 rows.")
+    assert [q["status"] for q in meta["questions"]] == ["failed", "ok"]
+    assert "### Q2. Rows?" in (run_dir / "questions.md").read_text()
+
+
+def test_a_run_that_cant_take_questions_says_why(monkeypatch, finished, capsys):
+    run_dir = Path(finished.run_dir)
+    (run_dir / "report.md").unlink()
+    with pytest.raises(SystemExit):
+        main(["ask", str(run_dir), "Rows?"])
+    assert "has no finished report to ask about" in capsys.readouterr().err
+
+
+def test_a_question_uses_its_runs_settings_unless_flags_say_otherwise(
+    monkeypatch, finished
+):
+    for name in RUN_SETTINGS:  # restored after the test
+        monkeypatch.setattr(settings, name, getattr(settings, name))
+    run_dir = Path(finished.run_dir)
+    meta = json.loads((run_dir / "run_meta.json").read_text())
+    meta["settings"].update(model_provider="anthropic", max_revisions=2)
+    (run_dir / "run_meta.json").write_text(json.dumps(meta))
+    use_run_settings(run_dir)
+    assert (settings.model_provider, settings.max_revisions) == ("anthropic", 2)
+    apply_flags(
+        build_parser().parse_args(["ask", str(run_dir), "q", "--provider", "ollama"])
+    )
+    assert (settings.model_provider, settings.max_revisions) == ("ollama", 2)

@@ -2,9 +2,10 @@
 
 The report's Markdown rendered (raw HTML in it is escaped: the text comes from a
 model), its charts embedded as base64, a header with the run's facts and
-grades, and an appendix with each task's status, open objection and script, so
-a finding's numbers can be traced to the code that printed them. Opens offline,
-anywhere, and prints.
+grades, the questions asked after the report with their answers
+(questions.md), and an appendix with each task's status, open objection and
+script, so a finding's numbers can be traced to the code that printed them.
+Opens offline, anywhere, and prints.
 """
 
 import base64
@@ -17,7 +18,7 @@ from pathlib import Path
 from markdown_it import MarkdownIt
 
 from agent.costs import run_model
-from agent.run_grades import run_grades
+from agent.run_grades import QUESTION_TASK, run_grades
 
 MARKDOWN = MarkdownIt("commonmark", {"html": False}).enable("table")
 IMAGE_SRC = re.compile(r'<img src="([^"]+)"')
@@ -74,7 +75,8 @@ def render_html(run_dir: Path) -> str:
         '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
         f"<title>{title}</title><style>{CSS}</style></head><body>\n"
-        f"{_header(run_dir, meta, grades)}\n{body}\n{_appendix(run_dir)}\n"
+        f"{_header(run_dir, meta, grades)}\n{body}\n{_questions(run_dir, meta)}\n"
+        f"{_appendix(run_dir)}\n"
         "</body></html>\n"
     )
 
@@ -117,6 +119,14 @@ def _header(run_dir: Path, meta: dict, grades: dict) -> str:
         f"{grades.get('tasks_failed') or 0} failed; "
         f"{grades.get('revisions') or 0} sent back for revision",
     }
+    if asked := meta.get("questions"):
+        answered = sum(1 for q in asked if q.get("status") == "ok")
+        costs = [(q.get("grades") or {}).get("cost_usd") for q in asked]
+        rows["Questions"] = f"{answered} answered" + (
+            f", {len(asked) - answered} not" if answered < len(asked) else ""
+        )
+        if None not in costs:
+            rows["Questions"] += f", ${sum(costs):.3f}"
     dl = "".join(
         f"<dt>{name}</dt><dd>{html.escape(str(value))}</dd>"
         for name, value in rows.items()
@@ -158,10 +168,31 @@ def _dataset(run_dir: Path, meta: dict, model: str | None) -> str:
     return name.removesuffix(f"_{safe}") if safe else name
 
 
+def _questions(run_dir: Path, meta: dict) -> str:
+    """The answers (questions.md), and the questions that got none"""
+    path = run_dir / "questions.md"
+    body = (
+        _embed_images(MARKDOWN.render(path.read_text()), run_dir)
+        if path.exists()
+        else ""
+    )
+    for q in meta.get("questions") or []:
+        if q.get("status") not in ("ok", "running"):
+            body += (
+                f'<p class="note bad">Q{q["number"]}. {html.escape(q["question"])}: '
+                f"no answer ({html.escape(q.get('error') or q['status'])})</p>"
+            )
+    return body
+
+
 def _appendix(run_dir: Path) -> str:
     """Per task: status, revisions, the lead's open objection, its script"""
     tasks = []
-    for path in sorted(run_dir.glob("tasks/*/result.json")):
+    results = sorted(
+        run_dir.glob("tasks/*/result.json"),  # a question's tasks after the run's
+        key=lambda p: (bool(QUESTION_TASK.match(p.parent.name)), p.parent.name),
+    )
+    for path in results:
         r = _json(path)
         report = r.get("report") or {}
         status = report.get("status") or "failed"
@@ -193,9 +224,10 @@ def _appendix(run_dir: Path) -> str:
         return ""
     return (
         "<h2>Appendix: tasks and their code</h2>"
-        "<p>The report's numbers were checked against the facts these scripts "
-        "recorded when they ran; any that matched none are listed under "
-        "Limitations.</p>" + "".join(tasks)
+        "<p>The numbers in the report and the answers were checked against the "
+        "facts these scripts recorded when they ran; any that matched none are "
+        "listed under Limitations or at the end of the answer. Tasks named q1_, "
+        "q2_… ran for a question.</p>" + "".join(tasks)
     )
 
 

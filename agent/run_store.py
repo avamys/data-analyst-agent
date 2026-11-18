@@ -137,33 +137,43 @@ class RunStore:
             self.write_json(f"{task_dir}/result.json", result)
 
 
+class RunNotLoadable(ValueError):
+    """A run directory that can't be picked up again, and why"""
+
+
 def load_run(run_dir: str | Path) -> HierarchicalState:
     """A finished run's final state: its starting state with every node's update
     applied in order (each update holds whole fields, not increments)"""
     run_dir = Path(run_dir).resolve()
     if not (run_dir / "run_meta.json").exists():
-        raise ValueError(f"{run_dir} is not a run directory (no run_meta.json)")
+        raise RunNotLoadable(f"{run_dir} is not a run directory (no run_meta.json)")
     meta = json.loads((run_dir / "run_meta.json").read_text())
     if meta.get("status") != "ok" or not (run_dir / "report.md").exists():
-        raise ValueError(f"{run_dir.name} has no finished report to ask about")
+        raise RunNotLoadable(f"{run_dir.name} has no finished report to ask about")
     csv, target = _started_with(meta)
     if not csv or not Path(csv).exists():
-        raise ValueError(f"The CSV {run_dir.name} analysed is gone: {csv}")
+        raise RunNotLoadable(f"The CSV {run_dir.name} analysed is gone: {csv}")
     state = {
         "dataset_info": generate_dataset_info(load_dataset(csv), csv),
         "dataset_path": csv,
         "target_column": target,
         "run_dir": str(run_dir),
     }
-    for update in sorted((run_dir / "state").glob("*.json")):
+    for update in state_files(run_dir):
         state.update(json.loads(update.read_text()) or {})
     try:
         return HierarchicalState.model_validate(state)
     except ValidationError as e:
-        raise ValueError(
+        raise RunNotLoadable(
             f"{run_dir.name} was recorded in an older format ({e.error_count()} "
             "fields don't match)"
         ) from e
+
+
+def state_files(run_dir: Path) -> list[Path]:
+    """state/NN_<node>.json in step order (NN grows past 99 with questions)"""
+    files = (run_dir / "state").glob("*.json")
+    return sorted(files, key=lambda p: int(p.name.split("_", 1)[0]))
 
 
 def _started_with(meta: dict) -> tuple[str | None, str | None]:

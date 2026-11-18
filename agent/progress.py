@@ -130,6 +130,30 @@ class Progress:
                     ],
                 }
             )
+        elif node == "ask" and update.get("questions"):
+            question = update["questions"][-1]
+            briefs = update.get("backlog", [])
+            self.known |= {b.id for b in briefs}
+            self.event(
+                {
+                    "event": "asked",
+                    "number": question.number,
+                    "facts": question.facts,
+                    "tasks": [
+                        {"id": b.id, "specialist": b.specialist, "question": b.question}
+                        for b in briefs
+                    ],
+                }
+            )
+        elif node == "answer" and update.get("questions"):
+            question = update["questions"][-1]
+            self.event(
+                {
+                    "event": "answered",
+                    "number": question.number,
+                    "unverified": len(question.unverified_numbers),
+                }
+            )
         elif node == "report":
             self.event(
                 {
@@ -182,6 +206,46 @@ class Progress:
                 if unverified
                 else ""
             )
+        if kind == "question":
+            return f"Q{event['number']}: {event['question']}"
+        if kind == "asked":
+            if event["tasks"]:
+                ids = ", ".join(t["id"] for t in event["tasks"])
+                return f"Plan: {_count(len(event['tasks']), 'task')} ({ids})"
+            return "Answering from " + (
+                _count(len(event["facts"]), "recorded fact")
+                if event["facts"]
+                else "the data's description: no fact answers it"
+            )
+        if kind == "answered":
+            unverified = event["unverified"]
+            return "Answer written" + (
+                f" ({_count(unverified, 'number')} not traced to a fact)"
+                if unverified
+                else ""
+            )
+        if kind == "question_done":
+            took = _minutes(event["seconds"])
+            if event["status"] == "ok":
+                line = f"Answered in {took}"
+            else:
+                line = f"Question {event['status']} after {took}: {event.get('error') or ''}"
+            grades = event.get("grades") or {}
+            parts = []
+            if grades.get("tasks_completed") or grades.get("tasks_failed"):
+                parts.append(
+                    f"{_count(grades['tasks_completed'], 'task')} done"
+                    + (
+                        f", {grades['tasks_failed']} failed"
+                        if grades["tasks_failed"]
+                        else ""
+                    )
+                )
+            if grades.get("unresolved_objections"):
+                parts.append(_count(grades["unresolved_objections"], "open objection"))
+            if grades.get("cost_usd") is not None:
+                parts.append(f"${grades['cost_usd']:.3f}")
+            return line + ("\n  " + " · ".join(parts) if parts else "")
         if kind == "run_done":
             took = _minutes(event["seconds"])
             if event["status"] == "ok":
