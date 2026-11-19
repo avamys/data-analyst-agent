@@ -1,0 +1,260 @@
+{
+  "task_id": "stat_2",
+  "specialist": "statistical",
+  "description": "Does Status change the relationship between Schooling or Adult Mortality and Life expectancy (an interaction)?",
+  "code": "# %%\nimport matplotlib.pyplot as plt\nimport numpy as np\nimport pandas as pd\n\nfrom agent.execution.runtime import (\n    df,\n    load,\n    publish,\n    record_fact,\n    record_model,\n    save_chart,\n)\n\n# %%\ncols = list(df.columns)\nprint(cols)\nprint(df['Status'].value_counts(dropna=False))\nprint(df[[c for c in cols if c.strip() in ['Life expectancy','Schooling','Adult Mortality']]].isna().sum())\nprint(df.dtypes.value_counts())\n\n# %%\nimport statsmodels.formula.api as smf\nd = df.rename(columns=lambda c: c.strip())\nd = d[['Life expectancy','Adult Mortality','Schooling','Status']].dropna().copy()\nd['Status'] = d['Status'].astype(str)\nd['Status'] = pd.Categorical(d['Status'], categories=['Developing','Developed'])\nd = d.rename(columns={'Life expectancy':'LE','Adult Mortality':'AM'})\nprint(len(d))\nm = smf.ols('LE ~ Schooling * C(Status) + AM * C(Status)', data=d).fit()\nci = m.conf_int()\nout = pd.DataFrame({'coef': m.params, 'ci_low': ci[0], 'ci_high': ci[1], 'p': m.pvalues})\nprint(out.round(4))\nprint('R2', round(m.rsquared,4), 'n', int(m.nobs))\nrecord_fact('ols_coefs', {k: float(v) for k, v in m.params.items()}, 'OLS coefficients of LE on Schooling, Adult Mortality, Status (Developed vs Developing reference) and interactions')\nrecord_fact('ols_ci', {k: [float(ci.loc[k,0]), float(ci.loc[k,1])] for k in m.params.index}, '95% CIs of OLS coefficients')\nrecord_fact('ols_pvalues', {k: float(v) for k, v in m.pvalues.items()}, 'p-values of OLS coefficients')\nrecord_fact('ols_r2', {'r2': float(m.rsquared), 'n': int(m.nobs)}, 'OLS model fit: R squared and sample size')\n# interaction joint test\nnames = [k for k in m.params.index if ':' in k]\nwald = m.wald_test(' , '.join(f'{k} = 0' for k in names), scalar=True)\nrecord_fact('interaction_joint_test', {'f': float(wald.statistic), 'p': float(wald.pvalue), 'terms': names}, 'Joint Wald F test that all Status interaction terms are zero')\nprint('joint interaction F', float(wald.statistic), float(wald.pvalue))\n# within-group slopes\nfor s in ['Developing','Developed']:\n    g = d[d['Status']==s]\n    mg = smf.ols('LE ~ Schooling + AM', data=g).fit()\n    gci = mg.conf_int()\n    print(s, len(g), mg.params.round(4).to_dict(), mg.pvalues.round(4).to_dict())\n    record_fact('slopes_'+s.lower(), {'n': int(len(g)), 'schooling_slope': float(mg.params['Schooling']), 'schooling_ci': [float(gci.loc['Schooling',0]), float(gci.loc['Schooling',1])], 'schooling_p': float(mg.pvalues['Schooling']), 'adult_mortality_slope': float(mg.params['AM']), 'adult_mortality_ci': [float(gci.loc['AM',0]), float(gci.loc['AM',1])], 'adult_mortality_p': float(mg.pvalues['AM'])}, f'Within-group OLS slopes of LE on Schooling and Adult Mortality for {s} countries')\n\n# %%\nfig, ax = plt.subplots(figsize=(7, 4.5))\nfor s, colr in [('Developing', 'tab:blue'), ('Developed', 'tab:orange')]:\n    g = d[d['Status'] == s]\n    ax.scatter(g['Schooling'], g['LE'], s=8, alpha=0.4, color=colr, label=f'{s} (n={len(g)})')\n    b = np.polyfit(g['Schooling'], g['LE'], 1)\n    xs = np.linspace(g['Schooling'].min(), g['Schooling'].max(), 50)\n    ax.plot(xs, b[0] * xs + b[1], color=colr, lw=2)\nax.set_xlabel('Schooling (years of schooling per country-year)')\nax.set_ylabel('Life expectancy (years)')\nax.set_title('Life expectancy vs Schooling by country Status: points are country-years, lines are within-group linear fits')\nax.legend()\nsave_chart(fig, 'le_vs_schooling_by_status', 'Life expectancy against Schooling for Developing and Developed countries, with a separate linear fit for each Status group')\nplt.close(fig)\n\n# %%\nterms = ['Schooling:C(Status)[T.Developed]', 'AM:C(Status)[T.Developed]']\nrows = {k: {'coef': float(m.params[k]), 'ci': [float(ci.loc[k, 0]), float(ci.loc[k, 1])], 'p': float(m.pvalues[k])} for k in terms}\nrecord_fact('interaction_terms_detail', rows, 'Coefficient, 95% CI and p-value of the Schooling x Developed and Adult Mortality x Developed interaction terms')\nprint(rows)\n",
+  "output": "['Country', 'Year', 'Status', 'Life expectancy ', 'Adult Mortality', 'infant deaths', 'Alcohol', 'percentage expenditure', 'Hepatitis B', 'Measles ', ' BMI ', 'under-five deaths ', 'Polio', 'Total expenditure', 'Diphtheria ', ' HIV/AIDS', 'GDP', 'Population', ' thinness  1-19 years', ' thinness 5-9 years', 'Income composition of resources', 'Schooling']\nStatus\nDeveloping    2426\nDeveloped      512\nName: count, dtype: int64\nLife expectancy      10\nAdult Mortality      10\nSchooling           163\ndtype: int64\nfloat64    16\nint64       4\nobject      2\nName: count, dtype: int64\n2768\n                                     coef   ci_low  ci_high       p\nIntercept                         56.2124  55.2295  57.1954  0.0000\nC(Status)[T.Developed]            15.6350  11.0890  20.1811  0.0000\nSchooling                          1.5031   1.4315   1.5746  0.0000\nSchooling:C(Status)[T.Developed]  -0.8453  -1.1175  -0.5732  0.0000\nAM                                -0.0319  -0.0336  -0.0302  0.0000\nAM:C(Status)[T.Developed]         -0.0052  -0.0149   0.0046  0.3008\nR2 0.7222 n 2768\njoint interaction F 18.664737201196452 8.87762490360445e-09\nDeveloping 2304 {'Intercept': 56.2124, 'Schooling': 1.5031, 'AM': -0.0319} {'Intercept': 0.0, 'Schooling': 0.0, 'AM': 0.0}\nDeveloped 464 {'Intercept': 71.8474, 'Schooling': 0.6577, 'AM': -0.0371} {'Intercept': 0.0, 'Schooling': 0.0, 'AM': 0.0}\n{'Schooling:C(Status)[T.Developed]': {'coef': -0.8453490396461771, 'ci': [-1.1175349923823026, -0.5731630869100516], 'p': 1.2867977358636618e-09}, 'AM:C(Status)[T.Developed]': {'coef': -0.005152923186671002, 'ci': [-0.014915858110544307, 0.004610011737202303], 'p': 0.3007913759778295}}\n",
+  "execution_time": 27.28,
+  "success": true,
+  "error": null,
+  "report": {
+    "status": "complete",
+    "findings": [
+      {
+        "statement": "The Schooling slope differs strongly by Status. In Developing countries (n=2,304) each extra year of Schooling goes with +1.503 years of Life expectancy (95% CI 1.428 to 1.579, p\u22481.5e-256). In Developed countries (n=464) the slope is +0.658 (95% CI 0.482 to 0.833, p\u22487.8e-13). The Schooling \u00d7 Developed interaction is -0.845 (95% CI -1.118 to -0.573, p=1.3e-9), so Schooling matters about 2.3 times as much in Developing countries.",
+        "facts": [
+          "slopes_developing",
+          "slopes_developed",
+          "interaction_terms_detail"
+        ]
+      },
+      {
+        "statement": "The interaction runs mainly through Schooling, not Adult Mortality. The Adult Mortality slope is -0.0319 per adult death per 1,000 in Developing countries and -0.0371 in Developed countries. The AM \u00d7 Developed interaction is -0.0052 (95% CI -0.0149 to 0.0046, p=0.30), which is not significant, while the Schooling interaction is -0.845 (p=1.3e-9).",
+        "facts": [
+          "interaction_terms_detail",
+          "slopes_developing",
+          "slopes_developed"
+        ]
+      },
+      {
+        "statement": "Status changes the relationship between Life expectancy and the two drivers jointly. The joint Wald F test of the Status interaction terms is F=18.66, p=8.9e-9 (n=2,768 country-years, model R\u00b2=0.722).",
+        "facts": [
+          "interaction_joint_test",
+          "ols_r2"
+        ]
+      },
+      {
+        "statement": "Caveat on inference: country-years are repeated within countries and are not independent. The OLS p-values and CIs, including p\u22481.5e-256 for the Developing Schooling slope and the interaction p-values, are therefore likely too narrow and too significant. The direction and size of the Schooling slope difference (about 1.50 vs 0.66 years per year of Schooling) are the robust parts.",
+        "facts": [
+          "ols_pvalues",
+          "slopes_developing",
+          "interaction_terms_detail"
+        ]
+      }
+    ],
+    "follow_ups": [
+      "Re-estimate the Status interaction with country-clustered standard errors or a mixed model with random intercepts for countries.",
+      "Does the smaller Schooling slope in Developed countries survive controls for GDP, income composition and health spending?",
+      "Only 464 Developed country-years exist; is the weaker Schooling slope stable across years and individual countries?"
+    ]
+  },
+  "facts": {
+    "ols_coefs": {
+      "value": {
+        "Intercept": 56.21242446355573,
+        "C(Status)[T.Developed]": 15.635015327410827,
+        "Schooling": 1.5030913032829205,
+        "Schooling:C(Status)[T.Developed]": -0.8453490396461771,
+        "AM": -0.03192393973848748,
+        "AM:C(Status)[T.Developed]": -0.005152923186671002
+      },
+      "desc": "OLS coefficients of LE on Schooling, Adult Mortality, Status (Developed vs Developing reference) and interactions",
+      "cell": 2
+    },
+    "ols_ci": {
+      "value": {
+        "Intercept": [
+          55.2294985615321,
+          57.19535036557936
+        ],
+        "C(Status)[T.Developed]": [
+          11.088968805681642,
+          20.18106184914001
+        ],
+        "Schooling": [
+          1.4315360620483126,
+          1.5746465445175284
+        ],
+        "Schooling:C(Status)[T.Developed]": [
+          -1.1175349923823026,
+          -0.5731630869100516
+        ],
+        "AM": [
+          -0.03364060713588008,
+          -0.030207272341094875
+        ],
+        "AM:C(Status)[T.Developed]": [
+          -0.014915858110544307,
+          0.004610011737202303
+        ]
+      },
+      "desc": "95% CIs of OLS coefficients",
+      "cell": 2
+    },
+    "ols_pvalues": {
+      "value": {
+        "Intercept": 0.0,
+        "C(Status)[T.Developed]": 1.8723029788702595e-11,
+        "Schooling": 1.5323023374569e-289,
+        "Schooling:C(Status)[T.Developed]": 1.2867977358636618e-09,
+        "AM": 5.285051569530977e-238,
+        "AM:C(Status)[T.Developed]": 0.3007913759778295
+      },
+      "desc": "p-values of OLS coefficients",
+      "cell": 2
+    },
+    "ols_r2": {
+      "value": {
+        "r2": 0.7221502784141898,
+        "n": 2768
+      },
+      "desc": "OLS model fit: R squared and sample size",
+      "cell": 2
+    },
+    "interaction_joint_test": {
+      "value": {
+        "f": 18.664737201196452,
+        "p": 8.87762490360445e-09,
+        "terms": [
+          "Schooling:C(Status)[T.Developed]",
+          "AM:C(Status)[T.Developed]"
+        ]
+      },
+      "desc": "Joint Wald F test that all Status interaction terms are zero",
+      "cell": 2
+    },
+    "slopes_developing": {
+      "value": {
+        "n": 2304,
+        "schooling_slope": 1.5030913032829325,
+        "schooling_ci": [
+          1.427646419479331,
+          1.578536187086534
+        ],
+        "schooling_p": 1.5007438544172202e-256,
+        "adult_mortality_slope": -0.03192393973848696,
+        "adult_mortality_ci": [
+          -0.03373392276825668,
+          -0.03011395670871723
+        ],
+        "adult_mortality_p": 1.8839291127931546e-211
+      },
+      "desc": "Within-group OLS slopes of LE on Schooling and Adult Mortality for Developing countries",
+      "cell": 2
+    },
+    "slopes_developed": {
+      "value": {
+        "n": 464,
+        "schooling_slope": 0.6577422636366911,
+        "schooling_ci": [
+          0.48245374677693836,
+          0.8330307804964439
+        ],
+        "schooling_p": 7.755380654542345e-13,
+        "adult_mortality_slope": -0.03707686292515276,
+        "adult_mortality_ci": [
+          -0.04349190671050336,
+          -0.03066181913980216
+        ],
+        "adult_mortality_p": 1.5795875899552385e-26
+      },
+      "desc": "Within-group OLS slopes of LE on Schooling and Adult Mortality for Developed countries",
+      "cell": 2
+    },
+    "interaction_terms_detail": {
+      "value": {
+        "Schooling:C(Status)[T.Developed]": {
+          "coef": -0.8453490396461771,
+          "ci": [
+            -1.1175349923823026,
+            -0.5731630869100516
+          ],
+          "p": 1.2867977358636618e-09
+        },
+        "AM:C(Status)[T.Developed]": {
+          "coef": -0.005152923186671002,
+          "ci": [
+            -0.014915858110544307,
+            0.004610011737202303
+          ],
+          "p": 0.3007913759778295
+        }
+      },
+      "desc": "Coefficient, 95% CI and p-value of the Schooling x Developed and Adult Mortality x Developed interaction terms",
+      "cell": 4
+    }
+  },
+  "charts": {
+    "le_vs_schooling_by_status": {
+      "file": "charts/le_vs_schooling_by_status.png",
+      "caption": "Life expectancy against Schooling for Developing and Developed countries, with a separate linear fit for each Status group",
+      "cell": 3
+    }
+  },
+  "published": [],
+  "artifacts": [],
+  "attempts": [
+    {
+      "attempt": 1,
+      "revision": 0,
+      "step": 1,
+      "code": "cols = list(df.columns)\nprint(cols)\nprint(df['Status'].value_counts(dropna=False))\nprint(df[[c for c in cols if c.strip() in ['Life expectancy','Schooling','Adult Mortality']]].isna().sum())\nprint(df.dtypes.value_counts())",
+      "output": "['Country', 'Year', 'Status', 'Life expectancy ', 'Adult Mortality', 'infant deaths', 'Alcohol', 'percentage expenditure', 'Hepatitis B', 'Measles ', ' BMI ', 'under-five deaths ', 'Polio', 'Total expenditure', 'Diphtheria ', ' HIV/AIDS', 'GDP', 'Population', ' thinness  1-19 years', ' thinness 5-9 years', 'Income composition of resources', 'Schooling']\nStatus\nDeveloping    2426\nDeveloped      512\nName: count, dtype: int64\nLife expectancy      10\nAdult Mortality      10\nSchooling           163\ndtype: int64\nfloat64    16\nint64       4\nobject      2\nName: count, dtype: int64\n",
+      "error": null,
+      "seconds": 3.41
+    },
+    {
+      "attempt": 2,
+      "revision": 0,
+      "step": 2,
+      "code": "import statsmodels.formula.api as smf\nd = df.rename(columns=lambda c: c.strip())\nd = d[['Life expectancy','Adult Mortality','Schooling','Status']].dropna().copy()\nd['Status'] = d['Status'].astype(str)\nd['Status'] = pd.Categorical(d['Status'], categories=['Developing','Developed'])\nd = d.rename(columns={'Life expectancy':'LE','Adult Mortality':'AM'})\nprint(len(d))\nm = smf.ols('LE ~ Schooling * C(Status) + AM * C(Status)', data=d).fit()\nci = m.conf_int()\nout = pd.DataFrame({'coef': m.params, 'ci_low': ci[0], 'ci_high': ci[1], 'p': m.pvalues})\nprint(out.round(4))\nprint('R2', round(m.rsquared,4), 'n', int(m.nobs))\nrecord_fact('ols_coefs', {k: float(v) for k, v in m.params.items()}, 'OLS coefficients of LE on Schooling, Adult Mortality, Status (Developed vs Developing reference) and interactions')\nrecord_fact('ols_ci', {k: [float(ci.loc[k,0]), float(ci.loc[k,1])] for k in m.params.index}, '95% CIs of OLS coefficients')\nrecord_fact('ols_pvalues', {k: float(v) for k, v in m.pvalues.items()}, 'p-values of OLS coefficients')\nrecord_fact('ols_r2', {'r2': float(m.rsquared), 'n': int(m.nobs)}, 'OLS model fit: R squared and sample size')\n# interaction joint test\nnames = [k for k in m.params.index if ':' in k]\nwald = m.wald_test(' , '.join(f'{k} = 0' for k in names), scalar=True)\nrecord_fact('interaction_joint_test', {'f': float(wald.statistic), 'p': float(wald.pvalue), 'terms': names}, 'Joint Wald F test that all Status interaction terms are zero')\nprint('joint interaction F', float(wald.statistic), float(wald.pvalue))\n# within-group slopes\nfor s in ['Developing','Developed']:\n    g = d[d['Status']==s]\n    mg = smf.ols('LE ~ Schooling + AM', data=g).fit()\n    gci = mg.conf_int()\n    print(s, len(g), mg.params.round(4).to_dict(), mg.pvalues.round(4).to_dict())\n    record_fact('slopes_'+s.lower(), {'n': int(len(g)), 'schooling_slope': float(mg.params['Schooling']), 'schooling_ci': [float(gci.loc['Schooling',0]), float(gci.loc['Schooling',1])], 'schooling_p': float(mg.pvalues['Schooling']), 'adult_mortality_slope': float(mg.params['AM']), 'adult_mortality_ci': [float(gci.loc['AM',0]), float(gci.loc['AM',1])], 'adult_mortality_p': float(mg.pvalues['AM'])}, f'Within-group OLS slopes of LE on Schooling and Adult Mortality for {s} countries')",
+      "output": "2768\n                                     coef   ci_low  ci_high       p\nIntercept                         56.2124  55.2295  57.1954  0.0000\nC(Status)[T.Developed]            15.6350  11.0890  20.1811  0.0000\nSchooling                          1.5031   1.4315   1.5746  0.0000\nSchooling:C(Status)[T.Developed]  -0.8453  -1.1175  -0.5732  0.0000\nAM                                -0.0319  -0.0336  -0.0302  0.0000\nAM:C(Status)[T.Developed]         -0.0052  -0.0149   0.0046  0.3008\nR2 0.7222 n 2768\njoint interaction F 18.664737201196452 8.87762490360445e-09\nDeveloping 2304 {'Intercept': 56.2124, 'Schooling': 1.5031, 'AM': -0.0319} {'Intercept': 0.0, 'Schooling': 0.0, 'AM': 0.0}\nDeveloped 464 {'Intercept': 71.8474, 'Schooling': 0.6577, 'AM': -0.0371} {'Intercept': 0.0, 'Schooling': 0.0, 'AM': 0.0}\n",
+      "error": null,
+      "seconds": 8.04
+    },
+    {
+      "attempt": 3,
+      "revision": 0,
+      "step": 3,
+      "code": "fig, ax = plt.subplots(figsize=(7, 4.5))\nfor s, colr in [('Developing', 'tab:blue'), ('Developed', 'tab:orange')]:\n    g = d[d['Status'] == s]\n    ax.scatter(g['Schooling'], g['LE'], s=8, alpha=0.4, color=colr, label=f'{s} (n={len(g)})')\n    b = np.polyfit(g['Schooling'], g['LE'], 1)\n    xs = np.linspace(g['Schooling'].min(), g['Schooling'].max(), 50)\n    ax.plot(xs, b[0] * xs + b[1], color=colr, lw=2)\nax.set_xlabel('Schooling (years of schooling per country-year)')\nax.set_ylabel('Life expectancy (years)')\nax.set_title('Life expectancy vs Schooling by country Status: points are country-years, lines are within-group linear fits')\nax.legend()\nsave_chart(fig, 'le_vs_schooling_by_status', 'Life expectancy against Schooling for Developing and Developed countries, with a separate linear fit for each Status group')\nplt.close(fig)",
+      "output": "",
+      "error": null,
+      "seconds": 8.66
+    },
+    {
+      "attempt": 4,
+      "revision": 1,
+      "step": 1,
+      "code": "terms = ['Schooling:C(Status)[T.Developed]', 'AM:C(Status)[T.Developed]']\nrows = {k: {'coef': float(m.params[k]), 'ci': [float(ci.loc[k, 0]), float(ci.loc[k, 1])], 'p': float(m.pvalues[k])} for k in terms}\nrecord_fact('interaction_terms_detail', rows, 'Coefficient, 95% CI and p-value of the Schooling x Developed and Adult Mortality x Developed interaction terms')\nprint(rows)",
+      "output": "{'Schooling:C(Status)[T.Developed]': {'coef': -0.8453490396461771, 'ci': [-1.1175349923823026, -0.5731630869100516], 'p': 1.2867977358636618e-09}, 'AM:C(Status)[T.Developed]': {'coef': -0.005152923186671002, 'ci': [-0.014915858110544307, 0.004610011737202303], 'p': 0.3007913759778295}}\n",
+      "error": null,
+      "seconds": 7.17
+    }
+  ],
+  "metadata": {
+    "steps": 4
+  },
+  "brief": {
+    "id": "stat_2",
+    "specialist": "statistical",
+    "question": "Does Status change the relationship between Schooling or Adult Mortality and Life expectancy (an interaction)?",
+    "complete_when": "Fits an OLS model with Life expectancy on Schooling, Adult Mortality, Status and their interaction terms; reports coefficients, confidence intervals and the interaction p-value; and gives the slope of Life expectancy on each driver within each Status group.",
+    "depends_on": [],
+    "outputs": []
+  },
+  "revisions": 1,
+  "reviews": [
+    {
+      "reasoning": "Checked the findings against the cited facts. The joint Wald F (18.66, p=8.9e-9), R\u00b2 (0.722, n=2768), the within-group Schooling slopes and CIs (1.503 and 0.658), the Schooling interaction (-0.845, p=1.3e-9) and the within-group Adult Mortality slopes (-0.0319 and -0.0371) all match the facts and the code. The 2.3x ratio is consistent with those slopes. Problems: (1) the claim that the Status interaction 'runs mainly through Schooling, not Adult Mortality' is not tested. The AM:Developed interaction term is one of the two terms in the joint test, and its coefficient, CI and p-value are not reported, so the joint F could be driven by it. (2) The brief asks for confidence intervals and the interaction p-value for the model terms, but the report gives CIs only for within-group slopes and does not report the interaction-term CIs or the AM interaction p-value. (3) The p-values (e.g. p\u22481.5e-256) are reported without the country-year non-independence caveat that the accepted stat_1 findings carry, so they are overstated. The code is a standard OLS with the right groups, and the automatic checks are clean.",
+      "verdict": "revise",
+      "feedback": "(a) Report the AM:C(Status)[T.Developed] coefficient, its 95% CI and its p-value from ols_coefs, ols_ci and ols_pvalues. Then either support the statement that the interaction runs mainly through Schooling with those values, or remove that statement. (b) Add the 95% CIs and p-values for the Schooling:Developed and AM:Developed interaction terms, as the brief requires. (c) Add a caveat that the country-year rows are not independent, so the OLS p-values and CIs (including p\u22481.5e-256 and the interaction p-values) are likely too narrow and too significant, as stated for the stat_1 findings. The direction and size of the Schooling slope difference are the robust parts.",
+      "follow_ups": []
+    },
+    {
+      "reasoning": "The reported slopes, CIs, p-values, interaction terms, joint Wald F, R2 and n all match the cited facts and the code's method (OLS with Schooling and AM interacted with Status, within-group OLS for each Status). The Developing and Developed Schooling slopes are reported correctly, and the 2.3x ratio is 1.503/0.658. The inference caveat about repeated country-years is stated. The brief's required contents (coefficients, CIs, interaction p-value, within-group slopes) are all present. The AM interaction CI and p-value are not visible in the truncated fact shown, so they are unverified here but the code computes them directly. No automatic check failed.",
+      "verdict": "accept",
+      "feedback": "",
+      "follow_ups": []
+    }
+  ]
+}

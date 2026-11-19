@@ -1,0 +1,441 @@
+{
+  "status": "ok",
+  "run_id": "4f05f90d-79c0-4459-8498-285304aaa955",
+  "dataset": "Life_Expectancy_Data",
+  "started": "2026-11-18T18:18:10",
+  "commit": "892ca69",
+  "dirty": false,
+  "network_blocked": true,
+  "parallel_tasks": 3,
+  "settings": {
+    "preset": "hosted",
+    "model_provider": "anthropic",
+    "ollama_base_url": "http://host.docker.internal:11434",
+    "ollama_model": "qwen3.5:9b",
+    "openrouter_base_url": "https://openrouter.ai/api/v1",
+    "openrouter_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "openrouter_reasoning": true,
+    "anthropic_model": "claude-haiku-5-5",
+    "analyst_model": "claude-haiku-5-5",
+    "coder_model": "claude-haiku-5-5",
+    "reporter_model": "claude-haiku-5-5",
+    "llm_reasoning": false,
+    "llm_num_ctx": 32768,
+    "llm_max_tokens": 4096,
+    "anthropic_max_tokens": 16000,
+    "anthropic_report_max_tokens": 32000,
+    "lead_effort": null,
+    "specialist_effort": null,
+    "llm_timeout_s": 1800,
+    "llm_num_gpu": 17,
+    "llm_retries": 1,
+    "lead_temperature": 0.2,
+    "eda_temperature": 0.3,
+    "statistical_temperature": 0.2,
+    "ml_temperature": 0.1,
+    "reporter_temperature": 0.3,
+    "max_tasks": 6,
+    "max_follow_ups": 5,
+    "max_revisions": 2,
+    "max_parallel_tasks": null,
+    "max_specialist_steps": 5,
+    "max_report_rewrites": 1,
+    "code_timeout_s": 300,
+    "max_cell_output_chars": 3000,
+    "prompt_fact_chars": 200,
+    "review_script_chars": 8000,
+    "plan_description_chars": 1000,
+    "overfit_gap": 0.1,
+    "near_perfect_score": 0.99,
+    "baseline_margin": 0.02,
+    "leakage_score": 0.9,
+    "imbalance_ratio": 2.0,
+    "number_check_max_label": 10,
+    "number_check_conventions": [
+      0.05
+    ],
+    "judge_model": "claude-sonnet-5-5",
+    "log_level": "INFO"
+  },
+  "nodes": [
+    {
+      "node": "profile",
+      "seconds": 2.7
+    },
+    {
+      "node": "plan",
+      "seconds": 7.2
+    },
+    {
+      "node": "run_task",
+      "seconds": 27.7
+    },
+    {
+      "node": "review",
+      "seconds": 9.9
+    },
+    {
+      "node": "run_task",
+      "seconds": 34.0
+    },
+    {
+      "node": "review",
+      "seconds": 10.2
+    },
+    {
+      "node": "run_task",
+      "seconds": 18.7
+    },
+    {
+      "node": "review",
+      "seconds": 8.6
+    },
+    {
+      "node": "run_task",
+      "seconds": 39.7
+    },
+    {
+      "node": "review",
+      "seconds": 13.9
+    },
+    {
+      "node": "run_task",
+      "seconds": 33.5
+    },
+    {
+      "node": "review",
+      "seconds": 14.1
+    },
+    {
+      "node": "run_task",
+      "seconds": 0.1
+    },
+    {
+      "node": "review",
+      "seconds": 10.3
+    },
+    {
+      "node": "run_task",
+      "seconds": 13.1
+    },
+    {
+      "node": "review",
+      "seconds": 10.4
+    },
+    {
+      "node": "run_task",
+      "seconds": 0.0
+    },
+    {
+      "node": "review",
+      "seconds": 15.4
+    },
+    {
+      "node": "run_task",
+      "seconds": 84.1
+    },
+    {
+      "node": "review",
+      "seconds": 12.8
+    },
+    {
+      "node": "run_task",
+      "seconds": 33.6
+    },
+    {
+      "node": "review",
+      "seconds": 8.7
+    },
+    {
+      "node": "run_task",
+      "seconds": 0.0
+    },
+    {
+      "node": "review",
+      "seconds": 9.3
+    },
+    {
+      "node": "run_task",
+      "seconds": 27.3
+    },
+    {
+      "node": "review",
+      "seconds": 8.2
+    },
+    {
+      "node": "run_task",
+      "seconds": 28.9
+    },
+    {
+      "node": "review",
+      "seconds": 11.7
+    },
+    {
+      "node": "run_task",
+      "seconds": 139.5
+    },
+    {
+      "node": "review",
+      "seconds": 6.9
+    },
+    {
+      "node": "run_task",
+      "seconds": 0.0
+    },
+    {
+      "node": "review",
+      "seconds": 9.6
+    },
+    {
+      "node": "run_task",
+      "seconds": 0.0
+    },
+    {
+      "node": "review",
+      "seconds": 10.9
+    },
+    {
+      "node": "run_task",
+      "seconds": 34.9
+    },
+    {
+      "node": "review",
+      "seconds": 15.4
+    },
+    {
+      "node": "run_task",
+      "seconds": 8.2
+    },
+    {
+      "node": "review",
+      "seconds": 9.4
+    },
+    {
+      "node": "run_task",
+      "seconds": 0.0
+    },
+    {
+      "node": "review",
+      "seconds": 15.6
+    },
+    {
+      "node": "run_task",
+      "seconds": 0.0
+    },
+    {
+      "node": "review",
+      "seconds": 14.9
+    },
+    {
+      "node": "run_task",
+      "seconds": 22.1
+    },
+    {
+      "node": "review",
+      "seconds": 10.9
+    },
+    {
+      "node": "run_task",
+      "seconds": 20.4
+    },
+    {
+      "node": "review",
+      "seconds": 19.3
+    },
+    {
+      "node": "run_task",
+      "seconds": 0.0
+    },
+    {
+      "node": "review",
+      "seconds": 7.5
+    },
+    {
+      "node": "run_task",
+      "seconds": 33.1
+    },
+    {
+      "node": "review",
+      "seconds": 12.0
+    },
+    {
+      "node": "report",
+      "seconds": 88.6
+    }
+  ],
+  "finished": "2026-11-18T18:34:27",
+  "seconds": 974.3,
+  "llm_calls": 103,
+  "input_tokens": 983964,
+  "output_tokens": 201613,
+  "calls_cut_off": 0,
+  "calls_window_full": 0,
+  "calls_empty": 0,
+  "tasks_completed": 11,
+  "tasks_failed": 0,
+  "unverified_numbers": [],
+  "context": {
+    "largest_prompt_tokens": 51562,
+    "window_warnings": [],
+    "prompt_cuts": {
+      "dataset description": 1,
+      "fact value": 681,
+      "cell output": 1
+    }
+  },
+  "grades": {
+    "run_ok": true,
+    "tasks_completed": 11,
+    "tasks_failed": 0,
+    "llm_calls": 103,
+    "input_tokens": 983964,
+    "output_tokens": 201613,
+    "cost_usd": 0.1992,
+    "unverified_numbers": 0,
+    "revisions": 13,
+    "unresolved_objections": 2,
+    "follow_ups": 5
+  },
+  "questions": [
+    {
+      "number": 1,
+      "question": "What is the average life expectancy in Developed vs Developing countries?",
+      "status": "ok",
+      "run_id": "f9902eb3-f442-4429-afb6-4ca564c7ef41",
+      "started": "2026-11-18T23:17:49",
+      "commit": "fe7393c",
+      "provider": "anthropic",
+      "model": "claude-haiku-5-5",
+      "nodes": [
+        {
+          "node": "ask",
+          "seconds": 6.1
+        },
+        {
+          "node": "answer",
+          "seconds": 4.4
+        }
+      ],
+      "tasks": [],
+      "facts": [
+        "eda_1.le_by_status_developed",
+        "eda_1.le_by_status_developing",
+        "eda_1.rows_by_year_and_status",
+        "stat_1.stat1_life_expectancy"
+      ],
+      "unverified_numbers": [],
+      "finished": "2026-11-18T23:18:00",
+      "seconds": 10.5,
+      "llm_calls": 2,
+      "input_tokens": 45960,
+      "output_tokens": 1022,
+      "calls_cut_off": 0,
+      "calls_window_full": 0,
+      "calls_empty": 0,
+      "grades": {
+        "tasks_completed": 0,
+        "tasks_failed": 0,
+        "revisions": 0,
+        "unresolved_objections": 0,
+        "cost_usd": 0.00511
+      }
+    },
+    {
+      "number": 2,
+      "question": "Does the random forest still beat the baseline when whole countries are held out of training?",
+      "status": "ok",
+      "run_id": "24c9b20d-7522-4748-a78f-542506eada53",
+      "started": "2026-11-18T23:18:49",
+      "commit": "fe7393c",
+      "provider": "anthropic",
+      "model": "claude-haiku-5-5",
+      "nodes": [
+        {
+          "node": "ask",
+          "seconds": 9.3
+        },
+        {
+          "node": "run_task",
+          "seconds": 64.1
+        },
+        {
+          "node": "review",
+          "seconds": 8.9
+        },
+        {
+          "node": "run_task",
+          "seconds": 20.0
+        },
+        {
+          "node": "review",
+          "seconds": 9.7
+        },
+        {
+          "node": "answer",
+          "seconds": 4.7
+        }
+      ],
+      "tasks": [
+        "q2_ml_1"
+      ],
+      "facts": [
+        "ml_1.ml1_rf",
+        "ml_1.ml1_mean_baseline"
+      ],
+      "unverified_numbers": [],
+      "finished": "2026-11-18T23:20:46",
+      "seconds": 116.8,
+      "llm_calls": 10,
+      "input_tokens": 120829,
+      "output_tokens": 13607,
+      "calls_cut_off": 0,
+      "calls_window_full": 0,
+      "calls_empty": 0,
+      "grades": {
+        "tasks_completed": 1,
+        "tasks_failed": 0,
+        "revisions": 1,
+        "unresolved_objections": 0,
+        "cost_usd": 0.01889
+      }
+    },
+    {
+      "number": 3,
+      "question": "How does life expectancy differ between men and women?",
+      "status": "ok",
+      "run_id": "b3a6c4ed-6efb-4977-899c-d385a39e1163",
+      "started": "2026-11-18T23:21:33",
+      "commit": "fe7393c",
+      "provider": "anthropic",
+      "model": "claude-haiku-5-5",
+      "nodes": [
+        {
+          "node": "ask",
+          "seconds": 5.7
+        },
+        {
+          "node": "answer",
+          "seconds": 2.3
+        }
+      ],
+      "tasks": [],
+      "facts": [],
+      "unverified_numbers": [],
+      "finished": "2026-11-18T23:21:41",
+      "seconds": 8.0,
+      "llm_calls": 2,
+      "input_tokens": 52375,
+      "output_tokens": 615,
+      "calls_cut_off": 0,
+      "calls_window_full": 0,
+      "calls_empty": 0,
+      "grades": {
+        "tasks_completed": 0,
+        "tasks_failed": 0,
+        "revisions": 0,
+        "unresolved_objections": 0,
+        "cost_usd": 0.00554
+      }
+    }
+  ]
+}

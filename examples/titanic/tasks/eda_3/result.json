@@ -1,0 +1,274 @@
+{
+  "task_id": "eda_3",
+  "specialist": "eda",
+  "description": "Does the child (0-12) survival advantage hold within each Pclass and within each Sex, or is it driven by class or sex mix?",
+  "code": "# %%\nimport matplotlib.pyplot as plt\nimport numpy as np\nimport pandas as pd\n\nfrom agent.execution.runtime import (\n    df,\n    load,\n    publish,\n    record_fact,\n    record_model,\n    save_chart,\n)\n\n# %%\nd = df.copy()\nd = d[d['Age'].notna()].copy()\nd['child'] = np.where(d['Age'] <= 12, 'child 0-12', 'older')\noverall = d.groupby('child')['Survived'].agg(['mean', 'count'])\nprint(overall)\nprint(len(d))\nprint(d.groupby(['Pclass', 'child'])['Survived'].agg(['mean', 'count']))\nprint(d.groupby(['Sex', 'child'])['Survived'].agg(['mean', 'count']))\nprint(d.groupby(['Sex', 'Pclass', 'child'])['Survived'].agg(['mean', 'count']))\n\n# %%\nt1=d.groupby(['Pclass','child'])['Survived'].agg(['mean','count']); t2=d.groupby(['Sex','child'])['Survived'].agg(['mean','count']); rec_pclass={f'{a}|{b}':{'rate':round(float(v[0]),3),'n':int(v[1])} for (a,b),v in zip(t1.index,t1.values)}; rec_sex={f'{a}|{b}':{'rate':round(float(v[0]),3),'n':int(v[1])} for (a,b),v in zip(t2.index,t2.values)}; record_fact('child_by_pclass',rec_pclass,'Survival rate and n for child 0-12 vs older, by Pclass (Age known, n=714)'); record_fact('child_by_sex',rec_sex,'Survival rate and n for child 0-12 vs older, by Sex (Age known, n=714)'); record_fact('child_overall',{'child_rate':round(float(overall.loc['child 0-12','mean']),4),'child_n':int(overall.loc['child 0-12','count']),'older_rate':round(float(overall.loc['older','mean']),4),'older_n':int(overall.loc['older','count']),'base_rate':0.3838},'Child 0-12 survival rate vs older passengers and the 38.4% base rate (Age known, n=714)'); cr=[t1.loc[(p,'child 0-12'),'mean'] for p in [1,2,3]]+[t2.loc[(s,'child 0-12'),'mean'] for s in ['female','male']]; orr=[t1.loc[(p,'older'),'mean'] for p in [1,2,3]]+[t2.loc[(s,'older'),'mean'] for s in ['female','male']]; x=np.arange(5); fig,ax=plt.subplots(figsize=(8,4)); ax.bar(x-0.2,cr,0.4,label='child 0-12'); ax.bar(x+0.2,orr,0.4,label='older passengers'); ax.axhline(0.3838,color='red',ls='--',label='base rate 38.4%'); ax.set_xticks(x); ax.set_xticklabels(['Pclass 1','Pclass 2','Pclass 3','Female','Male']); ax.set_ylabel('Survival rate (share surviving)'); ax.set_title('Survival rate of children 0-12 vs older passengers, by Pclass and Sex (Age known, n=714)'); ax.legend(); save_chart(fig,'eda3_child_survival_by_group','Survival rate of children 0-12 vs older passengers within each Pclass and each Sex; dashed red line = base rate 38.4%')\n\n# %%\nt1=d.groupby(['Pclass','child'])['Survived'].agg(['mean','count'])\nt3=d.groupby(['Sex','Pclass','child'])['Survived'].agg(['mean','count'])\nprint(t1)\nprint(t3)\nrec_sp={f'{a}|{b}|{c}':{'rate':round(float(v[0]),3),'n':int(v[1])} for (a,b,c),v in zip(t3.index,t3.values)}\nrecord_fact('child_by_sex_pclass',rec_sp,'Survival rate and n for child 0-12 vs older, by Sex and Pclass (Age known, n=714)')\nrecord_fact('child_by_pclass_full',{f'{a}|{b}':{'rate':round(float(v[0]),3),'n':int(v[1])} for (a,b),v in zip(t1.index,t1.values)},'Survival rate and n for child 0-12 vs older by Pclass, all levels (Age known, n=714)')\n",
+  "output": "                mean  count\nchild                      \nchild 0-12  0.579710     69\nolder       0.387597    645\n714\n                       mean  count\nPclass child                      \n1      child 0-12  0.750000      4\n       older       0.653846    182\n2      child 0-12  1.000000     17\n       older       0.423077    156\n3      child 0-12  0.416667     48\n       older       0.211726    307\n                       mean  count\nSex    child                      \nfemale child 0-12  0.593750     32\n       older       0.777293    229\nmale   child 0-12  0.567568     37\n       older       0.173077    416\n                              mean  count\nSex    Pclass child                      \nfemale 1      child 0-12  0.000000      1\n              older       0.976190     84\n       2      child 0-12  1.000000      8\n              older       0.909091     66\n       3      child 0-12  0.478261     23\n              older       0.455696     79\nmale   1      child 0-12  1.000000      3\n              older       0.377551     98\n       2      child 0-12  1.000000      9\n              older       0.066667     90\n       3      child 0-12  0.360000     25\n              older       0.127193    228\n                       mean  count\nPclass child                      \n1      child 0-12  0.750000      4\n       older       0.653846    182\n2      child 0-12  1.000000     17\n       older       0.423077    156\n3      child 0-12  0.416667     48\n       older       0.211726    307\n                              mean  count\nSex    Pclass child                      \nfemale 1      child 0-12  0.000000      1\n              older       0.976190     84\n       2      child 0-12  1.000000      8\n              older       0.909091     66\n       3      child 0-12  0.478261     23\n              older       0.455696     79\nmale   1      child 0-12  1.000000      3\n              older       0.377551     98\n       2      child 0-12  1.000000      9\n              older       0.066667     90\n       3      child 0-12  0.360000     25\n              older       0.127193    228\n",
+  "execution_time": 12.280000000000001,
+  "success": true,
+  "error": null,
+  "report": {
+    "status": "complete",
+    "findings": [
+      {
+        "statement": "Children aged 0-12 survived at 58.0% (n=69) versus 38.8% (n=645) for older passengers, among the 714 passengers with Age recorded. The child rate is above the 38.4% base rate.",
+        "facts": [
+          "child_overall"
+        ]
+      },
+      {
+        "statement": "By Pclass, the child advantage holds in Pclass 3: children survived at 41.7% (n=48) versus 21.2% (n=307) for older Pclass 3 passengers. In Pclass 2 children survived at 100% (n=17) versus 42.3% (n=156) for older passengers. In Pclass 1 children survived at 75.0% (n=4) versus 65.4% (n=182) for older passengers, but n=4 is too small to read reliably.",
+        "facts": [
+          "child_by_pclass",
+          "child_by_pclass_full"
+        ]
+      },
+      {
+        "statement": "By Sex, the child advantage is large among males and absent among females. Male children survived at 56.8% (n=37) versus 17.3% (n=416) for older men. Female children survived at 59.4% (n=32) versus 77.7% (n=229) for older women.",
+        "facts": [
+          "child_by_sex"
+        ]
+      },
+      {
+        "statement": "Within Sex and Pclass, male children survived at 100% (n=3) in Pclass 1 versus 37.8% (n=98) for older men, at 100% (n=9) in Pclass 2 versus 6.7% (n=90) for older men, and at 36.0% (n=25) in Pclass 3 versus 12.7% (n=228) for older men. Female children survived at 0.0% (n=1) in Pclass 1 versus 97.6% (n=84) for older women, at 100% (n=8) in Pclass 2 versus 90.9% (n=66) for older women, and at 47.8% (n=23) in Pclass 3 versus 45.6% (n=79) for older women. The female Pclass 1 child cell has n=1 and the male Pclass 1 child cell has n=3, so neither supports a firm conclusion.",
+        "facts": [
+          "child_by_sex_pclass"
+        ]
+      },
+      {
+        "statement": "The overall child advantage (58.0% versus 38.8%) is a descriptive split that does not adjust for Pclass mix. Male children are over-represented in Pclass 2 and Pclass 3 relative to older men, and the 17 Pclass 2 children (100% survival, 9 of them male) contribute heavily to the child rate. The male child advantage should therefore not be attributed to sex or to a causal effect without a model that adjusts for Pclass.",
+        "facts": [
+          "child_by_sex_pclass",
+          "child_by_pclass",
+          "child_overall"
+        ]
+      },
+      {
+        "statement": "Splitting by Sex and Pclass together leaves most cells small: only 1 to 9 children fall in the Pclass 1 and Pclass 2 cells for either sex. Pclass 3 is the only group where both sexes have 20 or more children, and there the female child rate (47.8%) matches older women (45.6%) while the male child rate (36.0%) is well above older men (12.7%).",
+        "facts": [
+          "child_by_sex_pclass"
+        ]
+      }
+    ],
+    "follow_ups": [
+      "Does the child advantage among males hold after controlling for Pclass, using a logistic model with Age group, Sex and Pclass together?",
+      "Why do older females survive at a higher rate than children of either sex in the same class? Is this a mix effect of Pclass within the female group?",
+      "Is the Pclass 2 child result (100%, n=17) reliable, or does it depend on a few families?"
+    ]
+  },
+  "facts": {
+    "child_by_pclass": {
+      "value": {
+        "1|child 0-12": {
+          "rate": 0.75,
+          "n": 4
+        },
+        "1|older": {
+          "rate": 0.654,
+          "n": 182
+        },
+        "2|child 0-12": {
+          "rate": 1.0,
+          "n": 17
+        },
+        "2|older": {
+          "rate": 0.423,
+          "n": 156
+        },
+        "3|child 0-12": {
+          "rate": 0.417,
+          "n": 48
+        },
+        "3|older": {
+          "rate": 0.212,
+          "n": 307
+        }
+      },
+      "desc": "Survival rate and n for child 0-12 vs older, by Pclass (Age known, n=714)",
+      "cell": 2
+    },
+    "child_by_sex": {
+      "value": {
+        "female|child 0-12": {
+          "rate": 0.594,
+          "n": 32
+        },
+        "female|older": {
+          "rate": 0.777,
+          "n": 229
+        },
+        "male|child 0-12": {
+          "rate": 0.568,
+          "n": 37
+        },
+        "male|older": {
+          "rate": 0.173,
+          "n": 416
+        }
+      },
+      "desc": "Survival rate and n for child 0-12 vs older, by Sex (Age known, n=714)",
+      "cell": 2
+    },
+    "child_overall": {
+      "value": {
+        "child_rate": 0.5797,
+        "child_n": 69,
+        "older_rate": 0.3876,
+        "older_n": 645,
+        "base_rate": 0.3838
+      },
+      "desc": "Child 0-12 survival rate vs older passengers and the 38.4% base rate (Age known, n=714)",
+      "cell": 2
+    },
+    "child_by_sex_pclass": {
+      "value": {
+        "female|1|child 0-12": {
+          "rate": 0.0,
+          "n": 1
+        },
+        "female|1|older": {
+          "rate": 0.976,
+          "n": 84
+        },
+        "female|2|child 0-12": {
+          "rate": 1.0,
+          "n": 8
+        },
+        "female|2|older": {
+          "rate": 0.909,
+          "n": 66
+        },
+        "female|3|child 0-12": {
+          "rate": 0.478,
+          "n": 23
+        },
+        "female|3|older": {
+          "rate": 0.456,
+          "n": 79
+        },
+        "male|1|child 0-12": {
+          "rate": 1.0,
+          "n": 3
+        },
+        "male|1|older": {
+          "rate": 0.378,
+          "n": 98
+        },
+        "male|2|child 0-12": {
+          "rate": 1.0,
+          "n": 9
+        },
+        "male|2|older": {
+          "rate": 0.067,
+          "n": 90
+        },
+        "male|3|child 0-12": {
+          "rate": 0.36,
+          "n": 25
+        },
+        "male|3|older": {
+          "rate": 0.127,
+          "n": 228
+        }
+      },
+      "desc": "Survival rate and n for child 0-12 vs older, by Sex and Pclass (Age known, n=714)",
+      "cell": 3
+    },
+    "child_by_pclass_full": {
+      "value": {
+        "1|child 0-12": {
+          "rate": 0.75,
+          "n": 4
+        },
+        "1|older": {
+          "rate": 0.654,
+          "n": 182
+        },
+        "2|child 0-12": {
+          "rate": 1.0,
+          "n": 17
+        },
+        "2|older": {
+          "rate": 0.423,
+          "n": 156
+        },
+        "3|child 0-12": {
+          "rate": 0.417,
+          "n": 48
+        },
+        "3|older": {
+          "rate": 0.212,
+          "n": 307
+        }
+      },
+      "desc": "Survival rate and n for child 0-12 vs older by Pclass, all levels (Age known, n=714)",
+      "cell": 3
+    }
+  },
+  "charts": {
+    "eda3_child_survival_by_group": {
+      "file": "charts/eda3_child_survival_by_group.png",
+      "caption": "Survival rate of children 0-12 vs older passengers within each Pclass and each Sex; dashed red line = base rate 38.4%",
+      "cell": 2
+    }
+  },
+  "published": [],
+  "artifacts": [],
+  "attempts": [
+    {
+      "attempt": 1,
+      "revision": 0,
+      "step": 1,
+      "code": "d = df.copy()\nd = d[d['Age'].notna()].copy()\nd['child'] = np.where(d['Age'] <= 12, 'child 0-12', 'older')\noverall = d.groupby('child')['Survived'].agg(['mean', 'count'])\nprint(overall)\nprint(len(d))\nprint(d.groupby(['Pclass', 'child'])['Survived'].agg(['mean', 'count']))\nprint(d.groupby(['Sex', 'child'])['Survived'].agg(['mean', 'count']))\nprint(d.groupby(['Sex', 'Pclass', 'child'])['Survived'].agg(['mean', 'count']))",
+      "output": "                mean  count\nchild                      \nchild 0-12  0.579710     69\nolder       0.387597    645\n714\n                       mean  count\nPclass child                      \n1      child 0-12  0.750000      4\n       older       0.653846    182\n2      child 0-12  1.000000     17\n       older       0.423077    156\n3      child 0-12  0.416667     48\n       older       0.211726    307\n                       mean  count\nSex    child                      \nfemale child 0-12  0.593750     32\n       older       0.777293    229\nmale   child 0-12  0.567568     37\n       older       0.173077    416\n                              mean  count\nSex    Pclass child                      \nfemale 1      child 0-12  0.000000      1\n              older       0.976190     84\n       2      child 0-12  1.000000      8\n              older       0.909091     66\n       3      child 0-12  0.478261     23\n              older       0.455696     79\nmale   1      child 0-12  1.000000      3\n              older       0.377551     98\n       2      child 0-12  1.000000      9\n              older       0.066667     90\n       3      child 0-12  0.360000     25\n              older       0.127193    228\n",
+      "error": null,
+      "seconds": 2.92
+    },
+    {
+      "attempt": 2,
+      "revision": 0,
+      "step": 2,
+      "code": "t1=d.groupby(['Pclass','child'])['Survived'].agg(['mean','count']); t2=d.groupby(['Sex','child'])['Survived'].agg(['mean','count']); rec_pclass={f'{a}|{b}':{'rate':round(float(v[0]),3),'n':int(v[1])} for (a,b),v in zip(t1.index,t1.values)}; rec_sex={f'{a}|{b}':{'rate':round(float(v[0]),3),'n':int(v[1])} for (a,b),v in zip(t2.index,t2.values)}; record_fact('child_by_pclass',rec_pclass,'Survival rate and n for child 0-12 vs older, by Pclass (Age known, n=714)'); record_fact('child_by_sex',rec_sex,'Survival rate and n for child 0-12 vs older, by Sex (Age known, n=714)'); record_fact('child_overall',{'child_rate':round(float(overall.loc['child 0-12','mean']),4),'child_n':int(overall.loc['child 0-12','count']),'older_rate':round(float(overall.loc['older','mean']),4),'older_n':int(overall.loc['older','count']),'base_rate':0.3838},'Child 0-12 survival rate vs older passengers and the 38.4% base rate (Age known, n=714)'); cr=[t1.loc[(p,'child 0-12'),'mean'] for p in [1,2,3]]+[t2.loc[(s,'child 0-12'),'mean'] for s in ['female','male']]; orr=[t1.loc[(p,'older'),'mean'] for p in [1,2,3]]+[t2.loc[(s,'older'),'mean'] for s in ['female','male']]; x=np.arange(5); fig,ax=plt.subplots(figsize=(8,4)); ax.bar(x-0.2,cr,0.4,label='child 0-12'); ax.bar(x+0.2,orr,0.4,label='older passengers'); ax.axhline(0.3838,color='red',ls='--',label='base rate 38.4%'); ax.set_xticks(x); ax.set_xticklabels(['Pclass 1','Pclass 2','Pclass 3','Female','Male']); ax.set_ylabel('Survival rate (share surviving)'); ax.set_title('Survival rate of children 0-12 vs older passengers, by Pclass and Sex (Age known, n=714)'); ax.legend(); save_chart(fig,'eda3_child_survival_by_group','Survival rate of children 0-12 vs older passengers within each Pclass and each Sex; dashed red line = base rate 38.4%')",
+      "output": "",
+      "error": null,
+      "seconds": 5.16
+    },
+    {
+      "attempt": 3,
+      "revision": 0,
+      "step": 3,
+      "code": "t1=d.groupby(['Pclass','child'])['Survived'].agg(['mean','count'])\nt3=d.groupby(['Sex','Pclass','child'])['Survived'].agg(['mean','count'])\nprint(t1)\nprint(t3)\nrec_sp={f'{a}|{b}|{c}':{'rate':round(float(v[0]),3),'n':int(v[1])} for (a,b,c),v in zip(t3.index,t3.values)}\nrecord_fact('child_by_sex_pclass',rec_sp,'Survival rate and n for child 0-12 vs older, by Sex and Pclass (Age known, n=714)')\nrecord_fact('child_by_pclass_full',{f'{a}|{b}':{'rate':round(float(v[0]),3),'n':int(v[1])} for (a,b),v in zip(t1.index,t1.values)},'Survival rate and n for child 0-12 vs older by Pclass, all levels (Age known, n=714)')",
+      "output": "                       mean  count\nPclass child                      \n1      child 0-12  0.750000      4\n       older       0.653846    182\n2      child 0-12  1.000000     17\n       older       0.423077    156\n3      child 0-12  0.416667     48\n       older       0.211726    307\n                              mean  count\nSex    Pclass child                      \nfemale 1      child 0-12  0.000000      1\n              older       0.976190     84\n       2      child 0-12  1.000000      8\n              older       0.909091     66\n       3      child 0-12  0.478261     23\n              older       0.455696     79\nmale   1      child 0-12  1.000000      3\n              older       0.377551     98\n       2      child 0-12  1.000000      9\n              older       0.066667     90\n       3      child 0-12  0.360000     25\n              older       0.127193    228\n",
+      "error": null,
+      "seconds": 4.2
+    }
+  ],
+  "metadata": {
+    "steps": 3
+  },
+  "brief": {
+    "id": "eda_3",
+    "specialist": "eda",
+    "question": "Does the child (0-12) survival advantage hold within each Pclass and within each Sex, or is it driven by class or sex mix?",
+    "complete_when": "A table of survival rate and group size for children (0-12) versus older passengers, broken down by Pclass and by Sex, with the overall child rate stated against the 38.4% base rate.",
+    "depends_on": [
+      "eda_1"
+    ],
+    "outputs": []
+  },
+  "revisions": 1,
+  "reviews": [
+    {
+      "reasoning": "Checked each finding against its cited facts. The overall child rate (58.0% n=69 vs 38.8% n=645, base 38.4%), the Pclass 1 and 2 figures, the Sex figures and the Pclass 2 female figures (90.9% n=66) all match the facts. Two problems. First, the brief asks whether the child advantage holds within each Pclass, but the report gives no older-passenger comparison for Pclass 3 (child_by_pclass has the Pclass 3 older rate, which the report omits), so the within-class question is unanswered for the largest class. Second, the Sex-by-Pclass cell facts include female Pclass 1 children at 0.0% (n=1), which the report leaves out while citing n=1, and the male cells by Pclass are never reported. The claim that the overall advantage is driven by males is supported descriptively by the Sex split, but it is stated as a conclusion without noting that Pclass mix was not adjusted and that the Pclass 2 child group (100%, n=17) also contributes. The chart is computed correctly from the same data.",
+      "verdict": "revise",
+      "feedback": "1) Add the Pclass 3 older-passenger survival rate and n from eda_3.child_by_pclass next to the Pclass 3 child figure (41.7%, n=48), and state whether the child advantage holds in Pclass 3. 2) Report the female Pclass 1 child cell as 0.0% (n=1) alongside its n, not only the size. 3) Add the male Pclass breakdown from eda_3.child_by_sex_pclass, or state that these cells were computed but not reported. 4) Qualify the sentence that the overall child advantage is driven mainly by males: it is a descriptive split that does not adjust for Pclass mix, and the Pclass 2 child group contributes heavily, so say that rather than attributing it causally.",
+      "follow_ups": []
+    },
+    {
+      "reasoning": "Checked the report against the facts. Overall child rate 58.0% (n=69) vs older 38.8% (n=645) and base 38.4% match child_overall. Pclass and Sex splits match child_by_pclass and child_by_sex. The Sex x Pclass cells match child_by_sex_pclass, and the cell counts sum to the Sex totals (male children 3+9+25=37, female children 1+8+23=32, older men 98+90+228=416, older women 84+66+79=229). The n=1 and n=3 cells are flagged as unreliable, and the Pclass 3 claim (both sexes have 20 or more children) holds. Automatic checks report no problems. The brief's table is given as prose with all required rates, group sizes and the base-rate comparison, plus a chart. One minor overstatement: male children are described as over-represented in Pclass 2, but the Pclass 2 difference is slight. The confounding conclusion still holds and does not rest on it. Accepting.",
+      "verdict": "accept",
+      "feedback": "",
+      "follow_ups": []
+    }
+  ]
+}

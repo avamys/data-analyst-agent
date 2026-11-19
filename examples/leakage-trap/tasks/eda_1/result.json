@@ -1,0 +1,243 @@
+{
+  "task_id": "eda_1",
+  "specialist": "eda",
+  "description": "How is churned distributed, and how do churn rates and feature averages differ across plan, binned usage_hours, binned tenure_months and refund_issued?",
+  "code": "# %%\nimport matplotlib.pyplot as plt\nimport numpy as np\nimport pandas as pd\n\nfrom agent.execution.runtime import (\n    df,\n    load,\n    publish,\n    record_fact,\n    record_model,\n    save_chart,\n)\n\n# %%\nd = df.copy()\nprint(d.shape)\nprint(d.dtypes.to_string())\nmissing = d.isna().sum()\nprint(missing.to_string())\nprint(d['churned'].value_counts(dropna=False).to_string())\nprint(d['plan'].value_counts(dropna=False).to_string())\nprint(d['refund_issued'].value_counts(dropna=False).to_string())\nprint(d[['usage_hours','tenure_months']].describe().round(2).to_string())\nrecord_fact('missing_per_column', {c: int(v) for c, v in missing.items()}, 'Count of missing values per column')\nrecord_fact('n_rows', int(d.shape[0]), 'Number of rows in dataset')\n\n# %%\nd = df.copy()\nd['usage_bin'] = pd.qcut(d['usage_hours'], 5, labels=['Q1','Q2','Q3','Q4','Q5'], duplicates='drop')\nd['tenure_bin'] = pd.qcut(d['tenure_months'], 5, labels=['Q1','Q2','Q3','Q4','Q5'], duplicates='drop')\npublish('binned_frame', d)\n\noverall = float(d['churned'].mean())\nrecord_fact('overall_churn_rate', {'rate': overall, 'n': int(len(d))}, 'Overall churn rate and n')\n\ndef rate_table(col):\n    t = d.groupby(col, observed=True)['churned'].agg(['mean','count']).rename(columns={'mean':'churn_rate','count':'n'})\n    return t\n\nplan_t = rate_table('plan')\nusage_t = rate_table('usage_bin')\ntenure_t = rate_table('tenure_bin')\nrefund_t = rate_table('refund_issued')\nfor name, t in [('plan', plan_t), ('usage_bin', usage_t), ('tenure_bin', tenure_t), ('refund_issued', refund_t)]:\n    print(name)\n    print(t.round(3).to_string())\n    record_fact(f'churn_by_{name}', {str(k): {'churn_rate': round(float(v['churn_rate']),4), 'n': int(v['n'])} for k, v in t.iterrows()}, f'Churn rate and n by {name}')\n\nmeans = d.groupby('churned')[['usage_hours','tenure_months']].mean().round(3)\nprint(means.to_string())\nrecord_fact('mean_by_churn', {str(k): {'usage_hours': float(v['usage_hours']), 'tenure_months': float(v['tenure_months'])} for k, v in means.iterrows()}, 'Mean usage_hours and tenure_months per churned group')\n\nfig, axes = plt.subplots(1, 2, figsize=(10, 4))\naxes[0].bar(plan_t.index.astype(str), plan_t['churn_rate'])\naxes[0].set_title('Churn rate by plan (share of customers churned)')\naxes[0].set_xlabel('Plan')\naxes[0].set_ylabel('Churn rate')\naxes[1].bar(tenure_t.index.astype(str), tenure_t['churn_rate'])\naxes[1].set_title('Churn rate by tenure quintile (share churned)')\naxes[1].set_xlabel('Tenure months quintile')\naxes[1].set_ylabel('Churn rate')\nfig.tight_layout()\nsave_chart(fig, 'churn_rate_by_plan_and_tenure', 'Churn rate by plan (left) and by tenure quintile (right)')\n\nfig2, ax2 = plt.subplots(figsize=(6,4))\nax2.bar(refund_t.index.astype(str), refund_t['churn_rate'])\nax2.set_title('Churn rate by refund_issued (0 vs 1)')\nax2.set_xlabel('refund_issued')\nax2.set_ylabel('Churn rate')\nfig2.tight_layout()\nsave_chart(fig2, 'churn_rate_by_refund', 'Churn rate by refund_issued value (0 vs 1)')\n",
+  "output": "(1000, 5)\nusage_hours      float64\ntenure_months      int64\nplan              object\nrefund_issued      int64\nchurned            int64\nusage_hours      0\ntenure_months    0\nplan             0\nrefund_issued    0\nchurned          0\nchurned\n0    637\n1    363\nplan\nbasic    512\nplus     297\npro      191\nrefund_issued\n0    632\n1    368\n       usage_hours  tenure_months\ncount      1000.00        1000.00\nmean         20.14          35.75\nstd           9.95          20.14\nmin           1.90           1.00\n25%          12.50          18.00\n50%          18.90          36.00\n75%          25.52          53.00\nmax          67.70          71.00\nplan\n       churn_rate    n\nplan                  \nbasic       0.428  512\nplus        0.293  297\npro         0.298  191\nusage_bin\n           churn_rate    n\nusage_bin                 \nQ1              0.490  204\nQ2              0.424  198\nQ3              0.389  198\nQ4              0.300  200\nQ5              0.210  200\ntenure_bin\n            churn_rate    n\ntenure_bin                 \nQ1               0.502  215\nQ2               0.458  190\nQ3               0.338  195\nQ4               0.266  203\nQ5               0.244  197\nrefund_issued\n               churn_rate    n\nrefund_issued                 \n0                   0.016  632\n1                   0.959  368\n         usage_hours  tenure_months\nchurned                            \n0             21.766         39.118\n1             17.298         29.843\n",
+  "execution_time": 10.63,
+  "success": true,
+  "error": null,
+  "report": {
+    "status": "complete",
+    "findings": [
+      {
+        "statement": "No missing values in any column (0 of 1000 rows for usage_hours, tenure_months, plan, refund_issued, churned). Overall churn rate is 0.363 (n=1000).",
+        "facts": [
+          "missing_per_column",
+          "n_rows",
+          "overall_churn_rate"
+        ]
+      },
+      {
+        "statement": "Churn rate by plan: basic 0.428 (n=512), plus 0.293 (n=297), pro 0.298 (n=191). Basic churns most often.",
+        "facts": [
+          "churn_by_plan"
+        ]
+      },
+      {
+        "statement": "Churn rate falls steadily across usage_hours quintiles: Q1 0.490 (n=204), Q2 0.424 (n=198), Q3 0.389 (n=198), Q4 0.300 (n=200), Q5 0.210 (n=200).",
+        "facts": [
+          "churn_by_usage_bin"
+        ]
+      },
+      {
+        "statement": "Churn rate falls across tenure_months quintiles: Q1 0.502 (n=215), Q2 0.458 (n=190), Q3 0.338 (n=195), Q4 0.266 (n=203), Q5 0.244 (n=197).",
+        "facts": [
+          "churn_by_tenure_bin"
+        ]
+      },
+      {
+        "statement": "refund_issued is a leakage candidate: churn rate is 0.959 (n=368) when refund_issued=1 versus 0.016 (n=632) when refund_issued=0, a near-deterministic split.",
+        "facts": [
+          "churn_by_refund_issued"
+        ]
+      },
+      {
+        "statement": "Churned customers have lower mean usage_hours (17.298 vs 21.766) and lower mean tenure_months (29.843 vs 39.118) than retained customers.",
+        "facts": [
+          "mean_by_churn"
+        ]
+      }
+    ],
+    "follow_ups": [
+      "Does churn still separate by plan, usage and tenure once refund_issued is excluded? Fit a model without refund_issued to check.",
+      "Why do refunds almost always coincide with churn: is refund_issued recorded after the churn decision, making it leakage?",
+      "Do usage_hours and tenure_months effects differ within each plan level (interaction)?"
+    ]
+  },
+  "facts": {
+    "missing_per_column": {
+      "value": {
+        "usage_hours": 0,
+        "tenure_months": 0,
+        "plan": 0,
+        "refund_issued": 0,
+        "churned": 0
+      },
+      "desc": "Count of missing values per column",
+      "cell": 1
+    },
+    "n_rows": {
+      "value": 1000,
+      "desc": "Number of rows in dataset",
+      "cell": 1
+    },
+    "overall_churn_rate": {
+      "value": {
+        "rate": 0.363,
+        "n": 1000
+      },
+      "desc": "Overall churn rate and n",
+      "cell": 2
+    },
+    "churn_by_plan": {
+      "value": {
+        "basic": {
+          "churn_rate": 0.4277,
+          "n": 512
+        },
+        "plus": {
+          "churn_rate": 0.2929,
+          "n": 297
+        },
+        "pro": {
+          "churn_rate": 0.2984,
+          "n": 191
+        }
+      },
+      "desc": "Churn rate and n by plan",
+      "cell": 2
+    },
+    "churn_by_usage_bin": {
+      "value": {
+        "Q1": {
+          "churn_rate": 0.4902,
+          "n": 204
+        },
+        "Q2": {
+          "churn_rate": 0.4242,
+          "n": 198
+        },
+        "Q3": {
+          "churn_rate": 0.3889,
+          "n": 198
+        },
+        "Q4": {
+          "churn_rate": 0.3,
+          "n": 200
+        },
+        "Q5": {
+          "churn_rate": 0.21,
+          "n": 200
+        }
+      },
+      "desc": "Churn rate and n by usage_bin",
+      "cell": 2
+    },
+    "churn_by_tenure_bin": {
+      "value": {
+        "Q1": {
+          "churn_rate": 0.5023,
+          "n": 215
+        },
+        "Q2": {
+          "churn_rate": 0.4579,
+          "n": 190
+        },
+        "Q3": {
+          "churn_rate": 0.3385,
+          "n": 195
+        },
+        "Q4": {
+          "churn_rate": 0.266,
+          "n": 203
+        },
+        "Q5": {
+          "churn_rate": 0.2437,
+          "n": 197
+        }
+      },
+      "desc": "Churn rate and n by tenure_bin",
+      "cell": 2
+    },
+    "churn_by_refund_issued": {
+      "value": {
+        "0": {
+          "churn_rate": 0.0158,
+          "n": 632
+        },
+        "1": {
+          "churn_rate": 0.9592,
+          "n": 368
+        }
+      },
+      "desc": "Churn rate and n by refund_issued",
+      "cell": 2
+    },
+    "mean_by_churn": {
+      "value": {
+        "0": {
+          "usage_hours": 21.766,
+          "tenure_months": 39.118
+        },
+        "1": {
+          "usage_hours": 17.298,
+          "tenure_months": 29.843
+        }
+      },
+      "desc": "Mean usage_hours and tenure_months per churned group",
+      "cell": 2
+    }
+  },
+  "charts": {
+    "churn_rate_by_plan_and_tenure": {
+      "file": "charts/churn_rate_by_plan_and_tenure.png",
+      "caption": "Churn rate by plan (left) and by tenure quintile (right)",
+      "cell": 2
+    },
+    "churn_rate_by_refund": {
+      "file": "charts/churn_rate_by_refund.png",
+      "caption": "Churn rate by refund_issued value (0 vs 1)",
+      "cell": 2
+    }
+  },
+  "published": [
+    "eda_1/binned_frame"
+  ],
+  "artifacts": [],
+  "attempts": [
+    {
+      "attempt": 1,
+      "revision": 0,
+      "step": 1,
+      "code": "d = df.copy()\nprint(d.shape)\nprint(d.dtypes.to_string())\nmissing = d.isna().sum()\nprint(missing.to_string())\nprint(d['churned'].value_counts(dropna=False).to_string())\nprint(d['plan'].value_counts(dropna=False).to_string())\nprint(d['refund_issued'].value_counts(dropna=False).to_string())\nprint(d[['usage_hours','tenure_months']].describe().round(2).to_string())\nrecord_fact('missing_per_column', {c: int(v) for c, v in missing.items()}, 'Count of missing values per column')\nrecord_fact('n_rows', int(d.shape[0]), 'Number of rows in dataset')",
+      "output": "(1000, 5)\nusage_hours      float64\ntenure_months      int64\nplan              object\nrefund_issued      int64\nchurned            int64\nusage_hours      0\ntenure_months    0\nplan             0\nrefund_issued    0\nchurned          0\nchurned\n0    637\n1    363\nplan\nbasic    512\nplus     297\npro      191\nrefund_issued\n0    632\n1    368\n       usage_hours  tenure_months\ncount      1000.00        1000.00\nmean         20.14          35.75\nstd           9.95          20.14\nmin           1.90           1.00\n25%          12.50          18.00\n50%          18.90          36.00\n75%          25.52          53.00\nmax          67.70          71.00\n",
+      "error": null,
+      "seconds": 4.65
+    },
+    {
+      "attempt": 2,
+      "revision": 0,
+      "step": 2,
+      "code": "d = df.copy()\nd['usage_bin'] = pd.qcut(d['usage_hours'], 5, labels=['Q1','Q2','Q3','Q4','Q5'], duplicates='drop')\nd['tenure_bin'] = pd.qcut(d['tenure_months'], 5, labels=['Q1','Q2','Q3','Q4','Q5'], duplicates='drop')\npublish('binned_frame', d)\n\noverall = float(d['churned'].mean())\nrecord_fact('overall_churn_rate', {'rate': overall, 'n': int(len(d))}, 'Overall churn rate and n')\n\ndef rate_table(col):\n    t = d.groupby(col, observed=True)['churned'].agg(['mean','count']).rename(columns={'mean':'churn_rate','count':'n'})\n    return t\n\nplan_t = rate_table('plan')\nusage_t = rate_table('usage_bin')\ntenure_t = rate_table('tenure_bin')\nrefund_t = rate_table('refund_issued')\nfor name, t in [('plan', plan_t), ('usage_bin', usage_t), ('tenure_bin', tenure_t), ('refund_issued', refund_t)]:\n    print(name)\n    print(t.round(3).to_string())\n    record_fact(f'churn_by_{name}', {str(k): {'churn_rate': round(float(v['churn_rate']),4), 'n': int(v['n'])} for k, v in t.iterrows()}, f'Churn rate and n by {name}')\n\nmeans = d.groupby('churned')[['usage_hours','tenure_months']].mean().round(3)\nprint(means.to_string())\nrecord_fact('mean_by_churn', {str(k): {'usage_hours': float(v['usage_hours']), 'tenure_months': float(v['tenure_months'])} for k, v in means.iterrows()}, 'Mean usage_hours and tenure_months per churned group')\n\nfig, axes = plt.subplots(1, 2, figsize=(10, 4))\naxes[0].bar(plan_t.index.astype(str), plan_t['churn_rate'])\naxes[0].set_title('Churn rate by plan (share of customers churned)')\naxes[0].set_xlabel('Plan')\naxes[0].set_ylabel('Churn rate')\naxes[1].bar(tenure_t.index.astype(str), tenure_t['churn_rate'])\naxes[1].set_title('Churn rate by tenure quintile (share churned)')\naxes[1].set_xlabel('Tenure months quintile')\naxes[1].set_ylabel('Churn rate')\nfig.tight_layout()\nsave_chart(fig, 'churn_rate_by_plan_and_tenure', 'Churn rate by plan (left) and by tenure quintile (right)')\n\nfig2, ax2 = plt.subplots(figsize=(6,4))\nax2.bar(refund_t.index.astype(str), refund_t['churn_rate'])\nax2.set_title('Churn rate by refund_issued (0 vs 1)')\nax2.set_xlabel('refund_issued')\nax2.set_ylabel('Churn rate')\nfig2.tight_layout()\nsave_chart(fig2, 'churn_rate_by_refund', 'Churn rate by refund_issued value (0 vs 1)')",
+      "output": "plan\n       churn_rate    n\nplan                  \nbasic       0.428  512\nplus        0.293  297\npro         0.298  191\nusage_bin\n           churn_rate    n\nusage_bin                 \nQ1              0.490  204\nQ2              0.424  198\nQ3              0.389  198\nQ4              0.300  200\nQ5              0.210  200\ntenure_bin\n            churn_rate    n\ntenure_bin                 \nQ1               0.502  215\nQ2               0.458  190\nQ3               0.338  195\nQ4               0.266  203\nQ5               0.244  197\nrefund_issued\n               churn_rate    n\nrefund_issued                 \n0                   0.016  632\n1                   0.959  368\n         usage_hours  tenure_months\nchurned                            \n0             21.766         39.118\n1             17.298         29.843\n",
+      "error": null,
+      "seconds": 5.98
+    }
+  ],
+  "metadata": {
+    "steps": 2
+  },
+  "brief": {
+    "id": "eda_1",
+    "specialist": "eda",
+    "question": "How is churned distributed, and how do churn rates and feature averages differ across plan, binned usage_hours, binned tenure_months and refund_issued?",
+    "complete_when": "Confirms zero missing values per column; reports churn rate (with n) for each plan level, for quintile bins of usage_hours and tenure_months, and for refund_issued 0 vs 1; reports mean usage_hours and tenure_months per churned group; includes at least one chart of churn rate by plan and by tenure bin; flags refund_issued as a leakage candidate with its churn rate split.",
+    "depends_on": [],
+    "outputs": [
+      {
+        "name": "binned_frame",
+        "contents": "The dataframe with added columns usage_bin and tenure_bin (quintiles) used for the group rates, saved for reuse."
+      }
+    ]
+  },
+  "revisions": 0,
+  "reviews": [
+    {
+      "reasoning": "Every number in the findings matches its cited fact after rounding: overall churn 0.363 (n=1000) matches the profile's 36.3%; plan rates 0.428/0.293/0.298 with n 512/297/191 sum to 1000; usage and tenure quintile rates and n sum to 1000 each; refund rates 0.016 (n=632) and 0.959 (n=368) sum to 1000; mean_by_churn values 21.766/17.298 and 39.118/29.843 match. Quintile rates fall monotonically, so 'falls steadily' is accurate. The brief is covered: missing values confirmed, rates with n for plan, both binned features and refund, group means, both charts, refund flagged as a leakage candidate with its split, and binned_frame published. The automatic checks report no problems. Remaining open questions (refund-without-leakage model, plan/usage/tenure interactions, significance) are already covered by stat_1, stat_2 and ml_2, so no new follow-up is needed.",
+      "verdict": "accept",
+      "feedback": "",
+      "follow_ups": []
+    }
+  ]
+}

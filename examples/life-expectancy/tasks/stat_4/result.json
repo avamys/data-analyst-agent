@@ -1,0 +1,204 @@
+{
+  "task_id": "stat_4",
+  "specialist": "statistical",
+  "description": "Does the Developed-Developing gap in Life expectancy, Schooling and Adult Mortality remain significant when standard errors account for the country-year structure (cluster-robust SEs or a mixed model with Country as the grouping factor)?",
+  "code": "# %%\nimport matplotlib.pyplot as plt\nimport numpy as np\nimport pandas as pd\n\nfrom agent.execution.runtime import (\n    df,\n    load,\n    publish,\n    record_fact,\n    record_model,\n    save_chart,\n)\n\n# %%\nimport statsmodels.formula.api as smf\n\nd = df.copy()\nd.columns = [c.strip().replace(' ', '_').replace('-', '_') for c in d.columns]\nprint(d.columns.tolist())\nprint(d['Status'].value_counts(dropna=False))\nprint('Countries:', d['Country'].nunique())\nprint(d[['Life_expectancy','Schooling','Adult_Mortality']].isna().sum())\nprint(d[['Life_expectancy','Schooling','Adult_Mortality']].dtypes)\n\n# %%\nres = {}\nfor y in ['Life_expectancy','Schooling','Adult_Mortality']:\n    sub = d[['Country','Status',y]].dropna().copy()\n    sub['dev'] = (sub['Status']=='Developed').astype(int)\n    m = smf.ols(f'{y} ~ dev', data=sub).fit(cov_type='cluster', cov_kwds={'groups': pd.factorize(sub['Country'])[0]})\n    ci = m.conf_int().loc['dev']\n    res[y] = {'coef': float(m.params['dev']), 'ci_low': float(ci[0]), 'ci_high': float(ci[1]), 'p': float(m.pvalues['dev']), 'n_rows': int(len(sub)), 'n_clusters': int(sub['Country'].nunique())}\n    print(y, res[y])\n    record_fact(f'stat4_cluster_{y.lower()}', res[y], f'Cluster-robust (Country) OLS Developed vs Developing coefficient for {y}: coef, 95% CI, p, rows, clusters')\n\n# %%\nnaive = {'life_expectancy': {'diff': 12.09, 'ci_low': 11.59, 'ci_high': 12.58, 'n_developed': 512, 'n_developing': 2416}, 'schooling': {'diff': 4.63, 'ci_low': 4.42, 'ci_high': 4.83, 'n_developed': 464, 'n_developing': 2311}, 'adult_mortality': {'diff': -103.15, 'ci_low': -109.73, 'ci_high': -96.57, 'n_developed': 512, 'n_developing': 2416}}\nfor k, v in naive.items():\n    record_fact(f'stat1_{k}', v, f'Naive Welch 95% CI for Developed minus Developing {k} from stat_1')\ncluster = {'life_expectancy': (10.322965660539639, 13.8498070008842), 'schooling': (3.8835050449614505, 5.3689317640031575), 'adult_mortality': (-121.7696966435683, -84.52560033490857)}\nratios = {}\nfor k in naive:\n    cw = cluster[k][1] - cluster[k][0]\n    nw = naive[k]['ci_high'] - naive[k]['ci_low']\n    ratios[k] = {'cluster_width': cw, 'naive_width': nw, 'ratio': cw / nw}\n    print(k, ratios[k])\nrecord_fact('stat4_width_ratios', ratios, 'Cluster-robust CI width divided by naive stat_1 CI width, per outcome')\n",
+  "output": "['Country', 'Year', 'Status', 'Life_expectancy', 'Adult_Mortality', 'infant_deaths', 'Alcohol', 'percentage_expenditure', 'Hepatitis_B', 'Measles', 'BMI', 'under_five_deaths', 'Polio', 'Total_expenditure', 'Diphtheria', 'HIV/AIDS', 'GDP', 'Population', 'thinness__1_19_years', 'thinness_5_9_years', 'Income_composition_of_resources', 'Schooling']\nStatus\nDeveloping    2426\nDeveloped      512\nName: count, dtype: int64\nCountries: 193\nLife_expectancy     10\nSchooling          163\nAdult_Mortality     10\ndtype: int64\nLife_expectancy    float64\nSchooling          float64\nAdult_Mortality    float64\ndtype: object\nLife_expectancy {'coef': 12.08638633071192, 'ci_low': 10.322965660539639, 'ci_high': 13.8498070008842, 'p': 3.848737852966796e-41, 'n_rows': 2928, 'n_clusters': 183}\nSchooling {'coef': 4.626218404482304, 'ci_low': 3.8835050449614505, 'ci_high': 5.3689317640031575, 'p': 2.809068010030333e-34, 'n_rows': 2775, 'n_clusters': 180}\nAdult_Mortality {'coef': -103.14764848923843, 'ci_low': -121.7696966435683, 'ci_high': -84.52560033490857, 'p': 1.8623377602826813e-27, 'n_rows': 2928, 'n_clusters': 183}\nlife_expectancy {'cluster_width': 3.5268413403445606, 'naive_width': 0.9900000000000002, 'ratio': 3.5624660003480404}\nschooling {'cluster_width': 1.485426719041707, 'naive_width': 0.41000000000000014, 'ratio': 3.6229919976626985}\nadult_mortality {'cluster_width': 37.24409630865972, 'naive_width': 13.16000000000001, 'ratio': 2.830098503697545}\n",
+  "execution_time": 21.689999999999998,
+  "success": true,
+  "error": null,
+  "report": {
+    "status": "complete",
+    "findings": [
+      {
+        "statement": "Life expectancy: the Developed minus Developing gap is 12.09 years (cluster-robust 95% CI 10.32 to 13.85, p = 3.8e-41, 2928 rows, 183 Country clusters). The naive stat_1 Welch CI was 11.59 to 12.58 (width about 0.99). The cluster-robust CI (width about 3.53) is about 3.6 times wider (ratio 3.56). The gap remains significant, so the conclusion does not change.",
+        "facts": [
+          "stat4_cluster_life_expectancy",
+          "stat1_life_expectancy",
+          "stat4_width_ratios"
+        ]
+      },
+      {
+        "statement": "Schooling: the Developed minus Developing gap is 4.63 years (cluster-robust 95% CI 3.88 to 5.37, p = 2.8e-34, 2775 rows, 180 Country clusters). The naive stat_1 CI was 4.42 to 4.83 (width about 0.41). The cluster-robust width (about 1.49) is about 3.6 times the naive width (ratio 3.62). The gap remains significant, so the conclusion does not change.",
+        "facts": [
+          "stat4_cluster_schooling",
+          "stat1_schooling",
+          "stat4_width_ratios"
+        ]
+      },
+      {
+        "statement": "Adult Mortality: the Developed minus Developing difference is -103.15 (cluster-robust 95% CI -121.77 to -84.53, p = 1.9e-27, 2928 rows, 183 Country clusters). The naive stat_1 CI was -109.73 to -96.57 (width about 13.2). The cluster-robust width (about 37.2) is about 2.8 times the naive width (ratio 2.83). The difference remains significant, so the conclusion does not change.",
+        "facts": [
+          "stat4_cluster_adult_mortality",
+          "stat1_adult_mortality",
+          "stat4_width_ratios"
+        ]
+      },
+      {
+        "statement": "Across all three outcomes, clustering by Country widens the CIs by roughly 2.8 to 3.6 times, but every cluster-robust 95% CI excludes zero with p-values below 1e-26. The Developed-Developing gaps in Life expectancy, Schooling and Adult Mortality all remain significant once the country-year structure is accounted for.",
+        "facts": [
+          "stat4_cluster_life_expectancy",
+          "stat4_cluster_schooling",
+          "stat4_cluster_adult_mortality",
+          "stat4_width_ratios"
+        ]
+      }
+    ],
+    "follow_ups": [
+      "Does the Developed-Developing gap in Life expectancy persist after adjusting for Schooling, Adult Mortality and income composition, using a mixed model with a random intercept for Country?",
+      "Is the Status effect driven by a small number of countries that switch status or have many years of data? A leave-one-country-out check would show how stable the cluster-robust CIs are."
+    ]
+  },
+  "facts": {
+    "stat4_cluster_life_expectancy": {
+      "value": {
+        "coef": 12.08638633071192,
+        "ci_low": 10.322965660539639,
+        "ci_high": 13.8498070008842,
+        "p": 3.848737852966796e-41,
+        "n_rows": 2928,
+        "n_clusters": 183
+      },
+      "desc": "Cluster-robust (Country) OLS Developed vs Developing coefficient for Life_expectancy: coef, 95% CI, p, rows, clusters",
+      "cell": 2
+    },
+    "stat4_cluster_schooling": {
+      "value": {
+        "coef": 4.626218404482304,
+        "ci_low": 3.8835050449614505,
+        "ci_high": 5.3689317640031575,
+        "p": 2.809068010030333e-34,
+        "n_rows": 2775,
+        "n_clusters": 180
+      },
+      "desc": "Cluster-robust (Country) OLS Developed vs Developing coefficient for Schooling: coef, 95% CI, p, rows, clusters",
+      "cell": 2
+    },
+    "stat4_cluster_adult_mortality": {
+      "value": {
+        "coef": -103.14764848923843,
+        "ci_low": -121.7696966435683,
+        "ci_high": -84.52560033490857,
+        "p": 1.8623377602826813e-27,
+        "n_rows": 2928,
+        "n_clusters": 183
+      },
+      "desc": "Cluster-robust (Country) OLS Developed vs Developing coefficient for Adult_Mortality: coef, 95% CI, p, rows, clusters",
+      "cell": 2
+    },
+    "stat1_life_expectancy": {
+      "value": {
+        "diff": 12.09,
+        "ci_low": 11.59,
+        "ci_high": 12.58,
+        "n_developed": 512,
+        "n_developing": 2416
+      },
+      "desc": "Naive Welch 95% CI for Developed minus Developing life_expectancy from stat_1",
+      "cell": 3
+    },
+    "stat1_schooling": {
+      "value": {
+        "diff": 4.63,
+        "ci_low": 4.42,
+        "ci_high": 4.83,
+        "n_developed": 464,
+        "n_developing": 2311
+      },
+      "desc": "Naive Welch 95% CI for Developed minus Developing schooling from stat_1",
+      "cell": 3
+    },
+    "stat1_adult_mortality": {
+      "value": {
+        "diff": -103.15,
+        "ci_low": -109.73,
+        "ci_high": -96.57,
+        "n_developed": 512,
+        "n_developing": 2416
+      },
+      "desc": "Naive Welch 95% CI for Developed minus Developing adult_mortality from stat_1",
+      "cell": 3
+    },
+    "stat4_width_ratios": {
+      "value": {
+        "life_expectancy": {
+          "cluster_width": 3.5268413403445606,
+          "naive_width": 0.9900000000000002,
+          "ratio": 3.5624660003480404
+        },
+        "schooling": {
+          "cluster_width": 1.485426719041707,
+          "naive_width": 0.41000000000000014,
+          "ratio": 3.6229919976626985
+        },
+        "adult_mortality": {
+          "cluster_width": 37.24409630865972,
+          "naive_width": 13.16000000000001,
+          "ratio": 2.830098503697545
+        }
+      },
+      "desc": "Cluster-robust CI width divided by naive stat_1 CI width, per outcome",
+      "cell": 3
+    }
+  },
+  "charts": {},
+  "published": [],
+  "artifacts": [],
+  "attempts": [
+    {
+      "attempt": 1,
+      "revision": 0,
+      "step": 1,
+      "code": "import statsmodels.formula.api as smf\n\nd = df.copy()\nd.columns = [c.strip().replace(' ', '_').replace('-', '_') for c in d.columns]\nprint(d.columns.tolist())\nprint(d['Status'].value_counts(dropna=False))\nprint('Countries:', d['Country'].nunique())\nprint(d[['Life_expectancy','Schooling','Adult_Mortality']].isna().sum())\nprint(d[['Life_expectancy','Schooling','Adult_Mortality']].dtypes)",
+      "output": "['Country', 'Year', 'Status', 'Life_expectancy', 'Adult_Mortality', 'infant_deaths', 'Alcohol', 'percentage_expenditure', 'Hepatitis_B', 'Measles', 'BMI', 'under_five_deaths', 'Polio', 'Total_expenditure', 'Diphtheria', 'HIV/AIDS', 'GDP', 'Population', 'thinness__1_19_years', 'thinness_5_9_years', 'Income_composition_of_resources', 'Schooling']\nStatus\nDeveloping    2426\nDeveloped      512\nName: count, dtype: int64\nCountries: 193\nLife_expectancy     10\nSchooling          163\nAdult_Mortality     10\ndtype: int64\nLife_expectancy    float64\nSchooling          float64\nAdult_Mortality    float64\ndtype: object\n",
+      "error": null,
+      "seconds": 6.92
+    },
+    {
+      "attempt": 2,
+      "revision": 0,
+      "step": 2,
+      "code": "# %%\nres = {}\nfor y in ['Life_expectancy','Schooling','Adult_Mortality']:\n    sub = d[['Country','Status',y]].dropna().copy()\n    sub['dev'] = (sub['Status']=='Developed').astype(int)\n    m = smf.ols(f'{y} ~ dev', data=sub).fit(cov_type='cluster', cov_kwds={'groups': pd.factorize(sub['Country'])[0]})\n    ci = m.conf_int().loc['dev']\n    res[y] = {'coef': float(m.params['dev']), 'ci_low': float(ci[0]), 'ci_high': float(ci[1]), 'p': float(m.pvalues['dev']), 'n_rows': int(len(sub)), 'n_clusters': int(sub['Country'].nunique())}\n    print(y, res[y])\n    record_fact(f'stat4_cluster_{y.lower()}', res[y], f'Cluster-robust (Country) OLS Developed vs Developing coefficient for {y}: coef, 95% CI, p, rows, clusters')",
+      "output": "Life_expectancy {'coef': 12.08638633071192, 'ci_low': 10.322965660539639, 'ci_high': 13.8498070008842, 'p': 3.848737852966796e-41, 'n_rows': 2928, 'n_clusters': 183}\nSchooling {'coef': 4.626218404482304, 'ci_low': 3.8835050449614505, 'ci_high': 5.3689317640031575, 'p': 2.809068010030333e-34, 'n_rows': 2775, 'n_clusters': 180}\nAdult_Mortality {'coef': -103.14764848923843, 'ci_low': -121.7696966435683, 'ci_high': -84.52560033490857, 'p': 1.8623377602826813e-27, 'n_rows': 2928, 'n_clusters': 183}\n",
+      "error": null,
+      "seconds": 7.64
+    },
+    {
+      "attempt": 3,
+      "revision": 1,
+      "step": 2,
+      "code": "naive = {'life_expectancy': {'diff': 12.09, 'ci_low': 11.59, 'ci_high': 12.58, 'n_developed': 512, 'n_developing': 2416}, 'schooling': {'diff': 4.63, 'ci_low': 4.42, 'ci_high': 4.83, 'n_developed': 464, 'n_developing': 2311}, 'adult_mortality': {'diff': -103.15, 'ci_low': -109.73, 'ci_high': -96.57, 'n_developed': 512, 'n_developing': 2416}}\nfor k, v in naive.items():\n    record_fact(f'stat1_{k}', v, f'Naive Welch 95% CI for Developed minus Developing {k} from stat_1')\ncluster = {'life_expectancy': (10.322965660539639, 13.8498070008842), 'schooling': (3.8835050449614505, 5.3689317640031575), 'adult_mortality': (-121.7696966435683, -84.52560033490857)}\nratios = {}\nfor k in naive:\n    cw = cluster[k][1] - cluster[k][0]\n    nw = naive[k]['ci_high'] - naive[k]['ci_low']\n    ratios[k] = {'cluster_width': cw, 'naive_width': nw, 'ratio': cw / nw}\n    print(k, ratios[k])\nrecord_fact('stat4_width_ratios', ratios, 'Cluster-robust CI width divided by naive stat_1 CI width, per outcome')",
+      "output": "life_expectancy {'cluster_width': 3.5268413403445606, 'naive_width': 0.9900000000000002, 'ratio': 3.5624660003480404}\nschooling {'cluster_width': 1.485426719041707, 'naive_width': 0.41000000000000014, 'ratio': 3.6229919976626985}\nadult_mortality {'cluster_width': 37.24409630865972, 'naive_width': 13.16000000000001, 'ratio': 2.830098503697545}\n",
+      "error": null,
+      "seconds": 7.13
+    }
+  ],
+  "metadata": {
+    "steps": 3
+  },
+  "brief": {
+    "id": "stat_4",
+    "specialist": "statistical",
+    "question": "Does the Developed-Developing gap in Life expectancy, Schooling and Adult Mortality remain significant when standard errors account for the country-year structure (cluster-robust SEs or a mixed model with Country as the grouping factor)?",
+    "complete_when": "Reports the Status coefficient for each of the three outcomes with a cluster-robust or mixed-model 95% CI and p-value, the number of Country clusters, and a comparison with the naive Welch CIs from stat_1, stating whether the conclusions change.",
+    "depends_on": [
+      "stat_1"
+    ],
+    "outputs": []
+  },
+  "revisions": 1,
+  "reviews": [
+    {
+      "reasoning": "The cluster-robust coefficients, CIs, p-values, row counts and cluster counts all match the facts and code, and the brief's required elements are present. One number is wrong: the Life expectancy cluster-robust CI (10.32 to 13.85) has width about 3.53 years, and the stat_1 naive CI (11.59 to 12.58) has width about 0.99, so the cluster CI is about 3.6 times wider, not 2.3. The conclusion (gap still significant) is unaffected.",
+      "verdict": "revise",
+      "feedback": "Correct the Life expectancy width comparison. Using stat4_cluster_life_expectancy (ci_low 10.32, ci_high 13.85; width about 3.53) and the stat_1 naive CI (11.59 to 12.58; width about 0.99), the cluster-robust CI is about 3.6 times wider, not about 2.3 times. For completeness, state the width ratios for the other outcomes as well, using stat4_cluster_schooling (width about 1.49) against the stat_1 Schooling CI (4.42 to 4.83, width about 0.41), and stat4_cluster_adult_mortality (width about 37.2) against the stat_1 Adult Mortality CI (-109.73 to -96.57, width about 13.2). Keep the conclusion that all three gaps remain significant.",
+      "follow_ups": []
+    },
+    {
+      "reasoning": "Checked each cluster-robust CI, p-value, cluster count and naive Welch CI against the facts. The coefficients, CI bounds, p-values and cluster counts match the stat4 facts. The naive CIs match stat_1, and the row counts (2928, 2775) agree with the stat_1 group sizes. The width ratios recompute correctly (3.56, about 3.62, 2.83), and the 'about 3.6 times' wording for the life expectancy ratio of 3.56 is a fair rounding. The brief asks for the Status coefficient, cluster-robust CI and p-value, cluster count and a naive-CI comparison with a statement on whether conclusions change, and all of these are present for all three outcomes. The conclusion that all gaps remain significant follows from the reported intervals. The code hardcodes the stat_1 values rather than reloading them, which is a reproducibility weakness but does not change any reported number. The automatic checks reported no problems. No follow-ups, since the budget is spent.",
+      "verdict": "accept",
+      "feedback": "",
+      "follow_ups": []
+    }
+  ]
+}

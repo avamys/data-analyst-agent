@@ -1,0 +1,178 @@
+{
+  "task_id": "stat_2",
+  "specialist": "statistical",
+  "description": "Does Sex change the effect of Pclass on survival (or Pclass the effect of Sex)?",
+  "code": "# %%\nimport matplotlib.pyplot as plt\nimport numpy as np\nimport pandas as pd\n\nfrom agent.execution.runtime import (\n    df,\n    load,\n    publish,\n    record_fact,\n    record_model,\n    save_chart,\n)\n\n# %%\nd = df[['Survived','Pclass','Sex']].dropna().copy()\nd['Pclass'] = d['Pclass'].astype(int)\nd['female'] = (d['Sex'] == 'female').astype(int)\nprint(d['Sex'].value_counts().to_dict(), d['Pclass'].value_counts().sort_index().to_dict(), len(d))\ng = d.groupby(['Pclass','Sex'])['Survived'].agg(['sum','count','mean'])\nprint(g.round(3))\n\n# %%\nimport statsmodels.formula.api as smf\nfrom scipy import stats\nfrom statsmodels.stats.proportion import proportion_confint\n\nfull = smf.logit('Survived ~ C(Pclass) * C(Sex)', data=d).fit(disp=0)\nred = smf.logit('Survived ~ C(Pclass) + C(Sex)', data=d).fit(disp=0)\nlr = 2*(full.llf - red.llf)\ndf_lr = full.df_model - red.df_model\np_lr = stats.chi2.sf(lr, df_lr)\nprint(full.summary2().tables[1].round(4))\nprint('LR interaction', round(lr,3), df_lr, p_lr)\n\nrows = {}\nfor c in [1,2,3]:\n    s = d[d.Pclass==c]\n    f = s[s.Sex=='female']; m = s[s.Sex=='male']\n    rf, nf = f.Survived.mean(), len(f)\n    rm, nm = m.Survived.mean(), len(m)\n    diff = rf-rm\n    se = np.sqrt(rf*(1-rf)/nf + rm*(1-rm)/nm)\n    lo, hi = diff-1.96*se, diff+1.96*se\n    rows[str(c)] = {'female_rate': round(rf,4), 'female_n': nf, 'male_rate': round(rm,4), 'male_n': nm, 'diff_female_minus_male': round(diff,4), 'ci': [round(lo,4), round(hi,4)]}\nprint(rows)\n\nd2 = d.groupby(['Pclass','Sex'])['Survived'].agg(['sum','count']).reset_index()\nrecord_fact('stat2_pclass_sex_rates', rows, 'Survival rate by Sex within each Pclass, with n, female-minus-male difference and Wald 95% CI')\nrecord_fact('stat2_interaction_lr', {'lr_chi2': round(lr,4), 'dof': int(df_lr), 'p': p_lr}, 'Likelihood-ratio test of Pclass x Sex interaction in logistic regression')\nrecord_fact('stat2_logit_interaction_coefs', {k: [round(v,4), round(full.pvalues[k],6)] for k,v in full.params.items()}, 'Logistic regression with Pclass*Sex interaction: coefficient and p-value per term')\n\nfig, ax = plt.subplots(figsize=(7,4))\nfor sex, mk in [('female','o'),('male','s')]:\n    sub = d.groupby(['Pclass','Sex'])['Survived'].mean().xs(sex, level='Sex')\n    ax.plot(sub.index, sub.values, marker=mk, label=sex)\nax.set_xticks([1,2,3]); ax.set_xlabel('Pclass'); ax.set_ylabel('Survival rate (share surviving)'); ax.set_title('Survival rate by Pclass, separately for female and male passengers'); ax.legend(); ax.set_ylim(0,1)\nsave_chart(fig, 'stat2_survival_by_pclass_sex', 'Survival rate by Pclass for female and male passengers')\n",
+  "output": "{'male': 577, 'female': 314} {1: 216, 2: 184, 3: 491} 891\n               sum  count   mean\nPclass Sex                      \n1      female   91     94  0.968\n       male     45    122  0.369\n2      female   70     76  0.921\n       male     17    108  0.157\n3      female   72    144  0.500\n       male     47    347  0.135\n                                Coef.  Std.Err.       z   P>|z|  [0.025  0.975]\nIntercept                      3.4122    0.5868  5.8151  0.0000  2.2622  4.5623\nC(Pclass)[T.2]                -0.9555    0.7248 -1.3184  0.1874 -2.3760  0.4650\nC(Pclass)[T.3]                -3.4122    0.6100 -5.5938  0.0000 -4.6078 -2.2167\nC(Sex)[T.male]                -3.9494    0.6161 -6.4107  0.0000 -5.1568 -2.7419\nC(Pclass)[T.2]:C(Sex)[T.male] -0.1850    0.7939 -0.2330  0.8158 -1.7410  1.3710\nC(Pclass)[T.3]:C(Sex)[T.male]  2.0958    0.6572  3.1889  0.0014  0.8077  3.3839\nLR interaction 28.791 2.0 5.597723734785402e-07\n{'1': {'female_rate': np.float64(0.9681), 'female_n': 94, 'male_rate': np.float64(0.3689), 'male_n': 122, 'diff_female_minus_male': np.float64(0.5992), 'ci': [np.float64(0.5065), np.float64(0.6919)]}, '2': {'female_rate': np.float64(0.9211), 'female_n': 76, 'male_rate': np.float64(0.1574), 'male_n': 108, 'diff_female_minus_male': np.float64(0.7636), 'ci': [np.float64(0.672), np.float64(0.8553)]}, '3': {'female_rate': np.float64(0.5), 'female_n': 144, 'male_rate': np.float64(0.1354), 'male_n': 347, 'diff_female_minus_male': np.float64(0.3646), 'ci': [np.float64(0.2753), np.float64(0.4538)]}}\n",
+  "execution_time": 9.01,
+  "success": true,
+  "error": null,
+  "report": {
+    "status": "complete",
+    "findings": [
+      {
+        "statement": "The Sex effect differs meaningfully across Pclass. The female-minus-male survival gap is 59.9 points in class 1 (95% CI 50.7 to 69.2), 76.4 points in class 2 (CI 67.2 to 85.5) and 36.5 points in class 3 (CI 27.5 to 45.4). The gap is clearly smallest in class 3, and the Pclass x Sex interaction is significant (LR chi2=28.79, dof 2, p=5.6e-7).",
+        "facts": [
+          "stat2_pclass_sex_rates",
+          "stat2_interaction_lr",
+          "stat2_logit_interaction_coefs"
+        ]
+      },
+      {
+        "statement": "Survival rates by Pclass and Sex (n): female class 1 96.8% (n=94), class 2 92.1% (n=76), class 3 50.0% (n=144); male class 1 36.9% (n=122), class 2 15.7% (n=108), class 3 13.5% (n=347). Female passengers in class 3 survive at about half the rate of women in classes 1 and 2, while male survival differs less across classes.",
+        "facts": [
+          "stat2_pclass_sex_rates"
+        ]
+      },
+      {
+        "statement": "The effect of Pclass also depends on Sex, because the interaction test is symmetric. The Pclass 3 interaction term is 2.10 on the log-odds scale (p=0.0014), so the drop from class 1 to class 3 is much steeper for women (96.8% to 50.0%) than for men (36.9% to 13.5%).",
+        "facts": [
+          "stat2_logit_interaction_coefs",
+          "stat2_pclass_sex_rates"
+        ]
+      },
+      {
+        "statement": "The class 1 versus class 2 difference in the Sex gap is small and not clearly different (class 2 interaction term -0.19, p=0.82). The meaningful difference is between class 3 and classes 1 and 2.",
+        "facts": [
+          "stat2_logit_interaction_coefs"
+        ]
+      }
+    ],
+    "follow_ups": [
+      "Does the Sex x Pclass interaction hold after adjusting for Age, Fare, Embarked and family size?",
+      "Is the female class-3 survival rate (50%) driven by the Embarked or Fare mix within class 3?",
+      "Do the rate-difference CIs hold up under a bootstrap or an exact method, given the small cells?"
+    ]
+  },
+  "facts": {
+    "stat2_pclass_sex_rates": {
+      "value": {
+        "1": {
+          "female_rate": 0.9681,
+          "female_n": 94,
+          "male_rate": 0.3689,
+          "male_n": 122,
+          "diff_female_minus_male": 0.5992,
+          "ci": [
+            0.5065,
+            0.6919
+          ]
+        },
+        "2": {
+          "female_rate": 0.9211,
+          "female_n": 76,
+          "male_rate": 0.1574,
+          "male_n": 108,
+          "diff_female_minus_male": 0.7636,
+          "ci": [
+            0.672,
+            0.8553
+          ]
+        },
+        "3": {
+          "female_rate": 0.5,
+          "female_n": 144,
+          "male_rate": 0.1354,
+          "male_n": 347,
+          "diff_female_minus_male": 0.3646,
+          "ci": [
+            0.2753,
+            0.4538
+          ]
+        }
+      },
+      "desc": "Survival rate by Sex within each Pclass, with n, female-minus-male difference and Wald 95% CI",
+      "cell": 2
+    },
+    "stat2_interaction_lr": {
+      "value": {
+        "lr_chi2": 28.7915,
+        "dof": 2,
+        "p": 5.597723734785402e-07
+      },
+      "desc": "Likelihood-ratio test of Pclass x Sex interaction in logistic regression",
+      "cell": 2
+    },
+    "stat2_logit_interaction_coefs": {
+      "value": {
+        "Intercept": [
+          3.4122,
+          0.0
+        ],
+        "C(Pclass)[T.2]": [
+          -0.9555,
+          0.187374
+        ],
+        "C(Pclass)[T.3]": [
+          -3.4122,
+          0.0
+        ],
+        "C(Sex)[T.male]": [
+          -3.9494,
+          0.0
+        ],
+        "C(Pclass)[T.2]:C(Sex)[T.male]": [
+          -0.185,
+          0.815751
+        ],
+        "C(Pclass)[T.3]:C(Sex)[T.male]": [
+          2.0958,
+          0.001428
+        ]
+      },
+      "desc": "Logistic regression with Pclass*Sex interaction: coefficient and p-value per term",
+      "cell": 2
+    }
+  },
+  "charts": {
+    "stat2_survival_by_pclass_sex": {
+      "file": "charts/stat2_survival_by_pclass_sex.png",
+      "caption": "Survival rate by Pclass for female and male passengers",
+      "cell": 2
+    }
+  },
+  "published": [],
+  "artifacts": [],
+  "attempts": [
+    {
+      "attempt": 1,
+      "revision": 0,
+      "step": 1,
+      "code": "d = df[['Survived','Pclass','Sex']].dropna().copy()\nd['Pclass'] = d['Pclass'].astype(int)\nd['female'] = (d['Sex'] == 'female').astype(int)\nprint(d['Sex'].value_counts().to_dict(), d['Pclass'].value_counts().sort_index().to_dict(), len(d))\ng = d.groupby(['Pclass','Sex'])['Survived'].agg(['sum','count','mean'])\nprint(g.round(3))",
+      "output": "{'male': 577, 'female': 314} {1: 216, 2: 184, 3: 491} 891\n               sum  count   mean\nPclass Sex                      \n1      female   91     94  0.968\n       male     45    122  0.369\n2      female   70     76  0.921\n       male     17    108  0.157\n3      female   72    144  0.500\n       male     47    347  0.135\n",
+      "error": null,
+      "seconds": 3.14
+    },
+    {
+      "attempt": 2,
+      "revision": 0,
+      "step": 2,
+      "code": "import statsmodels.formula.api as smf\nfrom scipy import stats\nfrom statsmodels.stats.proportion import proportion_confint\n\nfull = smf.logit('Survived ~ C(Pclass) * C(Sex)', data=d).fit(disp=0)\nred = smf.logit('Survived ~ C(Pclass) + C(Sex)', data=d).fit(disp=0)\nlr = 2*(full.llf - red.llf)\ndf_lr = full.df_model - red.df_model\np_lr = stats.chi2.sf(lr, df_lr)\nprint(full.summary2().tables[1].round(4))\nprint('LR interaction', round(lr,3), df_lr, p_lr)\n\nrows = {}\nfor c in [1,2,3]:\n    s = d[d.Pclass==c]\n    f = s[s.Sex=='female']; m = s[s.Sex=='male']\n    rf, nf = f.Survived.mean(), len(f)\n    rm, nm = m.Survived.mean(), len(m)\n    diff = rf-rm\n    se = np.sqrt(rf*(1-rf)/nf + rm*(1-rm)/nm)\n    lo, hi = diff-1.96*se, diff+1.96*se\n    rows[str(c)] = {'female_rate': round(rf,4), 'female_n': nf, 'male_rate': round(rm,4), 'male_n': nm, 'diff_female_minus_male': round(diff,4), 'ci': [round(lo,4), round(hi,4)]}\nprint(rows)\n\nd2 = d.groupby(['Pclass','Sex'])['Survived'].agg(['sum','count']).reset_index()\nrecord_fact('stat2_pclass_sex_rates', rows, 'Survival rate by Sex within each Pclass, with n, female-minus-male difference and Wald 95% CI')\nrecord_fact('stat2_interaction_lr', {'lr_chi2': round(lr,4), 'dof': int(df_lr), 'p': p_lr}, 'Likelihood-ratio test of Pclass x Sex interaction in logistic regression')\nrecord_fact('stat2_logit_interaction_coefs', {k: [round(v,4), round(full.pvalues[k],6)] for k,v in full.params.items()}, 'Logistic regression with Pclass*Sex interaction: coefficient and p-value per term')\n\nfig, ax = plt.subplots(figsize=(7,4))\nfor sex, mk in [('female','o'),('male','s')]:\n    sub = d.groupby(['Pclass','Sex'])['Survived'].mean().xs(sex, level='Sex')\n    ax.plot(sub.index, sub.values, marker=mk, label=sex)\nax.set_xticks([1,2,3]); ax.set_xlabel('Pclass'); ax.set_ylabel('Survival rate (share surviving)'); ax.set_title('Survival rate by Pclass, separately for female and male passengers'); ax.legend(); ax.set_ylim(0,1)\nsave_chart(fig, 'stat2_survival_by_pclass_sex', 'Survival rate by Pclass for female and male passengers')",
+      "output": "                                Coef.  Std.Err.       z   P>|z|  [0.025  0.975]\nIntercept                      3.4122    0.5868  5.8151  0.0000  2.2622  4.5623\nC(Pclass)[T.2]                -0.9555    0.7248 -1.3184  0.1874 -2.3760  0.4650\nC(Pclass)[T.3]                -3.4122    0.6100 -5.5938  0.0000 -4.6078 -2.2167\nC(Sex)[T.male]                -3.9494    0.6161 -6.4107  0.0000 -5.1568 -2.7419\nC(Pclass)[T.2]:C(Sex)[T.male] -0.1850    0.7939 -0.2330  0.8158 -1.7410  1.3710\nC(Pclass)[T.3]:C(Sex)[T.male]  2.0958    0.6572  3.1889  0.0014  0.8077  3.3839\nLR interaction 28.791 2.0 5.597723734785402e-07\n{'1': {'female_rate': np.float64(0.9681), 'female_n': 94, 'male_rate': np.float64(0.3689), 'male_n': 122, 'diff_female_minus_male': np.float64(0.5992), 'ci': [np.float64(0.5065), np.float64(0.6919)]}, '2': {'female_rate': np.float64(0.9211), 'female_n': 76, 'male_rate': np.float64(0.1574), 'male_n': 108, 'diff_female_minus_male': np.float64(0.7636), 'ci': [np.float64(0.672), np.float64(0.8553)]}, '3': {'female_rate': np.float64(0.5), 'female_n': 144, 'male_rate': np.float64(0.1354), 'male_n': 347, 'diff_female_minus_male': np.float64(0.3646), 'ci': [np.float64(0.2753), np.float64(0.4538)]}}\n",
+      "error": null,
+      "seconds": 5.87
+    }
+  ],
+  "metadata": {
+    "steps": 2
+  },
+  "brief": {
+    "id": "stat_2",
+    "specialist": "statistical",
+    "question": "Does Sex change the effect of Pclass on survival (or Pclass the effect of Sex)?",
+    "complete_when": "Survival rate for each Sex by Pclass cell with counts; a logistic regression with an interaction term and its test; a statement of whether the Sex effect differs meaningfully across Pclass levels, with confidence intervals on the rate differences.",
+    "depends_on": [
+      "stat_1"
+    ],
+    "outputs": []
+  },
+  "revisions": 0,
+  "reviews": [
+    {
+      "reasoning": "The report's numbers match the facts it cites. Class-level rates and counts (96.8% n=94, 36.9% n=122, 92.1% n=76, 50.0% n=144, 13.5% n=347) agree with stat2_pclass_sex_rates and sum to the accepted Sex totals (314 female, 577 male) and Pclass totals (216, 184, 491). The LR chi2 of 28.79, dof 2, p=5.6e-7 matches stat2_interaction_lr. The class 2 interaction term of -0.19 (p=0.82) matches the coefficient fact. The class 3 interaction of about 2.10 is consistent with the reported rates on the log-odds scale. The brief's required elements are present: rates with n per cell, the interaction LR test, a statement on whether the Sex effect differs across Pclass, and Wald CIs on the rate differences. The wording is no stronger than the evidence supports. Automatic checks report no problems. The Wald CIs on small cells are a limitation, but the report already flags this through the bootstrap follow-up, which is not required for acceptance.",
+      "verdict": "accept",
+      "feedback": "",
+      "follow_ups": []
+    }
+  ]
+}

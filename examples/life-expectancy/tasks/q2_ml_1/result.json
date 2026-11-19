@@ -1,0 +1,248 @@
+{
+  "task_id": "q2_ml_1",
+  "specialist": "ml",
+  "description": "Using the same numeric features plus Status as ml_1 (Country dropped as a feature, median imputation), does the random forest still beat the mean-prediction baseline for Life expectancy when whole countries are held out of training, using a grouped split by Country (for example GroupKFold or GroupShuffleSplit)?",
+  "code": "# %%\nimport matplotlib.pyplot as plt\nimport numpy as np\nimport pandas as pd\n\nfrom agent.execution.runtime import (\n    df,\n    load,\n    publish,\n    record_fact,\n    record_model,\n    save_chart,\n)\n\n# %%\nd = df.copy()\nd.columns = [c.strip() for c in d.columns]\nprint(d.shape)\nprint(d['Country'].nunique(), 'countries')\nprint(d['Status'].value_counts().to_dict())\nprint(d['Country'].value_counts().describe().round(2).to_dict())\nprint(d.isna().sum()[d.isna().sum()>0].to_dict())\n\n# %%\nfrom sklearn.model_selection import GroupKFold\nfrom sklearn.ensemble import RandomForestRegressor\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error\nt = 'Life expectancy'\ne = d.dropna(subset=[t]).reset_index(drop=True)\ny = e[t]\ng = e['Country']\nnum_cols = [c for c in e.columns if c not in ['Country', t, 'Status'] and pd.api.types.is_numeric_dtype(e[c])]\nX = pd.get_dummies(e[num_cols + ['Status']], columns=['Status'], dtype=float)\nrows = []\nfor k, (tr, te) in enumerate(GroupKFold(n_splits=5).split(X, y, g)):\n    rf = make_pipeline(SimpleImputer(strategy='median'), RandomForestRegressor(n_estimators=300, random_state=42, n_jobs=-1))\n    rf.fit(X.iloc[tr], y.iloc[tr])\n    p = rf.predict(X.iloc[te])\n    b = np.full(len(te), y.iloc[tr].mean())\n    yt = y.iloc[te]\n    overlap = len(set(g.iloc[tr]) & set(g.iloc[te]))\n    rows.append({'fold': k, 'n_test_rows': len(te), 'n_test_countries': int(g.iloc[te].nunique()), 'n_train_countries': int(g.iloc[tr].nunique()), 'country_overlap': overlap, 'rf_r2': r2_score(yt, p), 'rf_mae': mean_absolute_error(yt, p), 'rf_rmse': np.sqrt(mean_squared_error(yt, p)), 'base_r2': r2_score(yt, b), 'base_mae': mean_absolute_error(yt, b), 'base_rmse': np.sqrt(mean_squared_error(yt, b))})\nr = pd.DataFrame(rows)\nprint(r.round(3).to_string())\nsumm = {}\nfor c in ['rf_r2', 'rf_mae', 'rf_rmse', 'base_r2', 'base_mae', 'base_rmse']:\n    summ[c] = {'mean': float(r[c].mean()), 'sd': float(r[c].std())}\nsumm['mean_test_countries'] = float(r['n_test_countries'].mean())\nsumm['total_country_overlap'] = int(r['country_overlap'].sum())\nsumm['relative_mae_reduction'] = float(1 - r['rf_mae'].mean() / r['base_mae'].mean())\nsumm['n_folds'] = int(len(r))\nprint(summ)\nrecord_fact('q2_grouped_folds', r.round(4).to_dict(orient='records'), 'Per-fold RF and mean-baseline metrics, GroupKFold(5) by Country')\nrecord_fact('q2_grouped_summary', summ, 'Mean and SD across country-held-out folds for RF and mean baseline; overlap count; relative MAE reduction vs ml_1 random split (test R2 0.967, MAE 1.05)')\nfig, ax = plt.subplots(figsize=(8, 4.5))\nxs = np.arange(len(r))\nax.bar(xs - 0.2, r['rf_mae'], 0.4, label='Random forest')\nax.bar(xs + 0.2, r['base_mae'], 0.4, label='Mean-prediction baseline')\nax.set_xticks(xs)\nax.set_xticklabels([f'Fold {i}' for i in r['fold']])\nax.set_xlabel('GroupKFold fold (held-out countries)')\nax.set_ylabel('Test MAE (years of life expectancy)')\nax.set_title('Test MAE per country-held-out fold: random forest vs mean baseline')\nax.legend()\nsave_chart(fig, 'q2_mae_by_fold', 'Test MAE per GroupKFold fold (countries held out): random forest vs mean-prediction baseline')\n\n# %%\nprint(r.round(3).to_string())\nprint(summ)\nml1 = {'test_r2': 0.9671, 'test_mae': 1.0527, 'test_rmse': 1.6873, 'baseline_mae': 7.676658321262128, 'baseline_rmse': 9.308237114515464, 'baseline_r2': -0.0016633162021579828, 'n_test': 586}\nml1['relative_mae_reduction'] = float(1 - ml1['test_mae'] / ml1['baseline_mae'])\nrecord_fact('q2_ml1_reference', ml1, 'ml_1 random 80/20 split reference: RF test R2 0.967, MAE 1.05, RMSE 1.69; mean baseline MAE 7.68, RMSE 9.31; relative MAE reduction')\nprint(ml1)\n",
+  "output": "(2938, 22)\n193 countries\n{'Developing': 2426, 'Developed': 512}\n{'count': 193.0, 'mean': 15.22, 'std': 3.33, 'min': 1.0, '25%': 16.0, '50%': 16.0, '75%': 16.0, 'max': 16.0}\n{'Life expectancy': 10, 'Adult Mortality': 10, 'Alcohol': 194, 'Hepatitis B': 553, 'BMI': 34, 'Polio': 19, 'Total expenditure': 226, 'Diphtheria': 19, 'GDP': 448, 'Population': 652, 'thinness  1-19 years': 34, 'thinness 5-9 years': 34, 'Income composition of resources': 167, 'Schooling': 163}\n   fold  n_test_rows  n_test_countries  n_train_countries  country_overlap  rf_r2  rf_mae  rf_rmse  base_r2  base_mae  base_rmse\n0     0          592                37                146                0  0.946   1.716    2.351   -0.000     8.426     10.133\n1     1          592                37                146                0  0.908   1.935    2.566   -0.024     6.765      8.581\n2     2          592                37                146                0  0.918   1.892    2.693   -0.001     7.946      9.397\n3     3          576                36                147                0  0.906   1.930    2.523   -0.029     6.786      8.364\n4     4          576                36                147                0  0.873   2.702    3.805   -0.084     9.292     11.124\n{'rf_r2': {'mean': 0.9104147201187832, 'sd': 0.02615619623039734}, 'rf_mae': {'mean': 2.0351865271521516, 'sd': 0.3831546494778583}, 'rf_rmse': {'mean': 2.787459338489925, 'sd': 0.5818118842868883}, 'base_r2': {'mean': -0.02742969897230054, 'sd': 0.03402099583873136}, 'base_mae': {'mean': 7.843137799702134, 'sd': 1.0872543138205415}, 'base_rmse': {'mean': 9.519894381371854, 'sd': 1.1380957391527962}, 'mean_test_countries': 36.6, 'total_country_overlap': 0, 'relative_mae_reduction': 0.7405137358125413, 'n_folds': 5}\n   fold  n_test_rows  n_test_countries  n_train_countries  country_overlap  rf_r2  rf_mae  rf_rmse  base_r2  base_mae  base_rmse\n0     0          592                37                146                0  0.946   1.716    2.351   -0.000     8.426     10.133\n1     1          592                37                146                0  0.908   1.935    2.566   -0.024     6.765      8.581\n2     2          592                37                146                0  0.918   1.892    2.693   -0.001     7.946      9.397\n3     3          576                36                147                0  0.906   1.930    2.523   -0.029     6.786      8.364\n4     4          576                36                147                0  0.873   2.702    3.805   -0.084     9.292     11.124\n{'rf_r2': {'mean': 0.9104147201187832, 'sd': 0.02615619623039734}, 'rf_mae': {'mean': 2.0351865271521516, 'sd': 0.3831546494778583}, 'rf_rmse': {'mean': 2.787459338489925, 'sd': 0.5818118842868883}, 'base_r2': {'mean': -0.02742969897230054, 'sd': 0.03402099583873136}, 'base_mae': {'mean': 7.843137799702134, 'sd': 1.0872543138205415}, 'base_rmse': {'mean': 9.519894381371854, 'sd': 1.1380957391527962}, 'mean_test_countries': 36.6, 'total_country_overlap': 0, 'relative_mae_reduction': 0.7405137358125413, 'n_folds': 5}\n{'test_r2': 0.9671, 'test_mae': 1.0527, 'test_rmse': 1.6873, 'baseline_mae': 7.676658321262128, 'baseline_rmse': 9.308237114515464, 'baseline_r2': -0.0016633162021579828, 'n_test': 586, 'relative_mae_reduction': 0.8628700202685425}\n",
+  "execution_time": 32.67,
+  "success": true,
+  "error": null,
+  "report": {
+    "status": "complete",
+    "findings": [
+      {
+        "statement": "With whole countries held out (GroupKFold, 5 folds), the random forest still beats the mean-prediction baseline: mean test R2 0.910 (SD 0.026), MAE 2.04 years (SD 0.38), RMSE 2.79 years (SD 0.58), against a baseline with mean R2 -0.027 (SD 0.034), MAE 7.84 years (SD 1.09) and RMSE 9.52 years (SD 1.14), all on the same folds.",
+        "facts": [
+          "q2_grouped_summary",
+          "q2_grouped_folds"
+        ]
+      },
+      {
+        "statement": "Held-out test sets contain exactly 37, 37, 37, 36 and 36 countries across folds 0 to 4 (n_test_countries), with mean_test_countries 36.6; test rows are 592, 592, 592, 576 and 576. Training sets contain 146 countries in folds 0 to 2 and 147 in folds 3 and 4.",
+        "facts": [
+          "q2_grouped_folds",
+          "q2_grouped_summary"
+        ]
+      },
+      {
+        "statement": "No country appears in both training and test within any fold: the country overlap count is 0 in all 5 folds (total_country_overlap 0).",
+        "facts": [
+          "q2_grouped_folds",
+          "q2_grouped_summary"
+        ]
+      },
+      {
+        "statement": "The relative MAE reduction versus the mean baseline is about 74% under the grouped split (1 - mean RF MAE / mean baseline MAE = 0.741), compared with about 86% in the ml_1 random 80/20 split (test MAE 1.05 vs baseline 7.68). Test R2 falls from 0.967 to 0.910 and MAE rises from 1.05 to 2.04 years.",
+        "facts": [
+          "q2_grouped_summary",
+          "q2_ml1_reference"
+        ]
+      },
+      {
+        "statement": "The drop from the ml_1 random split to the grouped split is consistent with ml_1's random split benefiting from countries seen in training, since each country's history appears on both sides of that split. The two splits also differ in their test rows (586 random rows versus 576 to 592 held-out country rows per fold), so this comparison does not isolate the country effect alone.",
+        "facts": [
+          "q2_grouped_summary",
+          "q2_ml1_reference"
+        ]
+      },
+      {
+        "statement": "Fold-to-fold variation is noticeable: fold 4 has the highest RF MAE (2.70 years) and the lowest RF R2 (0.873), while folds 0 to 3 have MAE between 1.72 and 1.94 years.",
+        "facts": [
+          "q2_grouped_folds"
+        ]
+      }
+    ],
+    "follow_ups": [
+      "Which countries have the largest held-out errors, and do the errors concentrate in Developing countries with low HIV/AIDS or low income composition?",
+      "Does the fold-to-fold variation (fold 4 MAE 2.70) trace to specific countries or to particular years?",
+      "Does a country-level feature set (for example country mean HIV/AIDS) recover part of the random-split accuracy under grouped evaluation?"
+    ]
+  },
+  "facts": {
+    "q2_grouped_folds": {
+      "value": [
+        {
+          "fold": 0,
+          "n_test_rows": 592,
+          "n_test_countries": 37,
+          "n_train_countries": 146,
+          "country_overlap": 0,
+          "rf_r2": 0.9462,
+          "rf_mae": 1.7162,
+          "rf_rmse": 2.3506,
+          "base_r2": -0.0001,
+          "base_mae": 8.426,
+          "base_rmse": 10.1331
+        },
+        {
+          "fold": 1,
+          "n_test_rows": 592,
+          "n_test_countries": 37,
+          "n_train_countries": 146,
+          "country_overlap": 0,
+          "rf_r2": 0.9085,
+          "rf_mae": 1.9355,
+          "rf_rmse": 2.5656,
+          "base_r2": -0.024,
+          "base_mae": 6.7653,
+          "base_rmse": 8.5811
+        },
+        {
+          "fold": 2,
+          "n_test_rows": 592,
+          "n_test_countries": 37,
+          "n_train_countries": 146,
+          "country_overlap": 0,
+          "rf_r2": 0.9178,
+          "rf_mae": 1.8924,
+          "rf_rmse": 2.6934,
+          "base_r2": -0.0007,
+          "base_mae": 7.9463,
+          "base_rmse": 9.397
+        },
+        {
+          "fold": 3,
+          "n_test_rows": 576,
+          "n_test_countries": 36,
+          "n_train_countries": 147,
+          "country_overlap": 0,
+          "rf_r2": 0.9064,
+          "rf_mae": 1.9302,
+          "rf_rmse": 2.5229,
+          "base_r2": -0.0287,
+          "base_mae": 6.7861,
+          "base_rmse": 8.3643
+        },
+        {
+          "fold": 4,
+          "n_test_rows": 576,
+          "n_test_countries": 36,
+          "n_train_countries": 147,
+          "country_overlap": 0,
+          "rf_r2": 0.8732,
+          "rf_mae": 2.7016,
+          "rf_rmse": 3.8049,
+          "base_r2": -0.0836,
+          "base_mae": 9.292,
+          "base_rmse": 11.124
+        }
+      ],
+      "desc": "Per-fold RF and mean-baseline metrics, GroupKFold(5) by Country",
+      "cell": 2
+    },
+    "q2_grouped_summary": {
+      "value": {
+        "rf_r2": {
+          "mean": 0.9104147201187832,
+          "sd": 0.02615619623039734
+        },
+        "rf_mae": {
+          "mean": 2.0351865271521516,
+          "sd": 0.3831546494778583
+        },
+        "rf_rmse": {
+          "mean": 2.787459338489925,
+          "sd": 0.5818118842868883
+        },
+        "base_r2": {
+          "mean": -0.02742969897230054,
+          "sd": 0.03402099583873136
+        },
+        "base_mae": {
+          "mean": 7.843137799702134,
+          "sd": 1.0872543138205415
+        },
+        "base_rmse": {
+          "mean": 9.519894381371854,
+          "sd": 1.1380957391527962
+        },
+        "mean_test_countries": 36.6,
+        "total_country_overlap": 0,
+        "relative_mae_reduction": 0.7405137358125413,
+        "n_folds": 5
+      },
+      "desc": "Mean and SD across country-held-out folds for RF and mean baseline; overlap count; relative MAE reduction vs ml_1 random split (test R2 0.967, MAE 1.05)",
+      "cell": 2
+    },
+    "q2_ml1_reference": {
+      "value": {
+        "test_r2": 0.9671,
+        "test_mae": 1.0527,
+        "test_rmse": 1.6873,
+        "baseline_mae": 7.676658321262128,
+        "baseline_rmse": 9.308237114515464,
+        "baseline_r2": -0.0016633162021579828,
+        "n_test": 586,
+        "relative_mae_reduction": 0.8628700202685425
+      },
+      "desc": "ml_1 random 80/20 split reference: RF test R2 0.967, MAE 1.05, RMSE 1.69; mean baseline MAE 7.68, RMSE 9.31; relative MAE reduction",
+      "cell": 3
+    }
+  },
+  "charts": {
+    "q2_mae_by_fold": {
+      "file": "charts/q2_mae_by_fold.png",
+      "caption": "Test MAE per GroupKFold fold (countries held out): random forest vs mean-prediction baseline",
+      "cell": 2
+    }
+  },
+  "published": [],
+  "artifacts": [],
+  "attempts": [
+    {
+      "attempt": 1,
+      "revision": 0,
+      "step": 1,
+      "code": "d = df.copy()\nd.columns = [c.strip() for c in d.columns]\nprint(d.shape)\nprint(d['Country'].nunique(), 'countries')\nprint(d['Status'].value_counts().to_dict())\nprint(d['Country'].value_counts().describe().round(2).to_dict())\nprint(d.isna().sum()[d.isna().sum()>0].to_dict())",
+      "output": "(2938, 22)\n193 countries\n{'Developing': 2426, 'Developed': 512}\n{'count': 193.0, 'mean': 15.22, 'std': 3.33, 'min': 1.0, '25%': 16.0, '50%': 16.0, '75%': 16.0, 'max': 16.0}\n{'Life expectancy': 10, 'Adult Mortality': 10, 'Alcohol': 194, 'Hepatitis B': 553, 'BMI': 34, 'Polio': 19, 'Total expenditure': 226, 'Diphtheria': 19, 'GDP': 448, 'Population': 652, 'thinness  1-19 years': 34, 'thinness 5-9 years': 34, 'Income composition of resources': 167, 'Schooling': 163}\n",
+      "error": null,
+      "seconds": 4.28
+    },
+    {
+      "attempt": 2,
+      "revision": 0,
+      "step": 2,
+      "code": "from sklearn.model_selection import GroupKFold\nfrom sklearn.ensemble import RandomForestRegressor\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.impute import SimpleImputer\nfrom sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error\nt = 'Life expectancy'\ne = d.dropna(subset=[t]).reset_index(drop=True)\ny = e[t]\ng = e['Country']\nnum_cols = [c for c in e.columns if c not in ['Country', t, 'Status'] and pd.api.types.is_numeric_dtype(e[c])]\nX = pd.get_dummies(e[num_cols + ['Status']], columns=['Status'], dtype=float)\nrows = []\nfor k, (tr, te) in enumerate(GroupKFold(n_splits=5).split(X, y, g)):\n    rf = make_pipeline(SimpleImputer(strategy='median'), RandomForestRegressor(n_estimators=300, random_state=42, n_jobs=-1))\n    rf.fit(X.iloc[tr], y.iloc[tr])\n    p = rf.predict(X.iloc[te])\n    b = np.full(len(te), y.iloc[tr].mean())\n    yt = y.iloc[te]\n    overlap = len(set(g.iloc[tr]) & set(g.iloc[te]))\n    rows.append({'fold': k, 'n_test_rows': len(te), 'n_test_countries': int(g.iloc[te].nunique()), 'n_train_countries': int(g.iloc[tr].nunique()), 'country_overlap': overlap, 'rf_r2': r2_score(yt, p), 'rf_mae': mean_absolute_error(yt, p), 'rf_rmse': np.sqrt(mean_squared_error(yt, p)), 'base_r2': r2_score(yt, b), 'base_mae': mean_absolute_error(yt, b), 'base_rmse': np.sqrt(mean_squared_error(yt, b))})\nr = pd.DataFrame(rows)\nprint(r.round(3).to_string())\nsumm = {}\nfor c in ['rf_r2', 'rf_mae', 'rf_rmse', 'base_r2', 'base_mae', 'base_rmse']:\n    summ[c] = {'mean': float(r[c].mean()), 'sd': float(r[c].std())}\nsumm['mean_test_countries'] = float(r['n_test_countries'].mean())\nsumm['total_country_overlap'] = int(r['country_overlap'].sum())\nsumm['relative_mae_reduction'] = float(1 - r['rf_mae'].mean() / r['base_mae'].mean())\nsumm['n_folds'] = int(len(r))\nprint(summ)\nrecord_fact('q2_grouped_folds', r.round(4).to_dict(orient='records'), 'Per-fold RF and mean-baseline metrics, GroupKFold(5) by Country')\nrecord_fact('q2_grouped_summary', summ, 'Mean and SD across country-held-out folds for RF and mean baseline; overlap count; relative MAE reduction vs ml_1 random split (test R2 0.967, MAE 1.05)')\nfig, ax = plt.subplots(figsize=(8, 4.5))\nxs = np.arange(len(r))\nax.bar(xs - 0.2, r['rf_mae'], 0.4, label='Random forest')\nax.bar(xs + 0.2, r['base_mae'], 0.4, label='Mean-prediction baseline')\nax.set_xticks(xs)\nax.set_xticklabels([f'Fold {i}' for i in r['fold']])\nax.set_xlabel('GroupKFold fold (held-out countries)')\nax.set_ylabel('Test MAE (years of life expectancy)')\nax.set_title('Test MAE per country-held-out fold: random forest vs mean baseline')\nax.legend()\nsave_chart(fig, 'q2_mae_by_fold', 'Test MAE per GroupKFold fold (countries held out): random forest vs mean-prediction baseline')",
+      "output": "   fold  n_test_rows  n_test_countries  n_train_countries  country_overlap  rf_r2  rf_mae  rf_rmse  base_r2  base_mae  base_rmse\n0     0          592                37                146                0  0.946   1.716    2.351   -0.000     8.426     10.133\n1     1          592                37                146                0  0.908   1.935    2.566   -0.024     6.765      8.581\n2     2          592                37                146                0  0.918   1.892    2.693   -0.001     7.946      9.397\n3     3          576                36                147                0  0.906   1.930    2.523   -0.029     6.786      8.364\n4     4          576                36                147                0  0.873   2.702    3.805   -0.084     9.292     11.124\n{'rf_r2': {'mean': 0.9104147201187832, 'sd': 0.02615619623039738}, 'rf_mae': {'mean': 2.0351865271521516, 'sd': 0.38315464947785854}, 'rf_rmse': {'mean': 2.787459338489925, 'sd': 0.5818118842868883}, 'base_r2': {'mean': -0.02742969897230054, 'sd': 0.03402099583873136}, 'base_mae': {'mean': 7.843137799702134, 'sd': 1.0872543138205415}, 'base_rmse': {'mean': 9.519894381371854, 'sd': 1.1380957391527962}, 'mean_test_countries': 36.6, 'total_country_overlap': 0, 'relative_mae_reduction': 0.7405137358125413, 'n_folds': 5}\n",
+      "error": null,
+      "seconds": 14.97
+    },
+    {
+      "attempt": 3,
+      "revision": 0,
+      "step": 4,
+      "code": "print(r.round(3).to_string())\nprint(summ)\nml1 = {'test_r2': 0.9671, 'test_mae': 1.0527, 'test_rmse': 1.6873, 'baseline_mae': 7.676658321262128, 'baseline_rmse': 9.308237114515464, 'baseline_r2': -0.0016633162021579828, 'n_test': 586}\nml1['relative_mae_reduction'] = float(1 - ml1['test_mae'] / ml1['baseline_mae'])\nrecord_fact('q2_ml1_reference', ml1, 'ml_1 random 80/20 split reference: RF test R2 0.967, MAE 1.05, RMSE 1.69; mean baseline MAE 7.68, RMSE 9.31; relative MAE reduction')\nprint(ml1)",
+      "output": "   fold  n_test_rows  n_test_countries  n_train_countries  country_overlap  rf_r2  rf_mae  rf_rmse  base_r2  base_mae  base_rmse\n0     0          592                37                146                0  0.946   1.716    2.351   -0.000     8.426     10.133\n1     1          592                37                146                0  0.908   1.935    2.566   -0.024     6.765      8.581\n2     2          592                37                146                0  0.918   1.892    2.693   -0.001     7.946      9.397\n3     3          576                36                147                0  0.906   1.930    2.523   -0.029     6.786      8.364\n4     4          576                36                147                0  0.873   2.702    3.805   -0.084     9.292     11.124\n{'rf_r2': {'mean': 0.9104147201187832, 'sd': 0.02615619623039738}, 'rf_mae': {'mean': 2.0351865271521516, 'sd': 0.3831546494778586}, 'rf_rmse': {'mean': 2.787459338489925, 'sd': 0.5818118842868883}, 'base_r2': {'mean': -0.02742969897230054, 'sd': 0.03402099583873136}, 'base_mae': {'mean': 7.843137799702134, 'sd': 1.0872543138205415}, 'base_rmse': {'mean': 9.519894381371854, 'sd': 1.1380957391527962}, 'mean_test_countries': 36.6, 'total_country_overlap': 0, 'relative_mae_reduction': 0.7405137358125413, 'n_folds': 5}\n{'test_r2': 0.9671, 'test_mae': 1.0527, 'test_rmse': 1.6873, 'baseline_mae': 7.676658321262128, 'baseline_rmse': 9.308237114515464, 'baseline_r2': -0.0016633162021579828, 'n_test': 586, 'relative_mae_reduction': 0.8628700202685425}\n",
+      "error": null,
+      "seconds": 13.42
+    }
+  ],
+  "metadata": {
+    "steps": 3
+  },
+  "brief": {
+    "id": "q2_ml_1",
+    "specialist": "ml",
+    "question": "Using the same numeric features plus Status as ml_1 (Country dropped as a feature, median imputation), does the random forest still beat the mean-prediction baseline for Life expectancy when whole countries are held out of training, using a grouped split by Country (for example GroupKFold or GroupShuffleSplit)?",
+    "complete_when": "Report test R2, MAE and RMSE of the random forest and of the mean-prediction baseline, both computed on the same country-held-out folds, with the mean and spread across folds; state the number of countries in each held-out test set and confirm that no country appears in both training and test within any fold; state the relative MAE reduction versus the baseline and compare it with the random-split result in ml_1 (test R2 0.967, MAE 1.05).",
+    "depends_on": [
+      "ml_1"
+    ],
+    "outputs": []
+  },
+  "revisions": 1,
+  "reviews": [
+    {
+      "reasoning": "The grouped-split code is sound: GroupKFold by Country, median imputation inside the pipeline, the baseline is the training-fold mean, and overlap is computed from the actual train and test country sets. The summary numbers match the code. The relative MAE reductions check out: about 74% for the grouped split (1 - 2.04/7.84) and about 86% for ml_1 (1 - 1.05/7.68). The overlap of 0 in all folds is supported by the fact. Two points fall short of the brief. First, the brief asks for the number of countries in each held-out test set, but the report gives only 'about 36-37', which is imprecise. The exact per-fold n_test_countries values are in q2_grouped_folds and should be listed fold by fold. Second, the report states as fact that ml_1's optimism was caused by the same countries appearing in train and test. The evidence is consistent with that explanation but does not establish it, so the wording should be softened.",
+      "verdict": "revise",
+      "feedback": "(1) Replace 'about 36-37 test countries' with the exact n_test_countries for each of the five folds, taken from q2_grouped_folds, and give the mean from q2_grouped_summary (mean_test_countries). (2) Reword the causal claim that ml_1's accuracy was 'partly optimistic because the same countries appeared in train and test' as a consistent interpretation, for example 'the drop is consistent with ml_1's random split benefiting from countries seen in training', and note that the grouped and random splits also differ in their test rows. No other changes are needed.",
+      "follow_ups": []
+    },
+    {
+      "reasoning": "Checked the report against the recorded facts and the code. The fold-level means and SDs for RF R2 (0.910, 0.026), MAE (2.04, 0.38) and RMSE (2.79, 0.58) match the summary fact. Test countries (37, 37, 37, 36, 36; mean 36.6) and test rows (592x3, 576x2, totalling 2928) are consistent with the data. Training country counts of 146 and 147 are consistent with 183 countries having non-missing Life expectancy minus the held-out countries. Overlap is 0 in all folds. The relative MAE reductions check out: 1 - 2.035/7.84 \u2248 0.74, and 1 - 1.053/7.677 \u2248 0.86. The code fits imputation and the model inside each training fold, and the baseline uses only the training mean. The comparison to ml_1 is hedged appropriately, and the report notes the confound from differing test sets. The baseline fold-level figures are truncated in the fact text, so I could not verify them directly, but they are consistent with the summary. Nothing in the automatic checks needs fixing.",
+      "verdict": "accept",
+      "feedback": "",
+      "follow_ups": []
+    }
+  ]
+}

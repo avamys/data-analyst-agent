@@ -1,0 +1,199 @@
+{
+  "task_id": "stat_1",
+  "specialist": "statistical",
+  "description": "Which churn differences across plan, usage_hours, tenure_months and refund_issued are statistically significant, and how large are the effects?",
+  "code": "# %%\nimport matplotlib.pyplot as plt\nimport numpy as np\nimport pandas as pd\n\nfrom agent.execution.runtime import (\n    df,\n    load,\n    publish,\n    record_fact,\n    record_model,\n    save_chart,\n)\n\n# %%\nd = df.copy()\nprint(d.dtypes)\nprint(d['plan'].value_counts())\nprint(d['refund_issued'].value_counts())\nprint(d['churned'].value_counts())\nprint(d[['usage_hours','tenure_months']].describe().round(3))\nprint(pd.crosstab(d['refund_issued'], d['churned']))\n\n# %%\nfrom scipy import stats\nfrom statsmodels.stats.multitest import multipletests\n\nres = {}\n\n# Chi-square for plan vs churned\nct_plan = pd.crosstab(d['plan'], d['churned'])\nchi2_p, chi2_p_val, dof_p, _ = stats.chi2_contingency(ct_plan, correction=False)\nn = ct_plan.values.sum()\nv_plan = np.sqrt(chi2_p / (n * (min(ct_plan.shape) - 1)))\nres['plan'] = {'chi2': float(chi2_p), 'dof': int(dof_p), 'p': float(chi2_p_val), 'cramers_v': float(v_plan)}\n\n# Chi-square for refund_issued vs churned\nct_ref = pd.crosstab(d['refund_issued'], d['churned'])\nchi2_r, p_r, dof_r, _ = stats.chi2_contingency(ct_ref, correction=False)\nn_r = ct_ref.values.sum()\nv_ref = np.sqrt(chi2_r / (n_r * (min(ct_ref.shape) - 1)))\nres['refund_issued'] = {'chi2': float(chi2_r), 'dof': int(dof_r), 'p': float(p_r), 'cramers_v': float(v_ref)}\n\n# Mann-Whitney for numeric vs churned, with rank-biserial and Cohen's d\nfor col in ['usage_hours', 'tenure_months']:\n    a = d.loc[d['churned'] == 1, col]\n    b = d.loc[d['churned'] == 0, col]\n    u, p_u = stats.mannwhitneyu(a, b, alternative='two-sided')\n    rbc = 1 - 2 * u / (len(a) * len(b))\n    sp = np.sqrt(((len(a) - 1) * a.var(ddof=1) + (len(b) - 1) * b.var(ddof=1)) / (len(a) + len(b) - 2))\n    dcoh = (a.mean() - b.mean()) / sp\n    res[col] = {'U': float(u), 'p': float(p_u), 'rank_biserial': float(rbc), 'cohens_d': float(dcoh), 'mean_churned': float(a.mean()), 'mean_retained': float(b.mean())}\n\n# 95% CI for churn rate difference by refund_issued (1 minus 0), Wald\ng1 = d.loc[d['refund_issued'] == 1, 'churned']\ng0 = d.loc[d['refund_issued'] == 0, 'churned']\np1, p0 = g1.mean(), g0.mean()\nse = np.sqrt(p1 * (1 - p1) / len(g1) + p0 * (1 - p0) / len(g0))\ndiff = p1 - p0\nci = (diff - 1.96 * se, diff + 1.96 * se)\nres['refund_ci'] = {'rate_refund1': float(p1), 'rate_refund0': float(p0), 'diff': float(diff), 'ci_low': float(ci[0]), 'ci_high': float(ci[1])}\n\n# Holm correction across the four p-values\npvals = [res['plan']['p'], res['refund_issued']['p'], res['usage_hours']['p'], res['tenure_months']['p']]\nrej, p_adj, _, _ = multipletests(pvals, method='holm')\nnames = ['plan', 'refund_issued', 'usage_hours', 'tenure_months']\nfor nm, pa, rj in zip(names, p_adj, rej):\n    res[nm]['p_holm'] = float(pa)\n    res[nm]['significant_after_holm'] = bool(rj)\n\nfor k, v in res.items():\n    print(k, {kk: (round(vv, 6) if isinstance(vv, float) else vv) for kk, vv in v.items()})\n\nrecord_fact('stat1_plan_chi2', res['plan'], 'Chi-square plan vs churned with Cramer V and Holm-adjusted p')\nrecord_fact('stat1_refund_chi2', res['refund_issued'], 'Chi-square refund_issued vs churned with Cramer V and Holm-adjusted p')\nrecord_fact('stat1_usage_mwu', res['usage_hours'], 'Mann-Whitney usage_hours churned vs retained with rank-biserial, Cohen d, Holm p')\nrecord_fact('stat1_tenure_mwu', res['tenure_months'], 'Mann-Whitney tenure_months churned vs retained with rank-biserial, Cohen d, Holm p')\nrecord_fact('stat1_refund_diff_ci', res['refund_ci'], 'Churn rate difference refund_issued=1 minus 0 with 95% Wald CI')\n\n# %%\nimport matplotlib.pyplot as plt\nfig, axes = plt.subplots(1, 2, figsize=(10, 4))\nr = d.groupby('plan')['churned'].mean()\naxes[0].bar(r.index.astype(str), r.values, color='steelblue')\naxes[0].set_title('Churn rate by plan (share of customers churned)')\naxes[0].set_xlabel('plan')\naxes[0].set_ylabel('churn rate (share churned)')\nr2 = d.groupby('refund_issued')['churned'].mean()\naxes[1].bar(['refund_issued=0', 'refund_issued=1'], r2.values, color='indianred')\naxes[1].set_title('Churn rate by refund_issued value (share churned)')\naxes[1].set_xlabel('refund_issued')\naxes[1].set_ylabel('churn rate (share churned)')\nfig.tight_layout()\nsave_chart(fig, 'stat1_churn_rate_plan_refund', 'Churn rate by plan (left) and by refund_issued value (right)')\nplt.close(fig)\n\n# %%\nprint('usage_hours p_holm:', repr(res['usage_hours']['p_holm']))\nprint('tenure_months p_holm:', repr(res['tenure_months']['p_holm']))\nprint('usage_hours p:', repr(res['usage_hours']['p']))\nprint('tenure_months p:', repr(res['tenure_months']['p']))\n",
+  "output": "usage_hours      float64\ntenure_months      int64\nplan              object\nrefund_issued      int64\nchurned            int64\ndtype: object\nplan\nbasic    512\nplus     297\npro      191\nName: count, dtype: int64\nrefund_issued\n0    632\n1    368\nName: count, dtype: int64\nchurned\n0    637\n1    363\nName: count, dtype: int64\n       usage_hours  tenure_months\ncount     1000.000       1000.000\nmean        20.144         35.751\nstd          9.946         20.139\nmin          1.900          1.000\n25%         12.500         18.000\n50%         18.900         36.000\n75%         25.525         53.000\nmax         67.700         71.000\nchurned          0    1\nrefund_issued          \n0              622   10\n1               15  353\nplan {'chi2': 19.02923, 'dof': 2, 'p': 7.4e-05, 'cramers_v': 0.137946, 'p_holm': 7.4e-05, 'significant_after_holm': True}\nrefund_issued {'chi2': 895.211459, 'dof': 1, 'p': 0.0, 'cramers_v': 0.946156, 'p_holm': 0.0, 'significant_after_holm': True}\nusage_hours {'U': 86990.5, 'p': 0.0, 'rank_biserial': 0.247588, 'cohens_d': -0.459779, 'mean_churned': 17.298347, 'mean_retained': 21.76562, 'p_holm': 0.0, 'significant_after_holm': True}\ntenure_months {'U': 84982.5, 'p': 0.0, 'rank_biserial': 0.264956, 'cohens_d': -0.472042, 'mean_churned': 29.842975, 'mean_retained': 39.117739, 'p_holm': 0.0, 'significant_after_holm': True}\nrefund_ci {'rate_refund1': 0.959239, 'rate_refund0': 0.015823, 'diff': 0.943416, 'ci_low': 0.920993, 'ci_high': 0.96584}\nusage_hours p_holm: 1.4280901538117538e-10\ntenure_months p_holm: 9.132711653739477e-12\nusage_hours p: 7.140450769058769e-11\ntenure_months p: 3.0442372179131588e-12\n",
+  "execution_time": 28.23,
+  "success": true,
+  "error": null,
+  "report": {
+    "status": "complete",
+    "findings": [
+      {
+        "statement": "Plan is significantly associated with churn: chi-square = 19.03 on 2 df, p = 7.4e-05, unchanged after Holm correction across the four tests. Cramer's V = 0.138, a small association. Basic churns most often (0.428 vs 0.293 for plus and 0.298 for pro).",
+        "facts": [
+          "stat1_plan_chi2"
+        ]
+      },
+      {
+        "statement": "refund_issued is significantly associated with churn: chi-square = 895.2 on 1 df, p = 1.1e-196, Holm-adjusted p = 4.3e-196, Cramer's V = 0.946. This near-perfect association makes refund_issued a possible leakage column, and it should not be treated as a churn driver until the data-generating process confirms whether it is recorded after the churn decision.",
+        "facts": [
+          "stat1_refund_chi2"
+        ]
+      },
+      {
+        "statement": "The churn rate difference by refund_issued (1 minus 0) is 0.943, with 95% Wald CI 0.921 to 0.966 (churn 0.959 when refund_issued=1 vs 0.016 when refund_issued=0).",
+        "facts": [
+          "stat1_refund_diff_ci"
+        ]
+      },
+      {
+        "statement": "usage_hours differs significantly between churned and retained customers: Mann-Whitney p = 7.1e-11, Holm-adjusted p = 1.43e-10. The rank-biserial correlation is 0.248 and Cohen's d is -0.460, so churned customers have lower usage_hours (mean 17.30 vs 21.77), a small-to-medium effect.",
+        "facts": [
+          "stat1_usage_mwu"
+        ]
+      },
+      {
+        "statement": "tenure_months differs significantly between churned and retained customers: Mann-Whitney p = 3.0e-12, Holm-adjusted p = 9.1e-12. The rank-biserial correlation is 0.265 and Cohen's d is -0.472, so churned customers have shorter tenure (mean 29.84 vs 39.12), a small-to-medium effect.",
+        "facts": [
+          "stat1_tenure_mwu"
+        ]
+      },
+      {
+        "statement": "After Holm correction across the four tests (plan, refund_issued, usage_hours, tenure_months), all four effects remain statistically significant at the 0.05 level. The rank-biserial values are signed so that positive means churned customers rank lower, consistent with the negative Cohen's d values for usage_hours and tenure_months.",
+        "facts": [
+          "stat1_plan_chi2",
+          "stat1_refund_chi2",
+          "stat1_usage_mwu",
+          "stat1_tenure_mwu"
+        ]
+      }
+    ],
+    "follow_ups": [
+      "Does churn still separate by plan, usage_hours and tenure_months once refund_issued is excluded? Fit a model without refund_issued to check.",
+      "Is refund_issued recorded after the churn decision, making it leakage? Confirm with the data-generating process before using it as a feature.",
+      "Do usage_hours and tenure_months effects differ within each plan level (interaction)?"
+    ]
+  },
+  "facts": {
+    "stat1_plan_chi2": {
+      "value": {
+        "chi2": 19.02922970551945,
+        "dof": 2,
+        "p": 7.376583656143873e-05,
+        "cramers_v": 0.13794647405975788,
+        "p_holm": 7.376583656143873e-05,
+        "significant_after_holm": true
+      },
+      "desc": "Chi-square plan vs churned with Cramer V and Holm-adjusted p",
+      "cell": 2
+    },
+    "stat1_refund_chi2": {
+      "value": {
+        "chi2": 895.211459067251,
+        "dof": 1,
+        "p": 1.0784376892341865e-196,
+        "cramers_v": 0.9461561494104718,
+        "p_holm": 4.313750756936746e-196,
+        "significant_after_holm": true
+      },
+      "desc": "Chi-square refund_issued vs churned with Cramer V and Holm-adjusted p",
+      "cell": 2
+    },
+    "stat1_usage_mwu": {
+      "value": {
+        "U": 86990.5,
+        "p": 7.140450769058769e-11,
+        "rank_biserial": 0.24758790992557222,
+        "cohens_d": -0.45977850898038664,
+        "mean_churned": 17.298347107438016,
+        "mean_retained": 21.765620094191522,
+        "p_holm": 1.4280901538117538e-10,
+        "significant_after_holm": true
+      },
+      "desc": "Mann-Whitney usage_hours churned vs retained with rank-biserial, Cohen d, Holm p",
+      "cell": 2
+    },
+    "stat1_tenure_mwu": {
+      "value": {
+        "U": 84982.5,
+        "p": 3.0442372179131588e-12,
+        "rank_biserial": 0.2649558233973819,
+        "cohens_d": -0.47204230088860266,
+        "mean_churned": 29.84297520661157,
+        "mean_retained": 39.11773940345369,
+        "p_holm": 9.132711653739477e-12,
+        "significant_after_holm": true
+      },
+      "desc": "Mann-Whitney tenure_months churned vs retained with rank-biserial, Cohen d, Holm p",
+      "cell": 2
+    },
+    "stat1_refund_diff_ci": {
+      "value": {
+        "rate_refund1": 0.9592391304347826,
+        "rate_refund0": 0.015822784810126583,
+        "diff": 0.943416345624656,
+        "ci_low": 0.9209926830797832,
+        "ci_high": 0.9658400081695289
+      },
+      "desc": "Churn rate difference refund_issued=1 minus 0 with 95% Wald CI",
+      "cell": 2
+    }
+  },
+  "charts": {
+    "stat1_churn_rate_plan_refund": {
+      "file": "charts/stat1_churn_rate_plan_refund.png",
+      "caption": "Churn rate by plan (left) and by refund_issued value (right)",
+      "cell": 3
+    }
+  },
+  "published": [],
+  "artifacts": [],
+  "attempts": [
+    {
+      "attempt": 1,
+      "revision": 0,
+      "step": 1,
+      "code": "d = df.copy()\nprint(d.dtypes)\nprint(d['plan'].value_counts())\nprint(d['refund_issued'].value_counts())\nprint(d['churned'].value_counts())\nprint(d[['usage_hours','tenure_months']].describe().round(3))\nprint(pd.crosstab(d['refund_issued'], d['churned']))",
+      "output": "usage_hours      float64\ntenure_months      int64\nplan              object\nrefund_issued      int64\nchurned            int64\ndtype: object\nplan\nbasic    512\nplus     297\npro      191\nName: count, dtype: int64\nrefund_issued\n0    632\n1    368\nName: count, dtype: int64\nchurned\n0    637\n1    363\nName: count, dtype: int64\n       usage_hours  tenure_months\ncount     1000.000       1000.000\nmean        20.144         35.751\nstd          9.946         20.139\nmin          1.900          1.000\n25%         12.500         18.000\n50%         18.900         36.000\n75%         25.525         53.000\nmax         67.700         71.000\nchurned          0    1\nrefund_issued          \n0              622   10\n1               15  353\n",
+      "error": null,
+      "seconds": 4.02
+    },
+    {
+      "attempt": 2,
+      "revision": 0,
+      "step": 2,
+      "code": "from scipy import stats\nfrom statsmodels.stats.multitest import multipletests\n\nres = {}\n\n# Chi-square for plan vs churned\nct_plan = pd.crosstab(d['plan'], d['churned'])\nchi2_p, chi2_p_val, dof_p, _ = stats.chi2_contingency(ct_plan, correction=False)\nn = ct_plan.values.sum()\nv_plan = np.sqrt(chi2_p / (n * (min(ct_plan.shape) - 1)))\nres['plan'] = {'chi2': float(chi2_p), 'dof': int(dof_p), 'p': float(chi2_p_val), 'cramers_v': float(v_plan)}\n\n# Chi-square for refund_issued vs churned\nct_ref = pd.crosstab(d['refund_issued'], d['churned'])\nchi2_r, p_r, dof_r, _ = stats.chi2_contingency(ct_ref, correction=False)\nn_r = ct_ref.values.sum()\nv_ref = np.sqrt(chi2_r / (n_r * (min(ct_ref.shape) - 1)))\nres['refund_issued'] = {'chi2': float(chi2_r), 'dof': int(dof_r), 'p': float(p_r), 'cramers_v': float(v_ref)}\n\n# Mann-Whitney for numeric vs churned, with rank-biserial and Cohen's d\nfor col in ['usage_hours', 'tenure_months']:\n    a = d.loc[d['churned'] == 1, col]\n    b = d.loc[d['churned'] == 0, col]\n    u, p_u = stats.mannwhitneyu(a, b, alternative='two-sided')\n    rbc = 1 - 2 * u / (len(a) * len(b))\n    sp = np.sqrt(((len(a) - 1) * a.var(ddof=1) + (len(b) - 1) * b.var(ddof=1)) / (len(a) + len(b) - 2))\n    dcoh = (a.mean() - b.mean()) / sp\n    res[col] = {'U': float(u), 'p': float(p_u), 'rank_biserial': float(rbc), 'cohens_d': float(dcoh), 'mean_churned': float(a.mean()), 'mean_retained': float(b.mean())}\n\n# 95% CI for churn rate difference by refund_issued (1 minus 0), Wald\ng1 = d.loc[d['refund_issued'] == 1, 'churned']\ng0 = d.loc[d['refund_issued'] == 0, 'churned']\np1, p0 = g1.mean(), g0.mean()\nse = np.sqrt(p1 * (1 - p1) / len(g1) + p0 * (1 - p0) / len(g0))\ndiff = p1 - p0\nci = (diff - 1.96 * se, diff + 1.96 * se)\nres['refund_ci'] = {'rate_refund1': float(p1), 'rate_refund0': float(p0), 'diff': float(diff), 'ci_low': float(ci[0]), 'ci_high': float(ci[1])}\n\n# Holm correction across the four p-values\npvals = [res['plan']['p'], res['refund_issued']['p'], res['usage_hours']['p'], res['tenure_months']['p']]\nrej, p_adj, _, _ = multipletests(pvals, method='holm')\nnames = ['plan', 'refund_issued', 'usage_hours', 'tenure_months']\nfor nm, pa, rj in zip(names, p_adj, rej):\n    res[nm]['p_holm'] = float(pa)\n    res[nm]['significant_after_holm'] = bool(rj)\n\nfor k, v in res.items():\n    print(k, {kk: (round(vv, 6) if isinstance(vv, float) else vv) for kk, vv in v.items()})\n\nrecord_fact('stat1_plan_chi2', res['plan'], 'Chi-square plan vs churned with Cramer V and Holm-adjusted p')\nrecord_fact('stat1_refund_chi2', res['refund_issued'], 'Chi-square refund_issued vs churned with Cramer V and Holm-adjusted p')\nrecord_fact('stat1_usage_mwu', res['usage_hours'], 'Mann-Whitney usage_hours churned vs retained with rank-biserial, Cohen d, Holm p')\nrecord_fact('stat1_tenure_mwu', res['tenure_months'], 'Mann-Whitney tenure_months churned vs retained with rank-biserial, Cohen d, Holm p')\nrecord_fact('stat1_refund_diff_ci', res['refund_ci'], 'Churn rate difference refund_issued=1 minus 0 with 95% Wald CI')",
+      "output": "plan {'chi2': 19.02923, 'dof': 2, 'p': 7.4e-05, 'cramers_v': 0.137946, 'p_holm': 7.4e-05, 'significant_after_holm': True}\nrefund_issued {'chi2': 895.211459, 'dof': 1, 'p': 0.0, 'cramers_v': 0.946156, 'p_holm': 0.0, 'significant_after_holm': True}\nusage_hours {'U': 86990.5, 'p': 0.0, 'rank_biserial': 0.247588, 'cohens_d': -0.459779, 'mean_churned': 17.298347, 'mean_retained': 21.76562, 'p_holm': 0.0, 'significant_after_holm': True}\ntenure_months {'U': 84982.5, 'p': 0.0, 'rank_biserial': 0.264956, 'cohens_d': -0.472042, 'mean_churned': 29.842975, 'mean_retained': 39.117739, 'p_holm': 0.0, 'significant_after_holm': True}\nrefund_ci {'rate_refund1': 0.959239, 'rate_refund0': 0.015823, 'diff': 0.943416, 'ci_low': 0.920993, 'ci_high': 0.96584}\n",
+      "error": null,
+      "seconds": 6.97
+    },
+    {
+      "attempt": 3,
+      "revision": 0,
+      "step": 3,
+      "code": "import matplotlib.pyplot as plt\nfig, axes = plt.subplots(1, 2, figsize=(10, 4))\nr = d.groupby('plan')['churned'].mean()\naxes[0].bar(r.index.astype(str), r.values, color='steelblue')\naxes[0].set_title('Churn rate by plan (share of customers churned)')\naxes[0].set_xlabel('plan')\naxes[0].set_ylabel('churn rate (share churned)')\nr2 = d.groupby('refund_issued')['churned'].mean()\naxes[1].bar(['refund_issued=0', 'refund_issued=1'], r2.values, color='indianred')\naxes[1].set_title('Churn rate by refund_issued value (share churned)')\naxes[1].set_xlabel('refund_issued')\naxes[1].set_ylabel('churn rate (share churned)')\nfig.tight_layout()\nsave_chart(fig, 'stat1_churn_rate_plan_refund', 'Churn rate by plan (left) and by refund_issued value (right)')\nplt.close(fig)",
+      "output": "",
+      "error": null,
+      "seconds": 10.34
+    },
+    {
+      "attempt": 4,
+      "revision": 1,
+      "step": 1,
+      "code": "print('usage_hours p_holm:', repr(res['usage_hours']['p_holm']))\nprint('tenure_months p_holm:', repr(res['tenure_months']['p_holm']))\nprint('usage_hours p:', repr(res['usage_hours']['p']))\nprint('tenure_months p:', repr(res['tenure_months']['p']))",
+      "output": "usage_hours p_holm: 1.4280901538117538e-10\ntenure_months p_holm: 9.132711653739477e-12\nusage_hours p: 7.140450769058769e-11\ntenure_months p: 3.0442372179131588e-12\n",
+      "error": null,
+      "seconds": 6.9
+    }
+  ],
+  "metadata": {
+    "steps": 4
+  },
+  "brief": {
+    "id": "stat_1",
+    "specialist": "statistical",
+    "question": "Which churn differences across plan, usage_hours, tenure_months and refund_issued are statistically significant, and how large are the effects?",
+    "complete_when": "Chi-square test (with Cram\u00e9r's V) for plan vs churned and for refund_issued vs churned; Mann-Whitney or t-test (with Cohen's d or rank-biserial effect size) for usage_hours and tenure_months vs churned; 95% confidence intervals for the churn rate difference by refund_issued; p-values corrected for multiple comparisons; a clear statement of which effects survive correction.",
+    "depends_on": [
+      "eda_1"
+    ],
+    "outputs": []
+  },
+  "revisions": 1,
+  "reviews": [
+    {
+      "reasoning": "Findings match the facts and the code: chi-square, Cramer's V, Mann-Whitney, rank-biserial, Cohen's d, the refund rate difference with its Wald CI, and Holm across the four tests all follow the brief. Three problems need fixing. First, the report calls refund_issued almost certainly leakage, but the profile only flags possible leakage and the data-generating process has not been checked, so the claim is stronger than the evidence. Second, the report ranks plan as the smallest effect by comparing Cramer's V with rank-biserial and Cohen's d. These are different scales and cannot be ranked against each other. Third, the rank-biserial is reported unsigned while the Cohen's d is negative. The code's sign convention is not stated, so the direction is unclear. The usage_hours Holm p-value of about 2.1e-10 is also not confirmed by the visible facts, which truncate that field, so it must be quoted exactly from stat1_usage_mwu. The Holm-adjusted significance conclusions and the refund CI are correct.",
+      "verdict": "revise",
+      "feedback": "1) Describe refund_issued as a possible leakage column (as the profile warns) that is near-perfectly associated with churn, and state that it should not be treated as a churn driver until the data-generating process confirms whether it is recorded after the churn decision. Do not say almost certainly. 2) Remove the claim that plan's effect is the smallest among behavioural features, or restate it without ranking Cramer's V against rank-biserial and Cohen's d. 3) State the direction of the rank-biserial values (for example, that churned customers have lower usage_hours and tenure_months), consistent with the negative Cohen's d. 4) Replace the approximate usage_hours Holm p-value 'about 2.1e-10' with the exact p_holm value from stat1_usage_mwu, since the displayed fact is truncated and the figure cannot be confirmed from the visible facts. Keep the rest unchanged.",
+      "follow_ups": []
+    },
+    {
+      "reasoning": "Each finding matches the facts it cites: plan chi2 19.03, dof 2, p 7.4e-05, V 0.138; refund chi2 895.2, V 0.946; usage and tenure Mann-Whitney p, rank-biserial, Cohen's d and means; refund churn rates 0.959 vs 0.016 with diff 0.943 and Wald CI 0.921 to 0.966. The Holm-adjusted p-values are consistent with the four raw p-values (ranks 1 to 4 multiplied by 4, 3, 2, 1). The rank-biserial sign convention matches the code, where positive means churned customers rank lower. The brief's required elements are all present: chi-square with Cram\u00e9r's V, Mann-Whitney with effect sizes, a 95% CI for the refund difference, multiple-comparison correction, and a clear statement of which effects survive. The report flags refund_issued as a probable leakage column rather than a driver, which is appropriately hedged. The automatic checks found no problems. The open questions the specialist raised are already covered by backlog tasks stat_2 and ml_1/ml_2, so no new follow-ups are needed.",
+      "verdict": "accept",
+      "feedback": "",
+      "follow_ups": []
+    }
+  ]
+}
