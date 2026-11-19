@@ -231,7 +231,9 @@ def snapshot(results: Path) -> None:
 def run_suite(config: Config, cases: list[Case]) -> Path:
     """Every case × repeat, `jobs` at a time; returns the results file"""
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    suite_id = f"{stamp}_{config.version}_{config.model.replace('/', '-')}"
+    suite_id = (
+        f"{stamp}_{config.version}_{config.model.replace('/', '-').replace(':', '-')}"
+    )
     suite_dir = RUNS_DIR / suite_id
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     results = RESULTS_DIR / f"{suite_id}.jsonl"

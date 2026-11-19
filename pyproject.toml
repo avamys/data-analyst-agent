@@ -55,6 +55,7 @@ extend-exclude = [
   "*.md",               # code blocks in docs are illustrative sketches
   "docs/baseline/run",  # generated code from the reference run, kept verbatim
   "evals/heldout",      # kept byte-identical to evals/heldout.sha256
+  "examples/*/tasks",   # scripts the agent wrote in example runs, kept verbatim
   "evals/heldout2",     # kept byte-identical to evals/heldout2.sha256
 ]
 

@@ -20,7 +20,7 @@ Measured with an eval harness: datasets with planted findings and traps (a leake
 
 Details: [before/after](docs/eval/before-after.md), [held-out](docs/eval/phase3.md). The held-out cases were written by the project's owner and kept unseen until they ran. The one false claim found held-out came from a trap the agent passes on a famous dataset (Pima's zeros) and failed on an unknown one, which suggests memory. A fix to the dataset profile then cleared it, and a further case written blind after the fix confirmed it.
 
-**Local vs hosted:** one run of qwen3.5:9b on a 4 GB laptop GPU next to Claude's titanic runs: *in progress*.
+**Local vs hosted** ([details](docs/eval/local-vs-hosted.md)): one titanic run of qwen3.5:9b on a 4 GB laptop GPU finished in 3 h 19 min with 79% of the findings and no false claims, against Haiku's 100% in 7–10 min. It wrote 4 wrong numbers, and the number check flagged all of them in the report.
 
 ## How it works
 
