@@ -200,6 +200,5 @@
       "dataset description": 1,
       "fact value": 123
     }
-  },
-  "trace_url": "https://eu.smith.langchain.com/o/26c8aa3e-ae1f-439e-95e7-a6a980ce7d4d/projects/p/5c5ab6b4-9ae6-4e16-8168-f438cd7ffaa4/r/77896850-66f4-4bec-9585-02adf3e22879?poll=true"
+  }
 }

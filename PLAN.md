@@ -793,6 +793,7 @@ load run → ask ─┬─ answerable from recorded facts ───────�
 
 **P6.6 Merge and release** (S). *$0.*
 - [ ] A PR `phase-1` → `main` (likely conflict in `PLAN.md`: `phase-1`'s version wins), merged; CI passes on `main`. The old branches stay (owner).
+- [x] Before the merge, the LangSmith trace links removed from the committed eval results, their snapshots and `before-after.md`'s trace column (owner, 2026-11-19): they name a private workspace. Older commits still contain them; the links open only for the workspace's members.
 - [ ] The definition of done ticked; `v1.0.0` tagged on `main`; a GitHub release with a short summary and the results.
 - Each push, merge, tag and release is confirmed with the owner when it happens.
 

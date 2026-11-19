@@ -235,7 +235,6 @@
       "review script": 5
     }
   },
-  "trace_url": "https://eu.smith.langchain.com/o/26c8aa3e-ae1f-439e-95e7-a6a980ce7d4d/projects/p/d28661e8-217e-4fdb-bdea-3c643003bad9/r/4fc0f7c5-5764-4d29-ba04-a6305a242893?poll=true",
   "ollama": {
     "load_seconds": 24.98,
     "prompt_seconds": 379.34,

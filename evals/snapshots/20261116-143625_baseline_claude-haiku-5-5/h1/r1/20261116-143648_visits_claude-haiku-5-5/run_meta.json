@@ -56,6 +56,5 @@
   "input_tokens": 17199,
   "output_tokens": 36268,
   "tasks_completed": 6,
-  "tasks_failed": 0,
-  "trace_url": "https://eu.smith.langchain.com/o/26c8aa3e-ae1f-439e-95e7-a6a980ce7d4d/projects/p/b2743223-b5fc-478a-be0d-2bb1a890a2bc/r/abf19c7c-3ca5-473c-b22e-36bb60afdf53?poll=true"
+  "tasks_failed": 0
 }
