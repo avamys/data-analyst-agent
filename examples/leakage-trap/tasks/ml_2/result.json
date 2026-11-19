@@ -1,0 +1,278 @@
+{
+  "task_id": "ml_2",
+  "specialist": "ml",
+  "description": "How well do classifiers predict churned compared with the majority-class baseline, with and without refund_issued, and which features matter most?",
+  "code": "# %%\nimport matplotlib.pyplot as plt\nimport numpy as np\nimport pandas as pd\n\nfrom agent.execution.runtime import (\n    df,\n    load,\n    publish,\n    record_fact,\n    record_model,\n    save_chart,\n)\n\n# %%\ntrain_test = load(\"ml_1/split_data\")\nprint(type(train_test))\nif isinstance(train_test, dict):\n    print(list(train_test.keys()))\n    for k, v in train_test.items():\n        print(k, getattr(v, 'shape', len(v) if hasattr(v, '__len__') else v))\nelse:\n    for item in train_test:\n        print(type(item), getattr(item, 'shape', None))\n\n# %%\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.ensemble import GradientBoostingClassifier\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.metrics import accuracy_score, roc_auc_score, f1_score\n\nXtr_nl = train_test['X_train_no_leak']; Xte_nl = train_test['X_test_no_leak']\nXtr_wr = train_test['X_train_with_refund']; Xte_wr = train_test['X_test_with_refund']\nytr = train_test['y_train']; yte = train_test['y_test']\nfn_nl = list(Xtr_nl.columns); fn_wr = list(Xtr_wr.columns)\n\nres = {}\nfor tag, Xtr, Xte, fn in [('no_leak', Xtr_nl, Xte_nl, fn_nl), ('with_refund', Xtr_wr, Xte_wr, fn_wr)]:\n    lr = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))\n    gb = GradientBoostingClassifier(random_state=42)\n    lr.fit(Xtr, ytr); gb.fit(Xtr, ytr)\n    r_lr = record_model(f'ml2_logreg_{tag}', lr, Xtr, ytr, Xte, yte, f'Logistic regression ({tag})')\n    r_gb = record_model(f'ml2_gbt_{tag}', gb, Xtr, ytr, Xte, yte, f'Gradient boosting ({tag})')\n    res[tag] = {'logreg': r_lr, 'gbt': r_gb}\n    print(tag, 'LR', r_lr)\n    print(tag, 'GB', r_gb)\n\nprint('baseline test acc', accuracy_score(yte, np.zeros_like(yte)))\nprint(list(yte.value_counts().items()) if hasattr(yte,'value_counts') else np.unique(yte, return_counts=True))\n\n# %%\nlr_nl = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000)).fit(Xtr_nl, ytr)\ncoefs = {f: round(float(c), 4) for f, c in zip(fn_nl, lr_nl[-1].coef_[0])}\nrecord_fact('ml2_logreg_no_leak_signed_coefs', coefs, 'Standardized logistic regression coefficients for the no_leak model; sign gives direction of association with churn')\nprint(coefs)\nd = {'logreg_acc_drop': round(res['with_refund']['logreg']['test_accuracy'] - res['no_leak']['logreg']['test_accuracy'], 4), 'logreg_auc_drop': round(res['with_refund']['logreg']['test_roc_auc'] - res['no_leak']['logreg']['test_roc_auc'], 4), 'gbt_acc_drop': round(res['with_refund']['gbt']['test_accuracy'] - res['no_leak']['gbt']['test_accuracy'], 4), 'gbt_auc_drop': round(res['with_refund']['gbt']['test_roc_auc'] - res['no_leak']['gbt']['test_roc_auc'], 4)}\nrecord_fact('ml2_refund_score_drop', d, 'Test score drop when refund_issued is removed (with_refund minus no_leak), for both models')\nprint(d)\nlabels = ['LR no_leak', 'GBT no_leak', 'LR with_refund', 'GBT with_refund']\nrecs = [res['no_leak']['logreg'], res['no_leak']['gbt'], res['with_refund']['logreg'], res['with_refund']['gbt']]\nacc = [r['test_accuracy'] for r in recs]\nauc = [r['test_roc_auc'] for r in recs]\nfig, ax = plt.subplots(figsize=(9, 5))\nx = np.arange(4); w = 0.35\nax.bar(x - w/2, acc, w, label='Test accuracy')\nax.bar(x + w/2, auc, w, label='Test ROC AUC')\nax.axhline(0.635, color='gray', ls='--', label='Majority baseline accuracy (0.635)')\nax.set_xticks(x); ax.set_xticklabels(labels)\nax.set_ylim(0, 1.05)\nax.set_ylabel('Score on 200-row test set')\nax.set_title('Test accuracy and ROC AUC of churn classifiers vs majority baseline')\nax.legend()\nsave_chart(fig, 'ml2_model_comparison', 'Test accuracy and ROC AUC for logistic regression and gradient boosting, with and without refund_issued, against the majority-class baseline of 0.635')\n",
+  "output": "<class 'dict'>\n['X_train_no_leak', 'X_test_no_leak', 'X_train_with_refund', 'X_test_with_refund', 'y_train', 'y_test', 'feature_names']\nX_train_no_leak (800, 5)\nX_test_no_leak (200, 5)\nX_train_with_refund (800, 6)\nX_test_with_refund (200, 6)\ny_train (800,)\ny_test (200,)\nfeature_names 2\nno_leak LR {'kind': 'classifier', 'train_accuracy': 0.695, 'test_accuracy': 0.605, 'baseline_accuracy': 0.635, 'positive_class': np.int64(1), 'test_precision': 0.4348, 'test_recall': 0.274, 'test_f1': 0.3361, 'test_roc_auc': 0.612, 'feature_ranking': 'abs_coefficient', 'top_features': {'usage_hours': 0.6344, 'tenure_months': 0.5288, 'plan_plus': 0.1328, 'plan_basic': 0.1313, 'plan_pro': 0.0132}, 'n_train': 800, 'n_test': 200}\nno_leak GB {'kind': 'classifier', 'train_accuracy': 0.7963, 'test_accuracy': 0.57, 'baseline_accuracy': 0.635, 'positive_class': np.int64(1), 'test_precision': 0.3774, 'test_recall': 0.274, 'test_f1': 0.3175, 'test_roc_auc': 0.5305, 'feature_ranking': 'importance', 'top_features': {'usage_hours': 0.611, 'tenure_months': 0.3302, 'plan_plus': 0.0295, 'plan_basic': 0.0198, 'plan_pro': 0.0096}, 'n_train': 800, 'n_test': 200}\nwith_refund LR {'kind': 'classifier', 'train_accuracy': 0.9738, 'test_accuracy': 0.98, 'baseline_accuracy': 0.635, 'positive_class': np.int64(1), 'test_precision': 0.9726, 'test_recall': 0.9726, 'test_f1': 0.9726, 'test_roc_auc': 0.9903, 'feature_ranking': 'abs_coefficient', 'top_features': {'refund_issued': 3.3322, 'usage_hours': 0.7293, 'tenure_months': 0.2382, 'plan_pro': 0.1653, 'plan_basic': 0.1545, 'plan_plus': 0.0261}, 'n_train': 800, 'n_test': 200}\nwith_refund GB {'kind': 'classifier', 'train_accuracy': 0.99, 'test_accuracy': 0.965, 'baseline_accuracy': 0.635, 'positive_class': np.int64(1), 'test_precision': 0.9714, 'test_recall': 0.9315, 'test_f1': 0.951, 'test_roc_auc': 0.9763, 'feature_ranking': 'importance', 'top_features': {'refund_issued': 0.9358, 'usage_hours': 0.0422, 'tenure_months': 0.0178, 'plan_basic': 0.0023, 'plan_pro': 0.0016, 'plan_plus': 0.0002}, 'n_train': 800, 'n_test': 200}\nbaseline test acc 0.635\n[(0, 127), (1, 73)]\n{'usage_hours': -0.6344, 'tenure_months': -0.5288, 'plan_basic': 0.1313, 'plan_plus': -0.1328, 'plan_pro': -0.0132}\n{'logreg_acc_drop': 0.375, 'logreg_auc_drop': 0.3783, 'gbt_acc_drop': 0.395, 'gbt_auc_drop': 0.4458}\n",
+  "execution_time": 19.62,
+  "success": true,
+  "error": null,
+  "report": {
+    "status": "complete",
+    "findings": [
+      {
+        "statement": "Without refund_issued, neither classifier beats the majority-class baseline on test accuracy: logistic regression scores 0.605 and gradient boosting 0.57, against a baseline of 0.635.",
+        "facts": [
+          "ml2_logreg_no_leak",
+          "ml2_gbt_no_leak"
+        ]
+      },
+      {
+        "statement": "Test F1 on the no-leak features is 0.3361 for logistic regression and 0.3175 for gradient boosting. With refund_issued included, test F1 is 0.9726 for logistic regression and 0.951 for gradient boosting. The F1 gap reflects the leakage identified in ml_1, not a real churn driver.",
+        "facts": [
+          "ml2_logreg_no_leak",
+          "ml2_gbt_no_leak",
+          "ml2_logreg_with_refund",
+          "ml2_gbt_with_refund"
+        ]
+      },
+      {
+        "statement": "The no-leak gradient boosting model overfits: train accuracy is 0.7963 against test accuracy of 0.57, a gap of 0.23. Logistic regression is more stable, with train accuracy 0.695 and test accuracy 0.605.",
+        "facts": [
+          "ml2_gbt_no_leak",
+          "ml2_logreg_no_leak"
+        ]
+      },
+      {
+        "statement": "The no-leak gradient boosting test ROC AUC of 0.5305 is essentially chance. Logistic regression reaches 0.612, which is only modestly above chance, so usage, tenure and plan carry weak signal for churn.",
+        "facts": [
+          "ml2_gbt_no_leak",
+          "ml2_logreg_no_leak"
+        ]
+      },
+      {
+        "statement": "With refund_issued included, both models score far higher: logistic regression reaches test accuracy 0.98 and ROC AUC 0.9903, and gradient boosting reaches 0.965 and ROC AUC 0.9763. Removing refund_issued lowers test accuracy by 0.375 for logistic regression and 0.395 for gradient boosting, and lowers ROC AUC by 0.3783 and 0.4458.",
+        "facts": [
+          "ml2_logreg_with_refund",
+          "ml2_gbt_with_refund",
+          "ml2_refund_score_drop"
+        ]
+      },
+      {
+        "statement": "In the primary no-leak logistic regression, usage_hours (standardized coefficient -0.6344) and tenure_months (-0.5288) matter most, with negative signs: higher usage and longer tenure go with lower churn. Plan dummies are small by comparison: plan_basic 0.1313, plan_plus -0.1328, plan_pro -0.0132. Plan is significantly but weakly associated with churn in the accepted stat_1 finding, so its small contribution here is relative to usage and tenure, not evidence of no association.",
+        "facts": [
+          "ml2_logreg_no_leak_signed_coefs",
+          "ml2_logreg_no_leak"
+        ]
+      },
+      {
+        "statement": "Gradient boosting on the no-leak features also ranks usage_hours first (importance 0.611), then tenure_months (0.3302). Plan dummies contribute little (plan_plus 0.0295, plan_basic 0.0198, plan_pro 0.0096). The two models agree on the top two features.",
+        "facts": [
+          "ml2_gbt_no_leak",
+          "ml2_logreg_no_leak"
+        ]
+      }
+    ],
+    "follow_ups": [
+      "Does refund_issued carry real churn signal once the leakage question is settled, given that it is recorded after the churn event?",
+      "Are the weak no-leak scores (logistic regression AUC 0.612, gradient boosting AUC 0.5305) stable across cross-validation folds and random seeds, or is the 0.605 accuracy below baseline a split artifact?",
+      "Would tuning gradient boosting (depth, learning rate, regularization, early stopping) on the no-leak features remove the overfitting and lift its AUC above chance?"
+    ]
+  },
+  "facts": {
+    "ml2_logreg_no_leak": {
+      "value": {
+        "kind": "classifier",
+        "train_accuracy": 0.695,
+        "test_accuracy": 0.605,
+        "baseline_accuracy": 0.635,
+        "positive_class": 1,
+        "test_precision": 0.4348,
+        "test_recall": 0.274,
+        "test_f1": 0.3361,
+        "test_roc_auc": 0.612,
+        "feature_ranking": "abs_coefficient",
+        "top_features": {
+          "usage_hours": 0.6344,
+          "tenure_months": 0.5288,
+          "plan_plus": 0.1328,
+          "plan_basic": 0.1313,
+          "plan_pro": 0.0132
+        },
+        "n_train": 800,
+        "n_test": 200
+      },
+      "desc": "Logistic regression (no_leak)",
+      "kind": "model",
+      "cell": 2
+    },
+    "ml2_gbt_no_leak": {
+      "value": {
+        "kind": "classifier",
+        "train_accuracy": 0.7963,
+        "test_accuracy": 0.57,
+        "baseline_accuracy": 0.635,
+        "positive_class": 1,
+        "test_precision": 0.3774,
+        "test_recall": 0.274,
+        "test_f1": 0.3175,
+        "test_roc_auc": 0.5305,
+        "feature_ranking": "importance",
+        "top_features": {
+          "usage_hours": 0.611,
+          "tenure_months": 0.3302,
+          "plan_plus": 0.0295,
+          "plan_basic": 0.0198,
+          "plan_pro": 0.0096
+        },
+        "n_train": 800,
+        "n_test": 200
+      },
+      "desc": "Gradient boosting (no_leak)",
+      "kind": "model",
+      "cell": 2
+    },
+    "ml2_logreg_with_refund": {
+      "value": {
+        "kind": "classifier",
+        "train_accuracy": 0.9738,
+        "test_accuracy": 0.98,
+        "baseline_accuracy": 0.635,
+        "positive_class": 1,
+        "test_precision": 0.9726,
+        "test_recall": 0.9726,
+        "test_f1": 0.9726,
+        "test_roc_auc": 0.9903,
+        "feature_ranking": "abs_coefficient",
+        "top_features": {
+          "refund_issued": 3.3322,
+          "usage_hours": 0.7293,
+          "tenure_months": 0.2382,
+          "plan_pro": 0.1653,
+          "plan_basic": 0.1545,
+          "plan_plus": 0.0261
+        },
+        "n_train": 800,
+        "n_test": 200
+      },
+      "desc": "Logistic regression (with_refund)",
+      "kind": "model",
+      "cell": 2
+    },
+    "ml2_gbt_with_refund": {
+      "value": {
+        "kind": "classifier",
+        "train_accuracy": 0.99,
+        "test_accuracy": 0.965,
+        "baseline_accuracy": 0.635,
+        "positive_class": 1,
+        "test_precision": 0.9714,
+        "test_recall": 0.9315,
+        "test_f1": 0.951,
+        "test_roc_auc": 0.9763,
+        "feature_ranking": "importance",
+        "top_features": {
+          "refund_issued": 0.9358,
+          "usage_hours": 0.0422,
+          "tenure_months": 0.0178,
+          "plan_basic": 0.0023,
+          "plan_pro": 0.0016,
+          "plan_plus": 0.0002
+        },
+        "n_train": 800,
+        "n_test": 200
+      },
+      "desc": "Gradient boosting (with_refund)",
+      "kind": "model",
+      "cell": 2
+    },
+    "ml2_logreg_no_leak_signed_coefs": {
+      "value": {
+        "usage_hours": -0.6344,
+        "tenure_months": -0.5288,
+        "plan_basic": 0.1313,
+        "plan_plus": -0.1328,
+        "plan_pro": -0.0132
+      },
+      "desc": "Standardized logistic regression coefficients for the no_leak model; sign gives direction of association with churn",
+      "cell": 3
+    },
+    "ml2_refund_score_drop": {
+      "value": {
+        "logreg_acc_drop": 0.375,
+        "logreg_auc_drop": 0.3783,
+        "gbt_acc_drop": 0.395,
+        "gbt_auc_drop": 0.4458
+      },
+      "desc": "Test score drop when refund_issued is removed (with_refund minus no_leak), for both models",
+      "cell": 3
+    }
+  },
+  "charts": {
+    "ml2_model_comparison": {
+      "file": "charts/ml2_model_comparison.png",
+      "caption": "Test accuracy and ROC AUC for logistic regression and gradient boosting, with and without refund_issued, against the majority-class baseline of 0.635",
+      "cell": 3
+    }
+  },
+  "published": [],
+  "artifacts": [],
+  "attempts": [
+    {
+      "attempt": 1,
+      "revision": 0,
+      "step": 1,
+      "code": "train_test = load(\"ml_1/split_data\")\nprint(type(train_test))\nif isinstance(train_test, dict):\n    print(list(train_test.keys()))\n    for k, v in train_test.items():\n        print(k, getattr(v, 'shape', len(v) if hasattr(v, '__len__') else v))\nelse:\n    for item in train_test:\n        print(type(item), getattr(item, 'shape', None))",
+      "output": "<class 'dict'>\n['X_train_no_leak', 'X_test_no_leak', 'X_train_with_refund', 'X_test_with_refund', 'y_train', 'y_test', 'feature_names']\nX_train_no_leak (800, 5)\nX_test_no_leak (200, 5)\nX_train_with_refund (800, 6)\nX_test_with_refund (200, 6)\ny_train (800,)\ny_test (200,)\nfeature_names 2\n",
+      "error": null,
+      "seconds": 2.98
+    },
+    {
+      "attempt": 2,
+      "revision": 0,
+      "step": 2,
+      "code": "from sklearn.linear_model import LogisticRegression\nfrom sklearn.ensemble import GradientBoostingClassifier\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.metrics import accuracy_score, roc_auc_score, f1_score\n\nXtr_nl = train_test['X_train_no_leak']; Xte_nl = train_test['X_test_no_leak']\nXtr_wr = train_test['X_train_with_refund']; Xte_wr = train_test['X_test_with_refund']\nytr = train_test['y_train']; yte = train_test['y_test']\nfn_nl = list(Xtr_nl.columns); fn_wr = list(Xtr_wr.columns)\n\nres = {}\nfor tag, Xtr, Xte, fn in [('no_leak', Xtr_nl, Xte_nl, fn_nl), ('with_refund', Xtr_wr, Xte_wr, fn_wr)]:\n    lr = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))\n    gb = GradientBoostingClassifier(random_state=42)\n    lr.fit(Xtr, ytr); gb.fit(Xtr, ytr)\n    r_lr = record_model(f'ml2_logreg_{tag}', lr, Xtr, ytr, Xte, yte, f'Logistic regression ({tag})')\n    r_gb = record_model(f'ml2_gbt_{tag}', gb, Xtr, ytr, Xte, yte, f'Gradient boosting ({tag})')\n    res[tag] = {'logreg': r_lr, 'gbt': r_gb}\n    print(tag, 'LR', r_lr)\n    print(tag, 'GB', r_gb)\n\nprint('baseline test acc', accuracy_score(yte, np.zeros_like(yte)))\nprint(list(yte.value_counts().items()) if hasattr(yte,'value_counts') else np.unique(yte, return_counts=True))",
+      "output": "no_leak LR {'kind': 'classifier', 'train_accuracy': 0.695, 'test_accuracy': 0.605, 'baseline_accuracy': 0.635, 'positive_class': np.int64(1), 'test_precision': 0.4348, 'test_recall': 0.274, 'test_f1': 0.3361, 'test_roc_auc': 0.612, 'feature_ranking': 'abs_coefficient', 'top_features': {'usage_hours': 0.6344, 'tenure_months': 0.5288, 'plan_plus': 0.1328, 'plan_basic': 0.1313, 'plan_pro': 0.0132}, 'n_train': 800, 'n_test': 200}\nno_leak GB {'kind': 'classifier', 'train_accuracy': 0.7963, 'test_accuracy': 0.57, 'baseline_accuracy': 0.635, 'positive_class': np.int64(1), 'test_precision': 0.3774, 'test_recall': 0.274, 'test_f1': 0.3175, 'test_roc_auc': 0.5305, 'feature_ranking': 'importance', 'top_features': {'usage_hours': 0.611, 'tenure_months': 0.3302, 'plan_plus': 0.0295, 'plan_basic': 0.0198, 'plan_pro': 0.0096}, 'n_train': 800, 'n_test': 200}\nwith_refund LR {'kind': 'classifier', 'train_accuracy': 0.9738, 'test_accuracy': 0.98, 'baseline_accuracy': 0.635, 'positive_class': np.int64(1), 'test_precision': 0.9726, 'test_recall': 0.9726, 'test_f1': 0.9726, 'test_roc_auc': 0.9903, 'feature_ranking': 'abs_coefficient', 'top_features': {'refund_issued': 3.3322, 'usage_hours': 0.7293, 'tenure_months': 0.2382, 'plan_pro': 0.1653, 'plan_basic': 0.1545, 'plan_plus': 0.0261}, 'n_train': 800, 'n_test': 200}\nwith_refund GB {'kind': 'classifier', 'train_accuracy': 0.99, 'test_accuracy': 0.965, 'baseline_accuracy': 0.635, 'positive_class': np.int64(1), 'test_precision': 0.9714, 'test_recall': 0.9315, 'test_f1': 0.951, 'test_roc_auc': 0.9763, 'feature_ranking': 'importance', 'top_features': {'refund_issued': 0.9358, 'usage_hours': 0.0422, 'tenure_months': 0.0178, 'plan_basic': 0.0023, 'plan_pro': 0.0016, 'plan_plus': 0.0002}, 'n_train': 800, 'n_test': 200}\nbaseline test acc 0.635\n[(0, 127), (1, 73)]\n",
+      "error": null,
+      "seconds": 8.08
+    },
+    {
+      "attempt": 3,
+      "revision": 0,
+      "step": 3,
+      "code": "lr_nl = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000)).fit(Xtr_nl, ytr)\ncoefs = {f: round(float(c), 4) for f, c in zip(fn_nl, lr_nl[-1].coef_[0])}\nrecord_fact('ml2_logreg_no_leak_signed_coefs', coefs, 'Standardized logistic regression coefficients for the no_leak model; sign gives direction of association with churn')\nprint(coefs)\nd = {'logreg_acc_drop': round(res['with_refund']['logreg']['test_accuracy'] - res['no_leak']['logreg']['test_accuracy'], 4), 'logreg_auc_drop': round(res['with_refund']['logreg']['test_roc_auc'] - res['no_leak']['logreg']['test_roc_auc'], 4), 'gbt_acc_drop': round(res['with_refund']['gbt']['test_accuracy'] - res['no_leak']['gbt']['test_accuracy'], 4), 'gbt_auc_drop': round(res['with_refund']['gbt']['test_roc_auc'] - res['no_leak']['gbt']['test_roc_auc'], 4)}\nrecord_fact('ml2_refund_score_drop', d, 'Test score drop when refund_issued is removed (with_refund minus no_leak), for both models')\nprint(d)\nlabels = ['LR no_leak', 'GBT no_leak', 'LR with_refund', 'GBT with_refund']\nrecs = [res['no_leak']['logreg'], res['no_leak']['gbt'], res['with_refund']['logreg'], res['with_refund']['gbt']]\nacc = [r['test_accuracy'] for r in recs]\nauc = [r['test_roc_auc'] for r in recs]\nfig, ax = plt.subplots(figsize=(9, 5))\nx = np.arange(4); w = 0.35\nax.bar(x - w/2, acc, w, label='Test accuracy')\nax.bar(x + w/2, auc, w, label='Test ROC AUC')\nax.axhline(0.635, color='gray', ls='--', label='Majority baseline accuracy (0.635)')\nax.set_xticks(x); ax.set_xticklabels(labels)\nax.set_ylim(0, 1.05)\nax.set_ylabel('Score on 200-row test set')\nax.set_title('Test accuracy and ROC AUC of churn classifiers vs majority baseline')\nax.legend()\nsave_chart(fig, 'ml2_model_comparison', 'Test accuracy and ROC AUC for logistic regression and gradient boosting, with and without refund_issued, against the majority-class baseline of 0.635')",
+      "output": "{'usage_hours': -0.6344, 'tenure_months': -0.5288, 'plan_basic': 0.1313, 'plan_plus': -0.1328, 'plan_pro': -0.0132}\n{'logreg_acc_drop': 0.375, 'logreg_auc_drop': 0.3783, 'gbt_acc_drop': 0.395, 'gbt_auc_drop': 0.4458}\n",
+      "error": null,
+      "seconds": 8.56
+    }
+  ],
+  "metadata": {
+    "steps": 3
+  },
+  "brief": {
+    "id": "ml_2",
+    "specialist": "ml",
+    "question": "How well do classifiers predict churned compared with the majority-class baseline, with and without refund_issued, and which features matter most?",
+    "complete_when": "Trains logistic regression and a gradient-boosted tree model on the split_data sets; reports test accuracy, ROC AUC, and F1 for each, alongside the majority baseline; shows the score drop when refund_issued is removed; reports feature importances or standardized coefficients for the primary (no-leak) model; states which features matter most.",
+    "depends_on": [
+      "ml_1"
+    ],
+    "outputs": []
+  },
+  "revisions": 1,
+  "reviews": [
+    {
+      "reasoning": "Numbers in the findings match the facts: accuracies, AUCs, baseline 0.635, standardized coefficients, importances, and the four score drops (0.375, 0.395, 0.3783, 0.4458) all check out. Two problems block acceptance. First, the automatic check requires the report to state that gradient boosting on no-leak features overfits (train 0.7963 vs test 0.57, a gap of 0.23), and the report does not say so. Second, the brief asks for test F1 for each model alongside the baseline, but no F1 is reported, though facts give 0.3361 and 0.3175 (no-leak) and 0.9726 and 0.951 (with refund). The report also says plan matters little for churn, while stat_1 finds a significant but small plan association, so the wording should note that the plan effect is small in the models rather than absent. The report should also state that gradient boosting no-leak AUC of 0.5305 is essentially chance level.",
+      "verdict": "revise",
+      "feedback": "1) Add that the gradient boosting no-leak model overfits: train accuracy 0.7963 vs test accuracy 0.57, a gap of 0.23 (ml2_gbt_no_leak). 2) Report test F1 for all four models: no-leak logistic regression 0.3361 and gradient boosting 0.3175; with refund_issued logistic regression 0.9726 and gradient boosting 0.951 (from the model facts). 3) State that gradient boosting no-leak test ROC AUC 0.5305 is essentially chance. 4) Qualify 'plan dummies matter little' by noting that plan is significantly but weakly associated with churn in the accepted stat_1 finding, and that in these models its contribution is small relative to usage and tenure.",
+      "follow_ups": [
+        {
+          "id": "ml_3",
+          "specialist": "ml",
+          "question": "Are the no-leak classifier scores (logistic regression AUC 0.612, gradient boosting AUC 0.5305) stable across cross-validation folds and random seeds, or is the below-baseline accuracy a split artifact?",
+          "complete_when": "Reports mean and spread of accuracy, ROC AUC and F1 over repeated stratified cross-validation on the no-leak features for both models, compared with the majority-class baseline, and states whether the conclusion that neither model beats baseline holds.",
+          "depends_on": [
+            "ml_2"
+          ],
+          "outputs": []
+        }
+      ]
+    },
+    {
+      "reasoning": "I checked each number against its cited fact: test accuracies (0.605, 0.57, 0.98, 0.965), baseline 0.635, F1 values, ROC AUCs, train-test gap (0.7963 vs 0.57, about 0.23), signed standardized coefficients, and all four score drops (0.375, 0.3783, 0.395, 0.4458) match the facts. The overfitting, below-baseline accuracy, and refund leakage automatic checks are all stated in findings. The report covers every element the brief requires: both models, both feature sets, the majority baseline, the refund score drop, coefficients and importances, and which features matter most. The main limitation is that all scores come from one 200-row test split, and the report does not say so directly. The below-baseline and weak-signal claims would be stronger with that caveat, but the stability question is already queued as ml_3, so this is not a blocking error.",
+      "verdict": "accept",
+      "feedback": "",
+      "follow_ups": []
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+description: >
+  Confounding by a group mix that changes over time. Each quarter has 250
+  visits; gold grows from 8% of them in quarter 1 to 64% in quarter 8, bronze
+  shrinks, silver stays at 50. Gold returns far more often than silver, silver
+  more than bronze. Within every tier the repeat rate falls (silver ~60% ->
+  ~25%), but the pooled rate rises from ~29% to ~59% because of the mix.
+  Trap: reporting that repeat visits improved over time.
+# The agents see the file name, so it must not hint at the answer
+file: visits.csv
+target: repeat_visit
+data: {generator: ho_visits, seed: 4101}
+facts:
+  - {name: gold_share_q1, value: 0.08, near: [gold]}
+  - {name: gold_share_q8, value: 0.64, near: [gold]}
+must_find:
+  - Within each tier, the repeat-visit rate falls from earlier to later quarters (silver from about 60% to about 25%).
+  - The tier mix shifts toward gold over time, from 8% of visits in quarter 1 to 64% in quarter 8.
+  - Gold customers make repeat visits far more often than bronze customers, with silver in between.
+  - The pooled rise in repeat visits over time comes from the changing tier mix, not from improvement within tiers.
+must_not_claim:
+  - Customers became more likely to make a repeat visit over time, presented as a real trend rather than a mix effect.
+caveats:
+  composition: [mix, composition, simpson]
+  observational: [causal, observational, confound]

@@ -1,0 +1,266 @@
+{
+  "status": "ok",
+  "run_id": "3acd46ea-891d-446f-8667-e581cb5a35bb",
+  "started": "2026-11-05T15:30:08",
+  "command": [
+    "run.py",
+    "/workspaces/agents/evals/data/survey.csv",
+    "--target",
+    "outcome",
+    "--model",
+    "claude-haiku-5-5",
+    "--provider",
+    "anthropic",
+    "--preset",
+    "hosted"
+  ],
+  "commit": "9066886",
+  "dirty": true,
+  "settings": {
+    "preset": "hosted",
+    "model_provider": "anthropic",
+    "ollama_base_url": "http://host.docker.internal:11434",
+    "ollama_model": "qwen3.5:9b",
+    "openrouter_base_url": "https://openrouter.ai/api/v1",
+    "openrouter_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "openrouter_reasoning": true,
+    "anthropic_model": "claude-haiku-5-5",
+    "analyst_model": "claude-haiku-5-5",
+    "coder_model": "claude-haiku-5-5",
+    "reporter_model": "claude-haiku-5-5",
+    "llm_reasoning": false,
+    "llm_num_ctx": 16384,
+    "llm_max_tokens": 4096,
+    "anthropic_max_tokens": 16000,
+    "llm_timeout_s": 900,
+    "llm_num_gpu": 17,
+    "llm_retries": 1,
+    "lead_temperature": 0.2,
+    "eda_temperature": 0.3,
+    "statistical_temperature": 0.2,
+    "ml_temperature": 0.1,
+    "reporter_temperature": 0.3,
+    "max_tasks": 6,
+    "max_follow_ups": 5,
+    "max_revisions": 2,
+    "max_specialist_steps": 5,
+    "max_report_rewrites": 1,
+    "code_timeout_s": 300,
+    "max_cell_output_chars": 3000,
+    "prompt_fact_chars": 200,
+    "review_script_chars": 8000,
+    "plan_description_chars": 1000,
+    "overfit_gap": 0.1,
+    "near_perfect_score": 0.99,
+    "baseline_margin": 0.02,
+    "leakage_score": 0.9,
+    "imbalance_ratio": 2.0,
+    "number_check_max_label": 10,
+    "number_check_conventions": [
+      0.05
+    ],
+    "judge_model": "claude-sonnet-5-5",
+    "runs_directory": "/workspaces/agents/evals/runs/20261105-152942_current_claude-haiku-5-5/pure_noise/r1",
+    "log_level": "INFO"
+  },
+  "nodes": [
+    {
+      "node": "profile",
+      "seconds": 1.0
+    },
+    {
+      "node": "plan",
+      "seconds": 6.5
+    },
+    {
+      "node": "run_task",
+      "seconds": 36.6
+    },
+    {
+      "node": "review",
+      "seconds": 9.0
+    },
+    {
+      "node": "run_task",
+      "seconds": 14.5
+    },
+    {
+      "node": "review",
+      "seconds": 7.1
+    },
+    {
+      "node": "run_task",
+      "seconds": 45.5
+    },
+    {
+      "node": "review",
+      "seconds": 12.5
+    },
+    {
+      "node": "run_task",
+      "seconds": 24.4
+    },
+    {
+      "node": "review",
+      "seconds": 12.0
+    },
+    {
+      "node": "run_task",
+      "seconds": 64.6
+    },
+    {
+      "node": "review",
+      "seconds": 9.4
+    },
+    {
+      "node": "run_task",
+      "seconds": 34.9
+    },
+    {
+      "node": "review",
+      "seconds": 6.4
+    },
+    {
+      "node": "run_task",
+      "seconds": 69.8
+    },
+    {
+      "node": "review",
+      "seconds": 12.7
+    },
+    {
+      "node": "run_task",
+      "seconds": 55.8
+    },
+    {
+      "node": "review",
+      "seconds": 10.6
+    },
+    {
+      "node": "run_task",
+      "seconds": 33.3
+    },
+    {
+      "node": "review",
+      "seconds": 8.5
+    },
+    {
+      "node": "run_task",
+      "seconds": 18.3
+    },
+    {
+      "node": "review",
+      "seconds": 6.5
+    },
+    {
+      "node": "run_task",
+      "seconds": 43.3
+    },
+    {
+      "node": "review",
+      "seconds": 13.4
+    },
+    {
+      "node": "run_task",
+      "seconds": 83.4
+    },
+    {
+      "node": "review",
+      "seconds": 15.3
+    },
+    {
+      "node": "run_task",
+      "seconds": 54.6
+    },
+    {
+      "node": "review",
+      "seconds": 9.8
+    },
+    {
+      "node": "run_task",
+      "seconds": 137.8
+    },
+    {
+      "node": "review",
+      "seconds": 11.4
+    },
+    {
+      "node": "run_task",
+      "seconds": 55.0
+    },
+    {
+      "node": "review",
+      "seconds": 9.4
+    },
+    {
+      "node": "run_task",
+      "seconds": 51.5
+    },
+    {
+      "node": "review",
+      "seconds": 8.3
+    },
+    {
+      "node": "run_task",
+      "seconds": 73.8
+    },
+    {
+      "node": "review",
+      "seconds": 8.7
+    },
+    {
+      "node": "run_task",
+      "seconds": 75.0
+    },
+    {
+      "node": "review",
+      "seconds": 12.5
+    },
+    {
+      "node": "run_task",
+      "seconds": 58.0
+    },
+    {
+      "node": "review",
+      "seconds": 11.7
+    },
+    {
+      "node": "run_task",
+      "seconds": 34.5
+    },
+    {
+      "node": "review",
+      "seconds": 11.1
+    },
+    {
+      "node": "run_task",
+      "seconds": 103.6
+    },
+    {
+      "node": "review",
+      "seconds": 16.0
+    },
+    {
+      "node": "report",
+      "seconds": 56.9
+    }
+  ],
+  "finished": "2026-11-05T15:54:25",
+  "seconds": 1456.1,
+  "llm_calls": 84,
+  "input_tokens": 705620,
+  "output_tokens": 177597,
+  "tasks_completed": 9,
+  "tasks_failed": 0,
+  "unverified_numbers": [],
+  "context": {
+    "largest_prompt_tokens": 44520,
+    "window_warnings": [],
+    "prompt_cuts": {
+      "dataset description": 1,
+      "fact value": 378,
+      "review script": 1,
+      "cell output": 1
+    }
+  }
+}

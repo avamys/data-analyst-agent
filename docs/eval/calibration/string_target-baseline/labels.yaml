@@ -1,0 +1,20 @@
+case: string_target
+source: evals/runs/20261102-203054_baseline_claude-haiku-5-5/string_target/r1/20261102-203454_customers_claude-haiku-5-5/report.md
+must_find:
+- item: Customers on monthly contracts churn more often than those on annual contracts.
+  label: partly
+  note: Contract association significant; direction explicitly unconfirmed
+- item: Higher monthly_fee is associated with more churn.
+  label: partly
+  note: Fee differs significantly; direction "not reported"
+- item: More support_calls are associated with more churn.
+  label: partly
+  note: Support calls significant but "provisional", no direction
+- item: region shows no meaningful association with churn.
+  label: 'yes'
+must_not_claim:
+- item: region is a significant or important predictor of churn.
+  label: 'no'
+- item: Annual-contract customers churn more often than monthly-contract customers.
+  label: 'no'
+caveats: []

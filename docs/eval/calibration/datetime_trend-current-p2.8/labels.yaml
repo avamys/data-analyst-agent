@@ -1,0 +1,20 @@
+case: datetime_trend
+source: evals/runs/20261105-140404_current_claude-haiku-5-5/datetime_trend/r1/20261105-140418_daily_sales_claude-haiku-5-5/report.md
+must_find:
+- item: sales rise over time (an upward trend across the two years).
+  label: yes
+  note: 'trend detected'
+- item: sales are higher on weekends than on weekdays.
+  label: no
+  note: ''
+- item: Promotion days have higher sales than other days.
+  label: yes
+  note: ''
+must_not_claim:
+- item: sales decline over time.
+  label: no
+  note: ''
+- item: temperature is a significant driver of sales.
+  label: no
+  note: ''
+caveats: []

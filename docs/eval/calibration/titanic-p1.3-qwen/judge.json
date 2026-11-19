@@ -1,0 +1,105 @@
+{
+  "model": "claude-sonnet-5-5",
+  "served_by": "claude-sonnet-5-5",
+  "prompt": "983aca5d02a5",
+  "must_find": [
+    {
+      "item": "Women survived at a much higher rate than men (about 74% against 19%).",
+      "quote": "female passengers in Third Class had a drastically lower survival rate (24%) compared to females in First Class (96%)",
+      "reason": "The report says gender is the strongest predictor (V=0.54) but never gives the overall female vs male rates (74% vs 19%) or states that women survived more.",
+      "verdict": "partly",
+      "quote_found": true
+    },
+    {
+      "item": "Survival falls with passenger class, highest in first class and lowest in third.",
+      "quote": "First Class:** 63.0% survival rate. *   **Second Class:** 47.3% survival rate. *   **Third Class:** 24.2% survival rate.",
+      "reason": "Survival falls with class from first to third, with correct numbers.",
+      "verdict": "yes",
+      "quote_found": true
+    },
+    {
+      "item": "Passengers who survived had paid higher fares on average.",
+      "quote": "Survivors paid an average fare of **$48.40**, whereas non-survivors paid an average of **$22.12**.",
+      "reason": "Survivors paid higher fares on average, stated with numbers.",
+      "verdict": "yes",
+      "quote_found": true
+    },
+    {
+      "item": "Passengers without a recorded cabin survived less often than those with one.",
+      "quote": "Missingness is heavily skewed toward Third Class (479 cases) and Southampton embarkation (515 cases)",
+      "reason": "The report discusses cabin missingness but never says that passengers without a cabin survived less often.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "Passengers with a missing Age survived less often than those with a recorded Age.",
+      "quote": "when Cabin is missing, the probability of Age being missing jumps from ~9% to ~23%.",
+      "reason": "It relates Age missingness to Cabin missingness but not to survival.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "A predictive model is compared with the majority-class baseline (about 62% accuracy) and beats it.",
+      "quote": "Model training was interrupted due to a missing import statement for `LogisticRegression`.",
+      "reason": "No model was fit or compared with a baseline.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "Model results include precision, recall or F1, not only accuracy.",
+      "quote": "we lack comparative metrics (AUC-ROC, Precision/Recall)",
+      "reason": "The report states that no precision/recall results exist.",
+      "verdict": "no",
+      "quote_found": true
+    }
+  ],
+  "must_not_claim": [
+    {
+      "item": "Most passengers survived.",
+      "quote": "The dataset contains 342 survivors (38.4%) and 549 non-survivors.",
+      "reason": "The report correctly says most passengers did not survive.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "Men survived at a higher rate than women.",
+      "quote": "",
+      "reason": "The report never claims men survived more than women.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "Third-class passengers survived at a higher rate than first-class passengers.",
+      "quote": "Passengers in First Class had a 63% survival rate compared to only 24% for Third Class",
+      "reason": "It states first class survived more, the opposite of the claim.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "Age is the strongest predictor of survival.",
+      "quote": "Survival probability was primarily a function of **Socioeconomic Status (Class)**, followed closely by **Gender**, and then **Age**.",
+      "reason": "The report ranks Age third, not as the strongest predictor.",
+      "verdict": "no",
+      "quote_found": true
+    }
+  ],
+  "caveats": [
+    {
+      "item": "missing cabin (e.g. mentioning: Cabin)",
+      "quote": "**Data Quality Issues:** 77% of 'Cabin' data is missing, limiting the utility of specific cabin locations without imputation or binning.",
+      "reason": "The report explicitly lists missing Cabin data as a limitation.",
+      "verdict": "yes",
+      "quote_found": true
+    }
+  ],
+  "scores": {
+    "finding_recall": 0.35714285714285715,
+    "false_claims": 0.0,
+    "caveat_coverage": 1.0,
+    "quotes_not_found": 0
+  },
+  "usage": {
+    "input_tokens": 4418,
+    "output_tokens": 925
+  }
+}

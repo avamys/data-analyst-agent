@@ -1,0 +1,19 @@
+description: >
+  Trap: only 60 rows. feat_1 has a real positive effect on score (r = 0.41,
+  p = 0.001); feat_2 to feat_6 have none, but feat_3 comes close to p = 0.05 by
+  chance (p = 0.063). The sample is too small for firm conclusions beyond feat_1,
+  and for a reliable held-out model score.
+# The agents see the file name, so it must not hint at the answer
+file: pilot.csv
+target: score
+data: {generator: small_sample, seed: 10}
+facts:
+  - {name: mean_score, value: 48.948333, near: [score, mean, average]}
+must_find:
+  - feat_1 is positively associated with score.
+  - None of feat_2 to feat_6 is meaningfully associated with score.
+must_not_claim:
+  - One of feat_2 to feat_6 significantly predicts or drives score, stated as a real effect.
+  - A model's held-out score is presented as reliable without noting the small test set.
+caveats:
+  small_sample: [small sample, sample size, only 60, 60 rows, few rows]

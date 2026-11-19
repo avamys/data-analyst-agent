@@ -1,0 +1,212 @@
+{
+  "status": "ok",
+  "run_id": "a68e4aba-71fa-492a-9d09-d0a95d308953",
+  "started": "2026-11-17T17:20:41",
+  "command": [
+    "run.py",
+    "/workspaces/agents/evals/data/patients.csv",
+    "--target",
+    "Outcome",
+    "--model",
+    "claude-haiku-5-5",
+    "--provider",
+    "anthropic"
+  ],
+  "commit": "affd164",
+  "dirty": false,
+  "network_blocked": true,
+  "parallel_tasks": 3,
+  "settings": {
+    "preset": "local",
+    "model_provider": "anthropic",
+    "ollama_base_url": "http://host.docker.internal:11434",
+    "ollama_model": "qwen3.5:9b",
+    "openrouter_base_url": "https://openrouter.ai/api/v1",
+    "openrouter_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "openrouter_reasoning": true,
+    "anthropic_model": "claude-haiku-5-5",
+    "analyst_model": "claude-haiku-5-5",
+    "coder_model": "claude-haiku-5-5",
+    "reporter_model": "claude-haiku-5-5",
+    "llm_reasoning": false,
+    "llm_num_ctx": 16384,
+    "llm_max_tokens": 4096,
+    "anthropic_max_tokens": 16000,
+    "anthropic_report_max_tokens": 32000,
+    "lead_effort": null,
+    "specialist_effort": null,
+    "llm_timeout_s": 900,
+    "llm_num_gpu": 17,
+    "llm_retries": 1,
+    "lead_temperature": 0.2,
+    "eda_temperature": 0.3,
+    "statistical_temperature": 0.2,
+    "ml_temperature": 0.1,
+    "reporter_temperature": 0.3,
+    "max_tasks": 6,
+    "max_follow_ups": 2,
+    "max_revisions": 1,
+    "max_parallel_tasks": null,
+    "max_specialist_steps": 5,
+    "max_report_rewrites": 1,
+    "code_timeout_s": 300,
+    "max_cell_output_chars": 3000,
+    "prompt_fact_chars": 200,
+    "review_script_chars": 8000,
+    "plan_description_chars": 1000,
+    "overfit_gap": 0.1,
+    "near_perfect_score": 0.99,
+    "baseline_margin": 0.02,
+    "leakage_score": 0.9,
+    "imbalance_ratio": 2.0,
+    "number_check_max_label": 10,
+    "number_check_conventions": [
+      0.05
+    ],
+    "judge_model": "claude-sonnet-5-5",
+    "runs_directory": "/workspaces/agents/evals/runs/20261117-171234_current_claude-haiku-5-5/diabetes/r2",
+    "log_level": "INFO"
+  },
+  "nodes": [
+    {
+      "node": "profile",
+      "seconds": 3.0
+    },
+    {
+      "node": "plan",
+      "seconds": 12.8
+    },
+    {
+      "node": "run_task",
+      "seconds": 23.1
+    },
+    {
+      "node": "review",
+      "seconds": 9.1
+    },
+    {
+      "node": "run_task",
+      "seconds": 9.4
+    },
+    {
+      "node": "review",
+      "seconds": 8.1
+    },
+    {
+      "node": "run_task",
+      "seconds": 0.0
+    },
+    {
+      "node": "review",
+      "seconds": 10.8
+    },
+    {
+      "node": "run_task",
+      "seconds": 78.6
+    },
+    {
+      "node": "review",
+      "seconds": 14.1
+    },
+    {
+      "node": "run_task",
+      "seconds": 59.2
+    },
+    {
+      "node": "review",
+      "seconds": 14.6
+    },
+    {
+      "node": "run_task",
+      "seconds": 60.0
+    },
+    {
+      "node": "review",
+      "seconds": 16.7
+    },
+    {
+      "node": "run_task",
+      "seconds": 0.0
+    },
+    {
+      "node": "review",
+      "seconds": 10.5
+    },
+    {
+      "node": "run_task",
+      "seconds": 39.9
+    },
+    {
+      "node": "review",
+      "seconds": 8.7
+    },
+    {
+      "node": "run_task",
+      "seconds": 97.4
+    },
+    {
+      "node": "review",
+      "seconds": 12.6
+    },
+    {
+      "node": "run_task",
+      "seconds": 121.3
+    },
+    {
+      "node": "review",
+      "seconds": 13.7
+    },
+    {
+      "node": "run_task",
+      "seconds": 0.0
+    },
+    {
+      "node": "review",
+      "seconds": 14.5
+    },
+    {
+      "node": "run_task",
+      "seconds": 12.1
+    },
+    {
+      "node": "review",
+      "seconds": 13.5
+    },
+    {
+      "node": "run_task",
+      "seconds": 0.0
+    },
+    {
+      "node": "review",
+      "seconds": 14.6
+    },
+    {
+      "node": "run_task",
+      "seconds": 21.5
+    },
+    {
+      "node": "review",
+      "seconds": 13.3
+    },
+    {
+      "node": "report",
+      "seconds": 75.1
+    }
+  ],
+  "finished": "2026-11-17T17:33:53",
+  "seconds": 788.9,
+  "llm_calls": 64,
+  "input_tokens": 674533,
+  "output_tokens": 159575,
+  "tasks_completed": 7,
+  "tasks_failed": 0,
+  "unverified_numbers": [],
+  "context": {
+    "largest_prompt_tokens": 46471,
+    "window_warnings": [],
+    "prompt_cuts": {
+      "dataset description": 1,
+      "fact value": 507
+    }
+  }
+}

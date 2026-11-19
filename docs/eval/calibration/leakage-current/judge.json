@@ -1,0 +1,77 @@
+{
+  "model": "claude-sonnet-5-5",
+  "served_by": "claude-sonnet-5-5",
+  "prompt": "983aca5d02a5",
+  "must_find": [
+    {
+      "item": "refund_issued almost exactly reproduces churned (target leakage) and must not be used as a predictor.",
+      "quote": "refund_issued almost perfectly separates churn, which makes it a probable leak. Churn is 95.9% when a refund was issued and 1.6% when not.",
+      "reason": "Report flags refund_issued as a probable leak with near-perfect separation and says all-feature scores should not be read as a forecast, though it hedges as 'probable' and doesn't explicitly say 'must not be used'.",
+      "verdict": "yes",
+      "quote_found": true
+    },
+    {
+      "item": "Without refund_issued, models predict churn only moderately well, far from perfect.",
+      "quote": "Without refund_issued, the models do not beat the majority-class baseline. Logistic regression reaches 60.0% test accuracy and gradient boosting 56.5%, against a baseline of 63.5%. Their ROC AUCs are 0.612 and 0.539.",
+      "reason": "Report says models without refund_issued are weak, far from perfect, with low AUCs; the item says 'moderately well', and the report's characterization is somewhat weaker but still captures the not-near-perfect point.",
+      "verdict": "yes",
+      "quote_found": true
+    },
+    {
+      "item": "Customers with lower usage_hours churn more often.",
+      "quote": "Churn falls steadily across usage_hours quartiles, from 46.6% in Q1 to 21.2% in Q4.",
+      "reason": "Report states lower usage is associated with higher churn with numbers.",
+      "verdict": "yes",
+      "quote_found": true
+    },
+    {
+      "item": "Customers with shorter tenure_months churn more often.",
+      "quote": "It also falls across tenure_months quartiles, from 49.8% in Q1 to 24.3% in Q4.",
+      "reason": "Report states shorter tenure is associated with higher churn with numbers.",
+      "verdict": "yes",
+      "quote_found": true
+    },
+    {
+      "item": "The basic plan has a higher churn rate than the other plans.",
+      "quote": "Churn is 42.8% on the basic plan versus 29.3% (plus) and 29.8% (pro).",
+      "reason": "Report clearly states basic has higher churn than the other plans.",
+      "verdict": "yes",
+      "quote_found": true
+    }
+  ],
+  "must_not_claim": [
+    {
+      "item": "A near-perfect model is presented as a genuine predictive result, without flagging leakage.",
+      "quote": "With refund_issued, the models look near-perfect. Logistic regression reaches ROC AUC 0.991 and gradient boosting 0.975.",
+      "reason": "The near-perfect results are explicitly flagged as leakage-dependent and not to be read as a forecast, so the claim is not made.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "refund_issued is presented as a cause of churn or a valid predictor of it.",
+      "quote": "This is a leakage risk, not an established driver.",
+      "reason": "The report explicitly rejects treating refund_issued as a cause or valid predictor.",
+      "verdict": "no",
+      "quote_found": true
+    }
+  ],
+  "caveats": [
+    {
+      "item": "leakage (e.g. mentioning: leak)",
+      "quote": "**Probable target leakage.** refund_issued predicts churn almost perfectly (95.9% vs 1.6%).",
+      "reason": "Leakage is explicitly treated as a limitation with consequences for model results.",
+      "verdict": "yes",
+      "quote_found": true
+    }
+  ],
+  "scores": {
+    "finding_recall": 1.0,
+    "false_claims": 0.0,
+    "caveat_coverage": 1.0,
+    "quotes_not_found": 0
+  },
+  "usage": {
+    "input_tokens": 5616,
+    "output_tokens": 839
+  }
+}

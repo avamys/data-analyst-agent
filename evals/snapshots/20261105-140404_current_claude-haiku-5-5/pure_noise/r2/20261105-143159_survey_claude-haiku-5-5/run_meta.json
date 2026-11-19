@@ -1,0 +1,174 @@
+{
+  "status": "ok",
+  "run_id": "c43c686a-d03c-49c1-ba00-e837f57e4a32",
+  "started": "2026-11-05T14:31:59",
+  "command": [
+    "run.py",
+    "/workspaces/agents/evals/data/survey.csv",
+    "--target",
+    "outcome",
+    "--model",
+    "claude-haiku-5-5",
+    "--provider",
+    "anthropic"
+  ],
+  "commit": "9066886",
+  "dirty": true,
+  "settings": {
+    "preset": "local",
+    "model_provider": "anthropic",
+    "ollama_base_url": "http://host.docker.internal:11434",
+    "ollama_model": "qwen3.5:9b",
+    "openrouter_base_url": "https://openrouter.ai/api/v1",
+    "openrouter_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "openrouter_reasoning": true,
+    "anthropic_model": "claude-haiku-5-5",
+    "analyst_model": "claude-haiku-5-5",
+    "coder_model": "claude-haiku-5-5",
+    "reporter_model": "claude-haiku-5-5",
+    "llm_reasoning": false,
+    "llm_num_ctx": 16384,
+    "llm_max_tokens": 4096,
+    "anthropic_max_tokens": 16000,
+    "llm_timeout_s": 900,
+    "llm_num_gpu": 17,
+    "llm_retries": 1,
+    "lead_temperature": 0.2,
+    "eda_temperature": 0.3,
+    "statistical_temperature": 0.2,
+    "ml_temperature": 0.1,
+    "reporter_temperature": 0.3,
+    "max_tasks": 6,
+    "max_follow_ups": 2,
+    "max_revisions": 1,
+    "max_specialist_steps": 5,
+    "max_report_rewrites": 1,
+    "code_timeout_s": 300,
+    "max_cell_output_chars": 3000,
+    "prompt_fact_chars": 200,
+    "review_script_chars": 8000,
+    "plan_description_chars": 1000,
+    "overfit_gap": 0.1,
+    "near_perfect_score": 0.99,
+    "baseline_margin": 0.02,
+    "leakage_score": 0.9,
+    "imbalance_ratio": 2.0,
+    "number_check_max_label": 10,
+    "number_check_conventions": [
+      0.05
+    ],
+    "judge_model": "claude-sonnet-5-5",
+    "runs_directory": "/workspaces/agents/evals/runs/20261105-140404_current_claude-haiku-5-5/pure_noise/r2",
+    "log_level": "INFO"
+  },
+  "nodes": [
+    {
+      "node": "profile",
+      "seconds": 2.1
+    },
+    {
+      "node": "plan",
+      "seconds": 7.3
+    },
+    {
+      "node": "run_task",
+      "seconds": 29.6
+    },
+    {
+      "node": "review",
+      "seconds": 8.5
+    },
+    {
+      "node": "run_task",
+      "seconds": 13.1
+    },
+    {
+      "node": "review",
+      "seconds": 9.8
+    },
+    {
+      "node": "run_task",
+      "seconds": 56.6
+    },
+    {
+      "node": "review",
+      "seconds": 10.9
+    },
+    {
+      "node": "run_task",
+      "seconds": 132.4
+    },
+    {
+      "node": "review",
+      "seconds": 12.1
+    },
+    {
+      "node": "run_task",
+      "seconds": 114.8
+    },
+    {
+      "node": "review",
+      "seconds": 7.5
+    },
+    {
+      "node": "run_task",
+      "seconds": 121.6
+    },
+    {
+      "node": "review",
+      "seconds": 11.9
+    },
+    {
+      "node": "run_task",
+      "seconds": 67.6
+    },
+    {
+      "node": "review",
+      "seconds": 10.3
+    },
+    {
+      "node": "run_task",
+      "seconds": 45.5
+    },
+    {
+      "node": "review",
+      "seconds": 10.9
+    },
+    {
+      "node": "run_task",
+      "seconds": 65.4
+    },
+    {
+      "node": "review",
+      "seconds": 11.4
+    },
+    {
+      "node": "run_task",
+      "seconds": 58.7
+    },
+    {
+      "node": "review",
+      "seconds": 8.0
+    },
+    {
+      "node": "report",
+      "seconds": 51.5
+    }
+  ],
+  "finished": "2026-11-05T14:46:29",
+  "seconds": 868.3,
+  "llm_calls": 46,
+  "input_tokens": 378281,
+  "output_tokens": 90658,
+  "tasks_completed": 6,
+  "tasks_failed": 0,
+  "unverified_numbers": [],
+  "context": {
+    "largest_prompt_tokens": 24515,
+    "window_warnings": [],
+    "prompt_cuts": {
+      "dataset description": 1,
+      "fact value": 223
+    }
+  }
+}

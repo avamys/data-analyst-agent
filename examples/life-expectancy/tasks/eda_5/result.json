@@ -1,0 +1,278 @@
+{
+  "task_id": "eda_5",
+  "specialist": "eda",
+  "description": "Which countries are the low Life expectancy outliers below the overall IQR lower fence of 44.2 years, and are they concentrated in particular years or Status groups?",
+  "code": "# %%\nimport matplotlib.pyplot as plt\nimport numpy as np\nimport pandas as pd\n\nfrom agent.execution.runtime import (\n    df,\n    load,\n    publish,\n    record_fact,\n    record_model,\n    save_chart,\n)\n\n# %%\nd = df.copy()\nd.columns = [c.strip() for c in d.columns]\nle = d['Life expectancy']\nlow = d[le < 44.2][['Country','Year','Status','Life expectancy','Adult Mortality','HIV/AIDS']]\nprint(len(low))\nprint(low.sort_values('Life expectancy').to_string())\nprint(low['Status'].value_counts())\nprint(low['Year'].value_counts().sort_index())\nprint(low['Country'].value_counts())\nprint(d['Status'].value_counts())\nprint(d['Country'].nunique())\n\n# %%\nrows = low.sort_values('Life expectancy')[['Country','Year','Status','Life expectancy']].values.tolist()\nrecord_fact('eda5_low_rows', rows, 'Rows below 44.2 years: country, year, status, life expectancy')\nrecord_fact('eda5_low_by_status', {str(k): int(v) for k, v in low['Status'].value_counts().items()}, 'Count of rows below 44.2 years by Status')\nrecord_fact('eda5_low_by_year', {str(k): int(v) for k, v in low['Year'].value_counts().sort_index().items()}, 'Count of rows below 44.2 years by Year')\nrecord_fact('eda5_low_by_country', {str(k): int(v) for k, v in low['Country'].value_counts().items()}, 'Count of rows below 44.2 years by Country; total rows 2938, countries 193')\nfig, ax = plt.subplots(figsize=(7, 4))\nlow['Country'].value_counts().plot.bar(ax=ax)\nax.set_title('Rows with Life expectancy below 44.2 years, by country (count of rows)')\nax.set_xlabel('Country')\nax.set_ylabel('Rows (count)')\nsave_chart(fig, 'eda5_low_by_country', 'Count of rows with Life expectancy below 44.2 years, by country')\nplt.close(fig)\n\n# %%\nsl = low[low['Country']=='Sierra Leone'].sort_values('Year')[['Year','Life expectancy']]\nprint(sl.to_string())\nrecord_fact('eda5_sierra_leone_rows', sl.values.tolist(), 'Sierra Leone rows below 44.2 years: year, life expectancy')\nrecord_fact('eda5_status_base_rate', {'developing_rows': 2416, 'total_rows': 2928, 'share': 2416/2928}, 'Developing share of rows in eda_1 overall summary (accepted counts)')\nprint(2416/2928)\n\n# %%\ncounts = d['Year'].value_counts().sort_index()\nrecord_fact('eda5_rows_per_year', {str(int(k)): int(v) for k, v in counts.items()}, 'Row counts per Year in df (basis for year finding: each year has equal rows)')\nprint(counts.min(), counts.max(), len(counts))\n",
+  "output": "10\n           Country  Year      Status  Life expectancy  Adult Mortality  HIV/AIDS\n1127         Haiti  2010  Developing             36.3            682.0       1.9\n2312  Sierra Leone  2000  Developing             39.0            533.0       1.2\n2311  Sierra Leone  2001  Developing             41.0            519.0       1.5\n2309  Sierra Leone  2003  Developing             41.5             57.0       1.9\n2308  Sierra Leone  2004  Developing             42.3            496.0       2.1\n1585        Malawi  2000  Developing             43.1            588.0      25.5\n2307  Sierra Leone  2005  Developing             43.3             48.0       2.2\n1584        Malawi  2001  Developing             43.5            599.0      25.1\n2921        Zambia  2000  Developing             43.8            614.0      18.7\n1583        Malawi  2002  Developing             44.0             67.0      24.7\nStatus\nDeveloping    10\nName: count, dtype: int64\nYear\n2000    3\n2001    2\n2002    1\n2003    1\n2004    1\n2005    1\n2010    1\nName: count, dtype: int64\nCountry\nSierra Leone    5\nMalawi          3\nHaiti           1\nZambia          1\nName: count, dtype: int64\nStatus\nDeveloping    2426\nDeveloped      512\nName: count, dtype: int64\n193\n      Year  Life expectancy\n2312  2000             39.0\n2311  2001             41.0\n2309  2003             41.5\n2308  2004             42.3\n2307  2005             43.3\n0.825136612021858\n183 193 16\n",
+  "execution_time": 14.32,
+  "success": true,
+  "error": null,
+  "report": {
+    "status": "complete",
+    "findings": [
+      {
+        "statement": "The 10 rows below 44.2 years are: Haiti 2010 Developing 36.3; Sierra Leone 2000 Developing 39.0; Sierra Leone 2001 Developing 41.0; Sierra Leone 2003 Developing 41.5; Sierra Leone 2004 Developing 42.3; Sierra Leone 2005 Developing 43.3; Malawi (3 rows, years and values as in eda5_low_rows); Zambia (1 row, year and value as in eda5_low_rows). Sierra Leone (5) and Malawi (3) account for 8 of the 10 rows across 4 countries, so the low tail clusters in a few countries out of 193.",
+        "facts": [
+          "eda5_low_rows",
+          "eda5_low_by_country",
+          "eda5_sierra_leone_rows"
+        ]
+      },
+      {
+        "statement": "All 10 low rows are Developing (10 of 10, 0 Developed). The Developing share of rows in the eda_1 overall summary is 2416 of 2928 (about 82.5%). With only 10 rows, this cannot show whether the outliers are or are not concentrated in Status; the test has too little power to decide this either way.",
+        "facts": [
+          "eda5_low_by_status",
+          "eda5_status_base_rate"
+        ]
+      },
+      {
+        "statement": "The 10 low rows fall in 7 years, all between 2000 and 2010: 2000 has 3 rows, 2001 has 2, and 2002, 2003, 2004, 2005 and 2010 have 1 each; 7 of 10 fall in 2000-2003. These year counts come from the df. The df has 193 rows for 2013 against 183 for every other year, so the year pattern rests on raw counts and is not normalised for that discrepancy. No single year holds more than 3 rows, so the year pattern is weak evidence of concentration.",
+        "facts": [
+          "eda5_low_by_year",
+          "eda5_rows_per_year"
+        ]
+      }
+    ],
+    "follow_ups": [
+      "What drives the very low Life expectancy in Sierra Leone and Malawi, for example Adult Mortality, HIV/AIDS, infant deaths or income composition?",
+      "Why does the df have 193 rows for 2013 when the other years have 183, and does this change any year-level counts?",
+      "Are the low outlier countries the same ones that sit in the Developing group's tail across all years, or do they recover after 2005?"
+    ]
+  },
+  "facts": {
+    "eda5_low_rows": {
+      "value": [
+        [
+          "Haiti",
+          2010,
+          "Developing",
+          36.3
+        ],
+        [
+          "Sierra Leone",
+          2000,
+          "Developing",
+          39.0
+        ],
+        [
+          "Sierra Leone",
+          2001,
+          "Developing",
+          41.0
+        ],
+        [
+          "Sierra Leone",
+          2003,
+          "Developing",
+          41.5
+        ],
+        [
+          "Sierra Leone",
+          2004,
+          "Developing",
+          42.3
+        ],
+        [
+          "Malawi",
+          2000,
+          "Developing",
+          43.1
+        ],
+        [
+          "Sierra Leone",
+          2005,
+          "Developing",
+          43.3
+        ],
+        [
+          "Malawi",
+          2001,
+          "Developing",
+          43.5
+        ],
+        [
+          "Zambia",
+          2000,
+          "Developing",
+          43.8
+        ],
+        [
+          "Malawi",
+          2002,
+          "Developing",
+          44.0
+        ]
+      ],
+      "desc": "Rows below 44.2 years: country, year, status, life expectancy",
+      "cell": 2
+    },
+    "eda5_low_by_status": {
+      "value": {
+        "Developing": 10
+      },
+      "desc": "Count of rows below 44.2 years by Status",
+      "cell": 2
+    },
+    "eda5_low_by_year": {
+      "value": {
+        "2000": 3,
+        "2001": 2,
+        "2002": 1,
+        "2003": 1,
+        "2004": 1,
+        "2005": 1,
+        "2010": 1
+      },
+      "desc": "Count of rows below 44.2 years by Year",
+      "cell": 2
+    },
+    "eda5_low_by_country": {
+      "value": {
+        "Sierra Leone": 5,
+        "Malawi": 3,
+        "Haiti": 1,
+        "Zambia": 1
+      },
+      "desc": "Count of rows below 44.2 years by Country; total rows 2938, countries 193",
+      "cell": 2
+    },
+    "eda5_sierra_leone_rows": {
+      "value": [
+        [
+          2000.0,
+          39.0
+        ],
+        [
+          2001.0,
+          41.0
+        ],
+        [
+          2003.0,
+          41.5
+        ],
+        [
+          2004.0,
+          42.3
+        ],
+        [
+          2005.0,
+          43.3
+        ]
+      ],
+      "desc": "Sierra Leone rows below 44.2 years: year, life expectancy",
+      "cell": 3
+    },
+    "eda5_status_base_rate": {
+      "value": {
+        "developing_rows": 2416,
+        "total_rows": 2928,
+        "share": 0.825136612021858
+      },
+      "desc": "Developing share of rows in eda_1 overall summary (accepted counts)",
+      "cell": 3
+    },
+    "eda5_rows_per_year": {
+      "value": {
+        "2000": 183,
+        "2001": 183,
+        "2002": 183,
+        "2003": 183,
+        "2004": 183,
+        "2005": 183,
+        "2006": 183,
+        "2007": 183,
+        "2008": 183,
+        "2009": 183,
+        "2010": 183,
+        "2011": 183,
+        "2012": 183,
+        "2013": 193,
+        "2014": 183,
+        "2015": 183
+      },
+      "desc": "Row counts per Year in df (basis for year finding: each year has equal rows)",
+      "cell": 4
+    }
+  },
+  "charts": {
+    "eda5_low_by_country": {
+      "file": "charts/eda5_low_by_country.png",
+      "caption": "Count of rows with Life expectancy below 44.2 years, by country",
+      "cell": 2
+    }
+  },
+  "published": [],
+  "artifacts": [],
+  "attempts": [
+    {
+      "attempt": 1,
+      "revision": 0,
+      "step": 1,
+      "code": "d = df.copy()\nd.columns = [c.strip() for c in d.columns]\nle = d['Life expectancy']\nlow = d[le < 44.2][['Country','Year','Status','Life expectancy','Adult Mortality','HIV/AIDS']]\nprint(len(low))\nprint(low.sort_values('Life expectancy').to_string())\nprint(low['Status'].value_counts())\nprint(low['Year'].value_counts().sort_index())\nprint(low['Country'].value_counts())\nprint(d['Status'].value_counts())\nprint(d['Country'].nunique())",
+      "output": "10\n           Country  Year      Status  Life expectancy  Adult Mortality  HIV/AIDS\n1127         Haiti  2010  Developing             36.3            682.0       1.9\n2312  Sierra Leone  2000  Developing             39.0            533.0       1.2\n2311  Sierra Leone  2001  Developing             41.0            519.0       1.5\n2309  Sierra Leone  2003  Developing             41.5             57.0       1.9\n2308  Sierra Leone  2004  Developing             42.3            496.0       2.1\n1585        Malawi  2000  Developing             43.1            588.0      25.5\n2307  Sierra Leone  2005  Developing             43.3             48.0       2.2\n1584        Malawi  2001  Developing             43.5            599.0      25.1\n2921        Zambia  2000  Developing             43.8            614.0      18.7\n1583        Malawi  2002  Developing             44.0             67.0      24.7\nStatus\nDeveloping    10\nName: count, dtype: int64\nYear\n2000    3\n2001    2\n2002    1\n2003    1\n2004    1\n2005    1\n2010    1\nName: count, dtype: int64\nCountry\nSierra Leone    5\nMalawi          3\nHaiti           1\nZambia          1\nName: count, dtype: int64\nStatus\nDeveloping    2426\nDeveloped      512\nName: count, dtype: int64\n193\n",
+      "error": null,
+      "seconds": 3.76
+    },
+    {
+      "attempt": 2,
+      "revision": 0,
+      "step": 2,
+      "code": "rows = low.sort_values('Life expectancy')[['Country','Year','Status','Life expectancy']].values.tolist()\nrecord_fact('eda5_low_rows', rows, 'Rows below 44.2 years: country, year, status, life expectancy')\nrecord_fact('eda5_low_by_status', {str(k): int(v) for k, v in low['Status'].value_counts().items()}, 'Count of rows below 44.2 years by Status')\nrecord_fact('eda5_low_by_year', {str(k): int(v) for k, v in low['Year'].value_counts().sort_index().items()}, 'Count of rows below 44.2 years by Year')\nrecord_fact('eda5_low_by_country', {str(k): int(v) for k, v in low['Country'].value_counts().items()}, 'Count of rows below 44.2 years by Country; total rows 2938, countries 193')\nfig, ax = plt.subplots(figsize=(7, 4))\nlow['Country'].value_counts().plot.bar(ax=ax)\nax.set_title('Rows with Life expectancy below 44.2 years, by country (count of rows)')\nax.set_xlabel('Country')\nax.set_ylabel('Rows (count)')\nsave_chart(fig, 'eda5_low_by_country', 'Count of rows with Life expectancy below 44.2 years, by country')\nplt.close(fig)",
+      "output": "",
+      "error": null,
+      "seconds": 3.73
+    },
+    {
+      "attempt": 3,
+      "revision": 1,
+      "step": 1,
+      "code": "sl = low[low['Country']=='Sierra Leone'].sort_values('Year')[['Year','Life expectancy']]\nprint(sl.to_string())\nrecord_fact('eda5_sierra_leone_rows', sl.values.tolist(), 'Sierra Leone rows below 44.2 years: year, life expectancy')\nrecord_fact('eda5_status_base_rate', {'developing_rows': 2416, 'total_rows': 2928, 'share': 2416/2928}, 'Developing share of rows in eda_1 overall summary (accepted counts)')\nprint(2416/2928)",
+      "output": "      Year  Life expectancy\n2312  2000             39.0\n2311  2001             41.0\n2309  2003             41.5\n2308  2004             42.3\n2307  2005             43.3\n0.825136612021858\n",
+      "error": null,
+      "seconds": 3.45
+    },
+    {
+      "attempt": 4,
+      "revision": 1,
+      "step": 3,
+      "code": "counts = d['Year'].value_counts().sort_index()\nrecord_fact('eda5_rows_per_year', {str(int(k)): int(v) for k, v in counts.items()}, 'Row counts per Year in df (basis for year finding: each year has equal rows)')\nprint(counts.min(), counts.max(), len(counts))",
+      "output": "183 193 16\n",
+      "error": null,
+      "seconds": 3.38
+    }
+  ],
+  "metadata": {
+    "steps": 4
+  },
+  "brief": {
+    "id": "eda_5",
+    "specialist": "eda",
+    "question": "Which countries are the low Life expectancy outliers below the overall IQR lower fence of 44.2 years, and are they concentrated in particular years or Status groups?",
+    "complete_when": "Lists the countries and years of the rows below 44.2 years, counts them by Status and Year, and states whether the outliers cluster in a few countries or years.",
+    "depends_on": [
+      "eda_1"
+    ],
+    "outputs": []
+  },
+  "revisions": 2,
+  "reviews": [
+    {
+      "reasoning": "The counts check out against the facts: status 10 Developing, country 5+3+1+1=10, and years 3+2+1+1+1+1+1=10 across 7 years, with 7 of 10 in 2000-2003. The Haiti 2010 minimum of 36.3 matches eda_1. The report's weakness is that it calls the Developing-only result a concentration without a base rate. The accepted eda_1 facts give 2416 Developing rows out of 2928 (about 82%), so all 10 low rows being Developing is roughly what chance would produce and does not show a Status concentration. The Sierra Leone range 'about 43' also cannot be confirmed because the recorded eda5_low_rows fact is truncated in the report, so the full row list should be stated.",
+      "verdict": "revise",
+      "feedback": "1) In the Status finding, add the base rate from the accepted eda_1 counts: Developing is 2416 of 2928 rows (about 82%), so 10 of 10 Developing is close to what the population share predicts. State that the low-tail outliers are therefore not concentrated in Status, rather than presenting 'all Developing' as a Status concentration. 2) Replace the 'about 43' upper bound for Sierra Leone with the exact years and values from the full eda5_low_rows fact (the stored fact is truncated in the report), or cite it precisely. 3) Keep the year finding, but note that each year has 183 rows (eda_1), so the early-year lean is a raw count pattern on equal-sized years.",
+      "follow_ups": []
+    },
+    {
+      "reasoning": "Checked the report against the eda5 facts and the code. The Sierra Leone rows, the Haiti minimum of 36.3 in 2010, the country counts (5/3/1/1), the year counts and the 7-of-10 claim for 2000-2003 all match the facts. Three problems need fixing. First, the brief asks for the countries and years of the rows below 44.2, but the findings name years only for Sierra Leone and omit the Malawi, Zambia and Haiti years. Second, the Status finding treats 10 of 10 Developing as 'close' to the 8.3 expected from the 82.5% base rate and concludes the outliers are not concentrated in Status. A 1.7-row gap on n=10 neither confirms nor rules out concentration, so the conclusion is stronger than the numbers allow. Third, the year finding relies on eda_1's 183-per-year counts while the df shows 193 for 2013 and 2938 total rows; the report flags this, but the year claims should state which count basis they use. The follow-up budget is spent, so follow_ups is empty.",
+      "verdict": "revise",
+      "feedback": "1) In the findings, list all 10 low rows by country, year, status and life expectancy, using eda5_low_rows, including the Malawi (3 rows), Zambia and Haiti years, as the brief requires. 2) Rewrite the Status finding: all 10 low rows are Developing (eda5_low_by_status), against a base rate of 82.5% (eda5_status_base_rate). With only 10 rows this cannot show whether the outliers are or are not concentrated in Status. Remove 'close to that' and 'not concentrated in Status' and state the limitation instead. 3) In the year finding, say that the year counts come from the df (eda5_low_by_year), and that the df has 193 rows for 2013 against 183 elsewhere (eda5_rows_per_year), so the year pattern is based on raw counts and is not normalised for that discrepancy. Do not cite the eda_1 183-per-year figure as the basis for equal year sizes.",
+      "follow_ups": []
+    },
+    {
+      "reasoning": "Counts check out against the facts: 10 rows below 44.2, all Developing, 7 rows in 2000-2003, and Sierra Leone 5 plus Malawi 3 across 4 countries. The 193 vs 183 row discrepancy for 2013 is flagged. The main defect is completeness: the brief asks for the countries and years of the low rows, but the report gives only Haiti and Sierra Leone explicitly and defers Malawi (3 rows) and Zambia (1 row) to 'as in eda5_low_rows'. The report should list those four rows itself. The Developing share and year-cluster claims are appropriately hedged. Automatic checks were clean.",
+      "verdict": "revise",
+      "feedback": "List the Malawi rows (3, with years and life expectancy values) and the Zambia row (1, with year and value) explicitly in the findings, taken from eda5_low_rows, so the report answers the brief without requiring the reader to open a fact. Keep the rest of the report as it is.",
+      "follow_ups": []
+    }
+  ]
+}

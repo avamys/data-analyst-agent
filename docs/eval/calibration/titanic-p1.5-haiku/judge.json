@@ -1,0 +1,105 @@
+{
+  "model": "claude-sonnet-5-5",
+  "served_by": "claude-sonnet-5-5",
+  "prompt": "983aca5d02a5",
+  "must_find": [
+    {
+      "item": "Women survived at a much higher rate than men (about 74% against 19%).",
+      "quote": "74.2% of women survived against 18.9% of men (chi-square 263.05, Cram\u00e9r's V = 0.543)",
+      "reason": "States the female vs male survival gap with matching numbers.",
+      "verdict": "yes",
+      "quote_found": true
+    },
+    {
+      "item": "Survival falls with passenger class, highest in first class and lowest in third.",
+      "quote": "It is 63.0% in class 1 (216 passengers), 47.3% in class 2 (184) and 24.2% in class 3 (491).",
+      "reason": "Shows survival falling from first to third class.",
+      "verdict": "yes",
+      "quote_found": true
+    },
+    {
+      "item": "Passengers who survived had paid higher fares on average.",
+      "quote": "mean Fare is 48.4 for survivors against 22.1 for non-survivors",
+      "reason": "Survivors paid higher fares on average, with numbers.",
+      "verdict": "yes",
+      "quote_found": true
+    },
+    {
+      "item": "Passengers without a recorded cabin survived less often than those with one.",
+      "quote": "rows with missing Cabin survived at 30.0%, against 66.7% for rows with Cabin present (chi-square p = 6.7e-21)",
+      "reason": "Missing-cabin passengers survived less often, with numbers.",
+      "verdict": "yes",
+      "quote_found": true
+    },
+    {
+      "item": "Passengers with a missing Age survived less often than those with a recorded Age.",
+      "quote": "rows with missing Age survived at 29.4%, against 40.6% for rows with Age present (chi-square p = 0.0077)",
+      "reason": "Missing-Age passengers survived less often, with numbers.",
+      "verdict": "yes",
+      "quote_found": true
+    },
+    {
+      "item": "A predictive model is compared with the majority-class baseline (about 62% accuracy) and beats it.",
+      "quote": "The majority-class test accuracy is 61.4%. Logistic regression reaches 78.5% and random forest 78.9%",
+      "reason": "Compares models with the majority baseline (~61-62%) and shows they beat it.",
+      "verdict": "yes",
+      "quote_found": true
+    },
+    {
+      "item": "Model results include precision, recall or F1, not only accuracy.",
+      "quote": "Logistic regression: 78.5% accuracy, precision 0.738, recall 0.686, F1 0.711, ROC AUC 0.840.",
+      "reason": "Reports precision, recall and F1 as well as accuracy.",
+      "verdict": "yes",
+      "quote_found": true
+    }
+  ],
+  "must_not_claim": [
+    {
+      "item": "Most passengers survived.",
+      "quote": "38.4% survived (342 passengers) and 61.6% did not.",
+      "reason": "Report states most passengers did not survive, so it does not make this claim.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "Men survived at a higher rate than women.",
+      "quote": "74.2% of women survived against 18.9% of men",
+      "reason": "Report says women survived more, the opposite of the claim.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "Third-class passengers survived at a higher rate than first-class passengers.",
+      "quote": "survival falls with class. It is 63.0% in class 1 (216 passengers), 47.3% in class 2 (184) and 24.2% in class 3 (491).",
+      "reason": "Report says first class survived more than third.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "Age is the strongest predictor of survival.",
+      "quote": "Sex is the most important feature in both models.",
+      "reason": "Report identifies Sex, not Age, as the strongest predictor.",
+      "verdict": "no",
+      "quote_found": true
+    }
+  ],
+  "caveats": [
+    {
+      "item": "missing cabin (e.g. mentioning: Cabin)",
+      "quote": "Cabin missingness and survival:** rows with missing Cabin survived at 30.0%, against 66.7% for rows with Cabin present",
+      "reason": "Missing Cabin is analysed, and Cabin is excluded from features, but it is not framed as a limitation of the analysis, so it is only mentioned.",
+      "verdict": "partly",
+      "quote_found": true
+    }
+  ],
+  "scores": {
+    "finding_recall": 1.0,
+    "false_claims": 0.0,
+    "caveat_coverage": 0.5,
+    "quotes_not_found": 0
+  },
+  "usage": {
+    "input_tokens": 7358,
+    "output_tokens": 969
+  }
+}

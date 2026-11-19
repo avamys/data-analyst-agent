@@ -1,0 +1,335 @@
+{
+  "task_id": "eda_6",
+  "specialist": "eda",
+  "description": "Within Developed and within Developing countries separately, does the Adult Mortality band pattern still show the second band (74 to 144) above the first band (1 to 74), and which countries drive the second band?",
+  "code": "# %%\nimport matplotlib.pyplot as plt\nimport numpy as np\nimport pandas as pd\n\nfrom agent.execution.runtime import (\n    df,\n    load,\n    publish,\n    record_fact,\n    record_model,\n    save_chart,\n)\n\n# %%\ncols = {c.strip(): c for c in df.columns}\nl\u0435 = cols['Life expectancy']\nam = cols['Adult Mortality']\nst = cols['Status']\nco = cols['Country']\nprint(df[st].value_counts(dropna=False))\nprint(df[[l\u0435, am]].isna().sum())\nprint(df[am].describe())\nprint(df[co].nunique())\n\n# %%\nd=df[[co,st,l\u0435,am]].dropna().copy()\nd.columns=['c','s','le','am']\nedges=[1.0,74.0,144.0,228.0,723.0]\nd['band']=pd.cut(d['am'],bins=edges,include_lowest=True,labels=['b1','b2','b3','b4'])\nres={}\nfor s in ['Developed','Developing']:\n    g=d[d['s']==s]\n    tab=g.groupby('band',observed=False)['le'].agg(['count','mean','median']).round(3)\n    print(s)\n    print(tab)\n    top=g[g['band']=='b2']['c'].value_counts().head(10)\n    print(top)\n    res[s]={'edges':edges,'band_count':[int(x) for x in tab['count'].tolist()],'band_mean':[float(x) for x in tab['mean'].tolist()],'band_median':[float(x) for x in tab['median'].tolist()],'band2_top_countries':{str(k):int(v) for k,v in top.items()}}\n    record_fact(s.lower()+'_am_bands',res[s],'Per-band n, mean and median Life expectancy by Adult Mortality band (fixed edges 1,74,144,228,723) within '+s+', plus top countries by row count in band b2 (74 to 144)')\n\n# %%\nimport matplotlib.pyplot as plt\nres2={}\nfig,axes=plt.subplots(1,2,figsize=(10,4),sharey=True)\nfor ax,s in zip(axes,['Developed','Developing']):\n    g=d[d['s']==s].copy()\n    q=g['am'].quantile([0,.25,.5,.75,1]).tolist()\n    g['qb']=pd.cut(g['am'],bins=q,include_lowest=True,labels=['q1','q2','q3','q4'])\n    tab=g.groupby('qb',observed=False)['le'].agg(['count','mean','median']).round(3)\n    top=g[g['qb']=='q2']['c'].value_counts().head(10)\n    print(s); print(tab); print(top)\n    res2[s]={'edges':[round(x,2) for x in q],'n':[int(x) for x in tab['count']],'mean':[float(x) for x in tab['mean']],'median':[float(x) for x in tab['median']],'q2_top':{str(k):int(v) for k,v in top.items()}}\n    record_fact(s.lower()+'_am_quartile_bands',res2[s],'Quartile band edges, n, mean and median Life expectancy by Adult Mortality quartile band within '+s+'; q2 top countries by row count')\n    ax.bar(tab.index.astype(str),tab['mean'])\n    ax.set_title(s+': mean Life expectancy by Adult Mortality quartile band')\n    ax.set_xlabel('Adult Mortality quartile band (q1 lowest to q4 highest)')\n    ax.set_ylabel('Mean Life expectancy (years)')\nplt.tight_layout()\nsave_chart(fig,'am_quartile_bands_by_status','Mean Life expectancy (years) per Adult Mortality quartile band, separately for Developed and Developing countries')\n\n# %%\nfor s in ['Developed','Developing']: g=d[(d['s']==s)&(d['band']=='b2')]; vc=g['c'].value_counts(); print(s,len(g),g['c'].nunique()); print(vc.head(10)); record_fact(s.lower()+'_am_b2_countries',{'rows':int(len(g)),'countries':int(g['c'].nunique()),'top10':{str(k):int(v) for k,v in vc.head(10).items()}},'Countries with most rows in fixed Adult Mortality band 74 to 144 within '+s)\n",
+  "output": "Status\nDeveloping    2426\nDeveloped      512\nName: count, dtype: int64\nLife expectancy     10\nAdult Mortality     10\ndtype: int64\ncount    2928.000000\nmean      164.796448\nstd       124.292079\nmin         1.000000\n25%        74.000000\n50%       144.000000\n75%       228.000000\nmax       723.000000\nName: Adult Mortality, dtype: float64\n193\nDeveloped\n      count    mean  median\nband                       \nb1      270  81.032    81.4\nb2      183  78.349    78.4\nb3       57  73.363    73.1\nb4        2  75.500    75.5\nc\nCroatia     12\nBelgium     12\nSlovenia    11\nSlovakia    11\nIreland     10\nDenmark     10\nCzechia     10\nPortugal    10\nGermany      9\nAustria      9\nName: count, dtype: int64\nDeveloping\n      count    mean  median\nband                       \nb1      476  67.716    71.2\nb2      551  75.298    74.8\nb3      667  70.103    69.8\nb4      722  57.702    58.0\nc\nUruguay     16\nSerbia      16\nKuwait      15\nJordan      15\nPanama      15\nViet Nam    15\nMexico      14\nGeorgia     14\nArmenia     14\nFrance      13\nName: count, dtype: int64\nDeveloped\n    count    mean  median\nqb                       \nq1    131  79.427    79.7\nq2    131  82.518    81.6\nq3    125  79.993    79.4\nq4    125  74.683    74.7\nc\nAustralia      13\nNorway         10\nCyprus          9\nSweden          9\nMalta           9\nSingapore       9\nJapan           9\nItaly           8\nNetherlands     8\nNew Zealand     6\nName: count, dtype: int64\nDeveloping\n    count    mean  median\nqb                       \nq1    607  69.954   73.60\nq2    605  73.876   73.90\nq3    602  68.137   68.10\nq4    602  56.422   56.75\nc\nLibya                  16\nUruguay                16\nSerbia                 16\nEcuador                15\nViet Nam               15\nJordan                 15\nPanama                 15\nMalaysia               14\nArmenia                14\nAntigua and Barbuda    14\nName: count, dtype: int64\nDeveloped 183 26\nc\nCroatia     12\nBelgium     12\nSlovenia    11\nSlovakia    11\nIreland     10\nDenmark     10\nCzechia     10\nPortugal    10\nGermany      9\nAustria      9\nName: count, dtype: int64\nDeveloping 551 59\nc\nUruguay     16\nSerbia      16\nKuwait      15\nJordan      15\nPanama      15\nViet Nam    15\nMexico      14\nGeorgia     14\nArmenia     14\nFrance      13\nName: count, dtype: int64\n",
+  "execution_time": 15.52,
+  "success": true,
+  "error": null,
+  "report": {
+    "status": "complete",
+    "findings": [
+      {
+        "statement": "Within Developed countries the reversal does not persist on the fixed bands: the second band (74 to 144, n=183) has mean Life expectancy 78.35 against 81.03 for the first band (1 to 74, n=270), with medians 78.4 and 81.4. Means fall from band 1 to band 3 (73.36, n=57); band 4 has only 2 rows.",
+        "facts": [
+          "developed_am_bands"
+        ]
+      },
+      {
+        "statement": "Within Developing countries the reversal persists on the fixed bands: the second band (74 to 144, n=551) has mean Life expectancy 75.30 against 67.72 for the first band (1 to 74, n=476), with medians 74.8 and 71.2. The third band (n=667) has mean 70.10 and the fourth (n=722) has mean 57.70.",
+        "facts": [
+          "developing_am_bands"
+        ]
+      },
+      {
+        "statement": "On within-status quartile bands, Developing shows the reversal again: the second quartile (edges 92 to 163, n=605) has mean 73.88 against 69.95 for the first quartile (edges 1 to 92, n=607). Developed also shows second quartile above first (82.52 against 79.43, edges 58 to 73 and 1 to 58, n=131 each), but these bands are narrow and not the fixed bands, so this is weaker evidence.",
+        "facts": [
+          "developed_am_quartile_bands",
+          "developing_am_quartile_bands"
+        ]
+      },
+      {
+        "statement": "The second band in Developing is spread across 59 countries, with the largest contributors Uruguay (16), Serbia (16), Kuwait, Jordan, Panama and Viet Nam (15 each). No single country dominates the band.",
+        "facts": [
+          "developing_am_b2_countries"
+        ]
+      },
+      {
+        "statement": "The second band in Developed is spread across 26 countries, with the largest contributors Croatia (12) and Belgium (12), then Slovenia and Slovakia (11 each).",
+        "facts": [
+          "developed_am_b2_countries"
+        ]
+      }
+    ],
+    "follow_ups": [
+      "Does the Developing second-band advantage hold within countries over years, or does it reflect between-country composition?",
+      "Developed band 4 (228 to 723) has only 2 rows; is the Developed fourth-band mean of 75.5 meaningful at all?",
+      "Do the Developed quartile-band results (second quartile above first) survive a different binning, given the narrow bands?",
+      "Does Status overlap with the other Adult Mortality drivers (HIV/AIDS, schooling, income composition) so that the band effects partly reflect the status gap?"
+    ]
+  },
+  "facts": {
+    "developed_am_bands": {
+      "value": {
+        "edges": [
+          1.0,
+          74.0,
+          144.0,
+          228.0,
+          723.0
+        ],
+        "band_count": [
+          270,
+          183,
+          57,
+          2
+        ],
+        "band_mean": [
+          81.032,
+          78.349,
+          73.363,
+          75.5
+        ],
+        "band_median": [
+          81.4,
+          78.4,
+          73.1,
+          75.5
+        ],
+        "band2_top_countries": {
+          "Croatia": 12,
+          "Belgium": 12,
+          "Slovenia": 11,
+          "Slovakia": 11,
+          "Ireland": 10,
+          "Denmark": 10,
+          "Czechia": 10,
+          "Portugal": 10,
+          "Germany": 9,
+          "Austria": 9
+        }
+      },
+      "desc": "Per-band n, mean and median Life expectancy by Adult Mortality band (fixed edges 1,74,144,228,723) within Developed, plus top countries by row count in band b2 (74 to 144)",
+      "cell": 2
+    },
+    "developing_am_bands": {
+      "value": {
+        "edges": [
+          1.0,
+          74.0,
+          144.0,
+          228.0,
+          723.0
+        ],
+        "band_count": [
+          476,
+          551,
+          667,
+          722
+        ],
+        "band_mean": [
+          67.716,
+          75.298,
+          70.103,
+          57.702
+        ],
+        "band_median": [
+          71.2,
+          74.8,
+          69.8,
+          58.0
+        ],
+        "band2_top_countries": {
+          "Uruguay": 16,
+          "Serbia": 16,
+          "Kuwait": 15,
+          "Jordan": 15,
+          "Panama": 15,
+          "Viet Nam": 15,
+          "Mexico": 14,
+          "Georgia": 14,
+          "Armenia": 14,
+          "France": 13
+        }
+      },
+      "desc": "Per-band n, mean and median Life expectancy by Adult Mortality band (fixed edges 1,74,144,228,723) within Developing, plus top countries by row count in band b2 (74 to 144)",
+      "cell": 2
+    },
+    "developed_am_quartile_bands": {
+      "value": {
+        "edges": [
+          1.0,
+          58.0,
+          73.0,
+          96.0,
+          229.0
+        ],
+        "n": [
+          131,
+          131,
+          125,
+          125
+        ],
+        "mean": [
+          79.427,
+          82.518,
+          79.993,
+          74.683
+        ],
+        "median": [
+          79.7,
+          81.6,
+          79.4,
+          74.7
+        ],
+        "q2_top": {
+          "Australia": 13,
+          "Norway": 10,
+          "Cyprus": 9,
+          "Sweden": 9,
+          "Malta": 9,
+          "Singapore": 9,
+          "Japan": 9,
+          "Italy": 8,
+          "Netherlands": 8,
+          "New Zealand": 6
+        }
+      },
+      "desc": "Quartile band edges, n, mean and median Life expectancy by Adult Mortality quartile band within Developed; q2 top countries by row count",
+      "cell": 3
+    },
+    "developing_am_quartile_bands": {
+      "value": {
+        "edges": [
+          1.0,
+          92.0,
+          163.0,
+          253.0,
+          723.0
+        ],
+        "n": [
+          607,
+          605,
+          602,
+          602
+        ],
+        "mean": [
+          69.954,
+          73.876,
+          68.137,
+          56.422
+        ],
+        "median": [
+          73.6,
+          73.9,
+          68.1,
+          56.75
+        ],
+        "q2_top": {
+          "Libya": 16,
+          "Uruguay": 16,
+          "Serbia": 16,
+          "Ecuador": 15,
+          "Viet Nam": 15,
+          "Jordan": 15,
+          "Panama": 15,
+          "Malaysia": 14,
+          "Armenia": 14,
+          "Antigua and Barbuda": 14
+        }
+      },
+      "desc": "Quartile band edges, n, mean and median Life expectancy by Adult Mortality quartile band within Developing; q2 top countries by row count",
+      "cell": 3
+    },
+    "developed_am_b2_countries": {
+      "value": {
+        "rows": 183,
+        "countries": 26,
+        "top10": {
+          "Croatia": 12,
+          "Belgium": 12,
+          "Slovenia": 11,
+          "Slovakia": 11,
+          "Ireland": 10,
+          "Denmark": 10,
+          "Czechia": 10,
+          "Portugal": 10,
+          "Germany": 9,
+          "Austria": 9
+        }
+      },
+      "desc": "Countries with most rows in fixed Adult Mortality band 74 to 144 within Developed",
+      "cell": 4
+    },
+    "developing_am_b2_countries": {
+      "value": {
+        "rows": 551,
+        "countries": 59,
+        "top10": {
+          "Uruguay": 16,
+          "Serbia": 16,
+          "Kuwait": 15,
+          "Jordan": 15,
+          "Panama": 15,
+          "Viet Nam": 15,
+          "Mexico": 14,
+          "Georgia": 14,
+          "Armenia": 14,
+          "France": 13
+        }
+      },
+      "desc": "Countries with most rows in fixed Adult Mortality band 74 to 144 within Developing",
+      "cell": 4
+    }
+  },
+  "charts": {
+    "am_quartile_bands_by_status": {
+      "file": "charts/am_quartile_bands_by_status.png",
+      "caption": "Mean Life expectancy (years) per Adult Mortality quartile band, separately for Developed and Developing countries",
+      "cell": 3
+    }
+  },
+  "published": [],
+  "artifacts": [],
+  "attempts": [
+    {
+      "attempt": 1,
+      "revision": 0,
+      "step": 1,
+      "code": "cols = {c.strip(): c for c in df.columns}\nl\u0435 = cols['Life expectancy']\nam = cols['Adult Mortality']\nst = cols['Status']\nco = cols['Country']\nprint(df[st].value_counts(dropna=False))\nprint(df[[l\u0435, am]].isna().sum())\nprint(df[am].describe())\nprint(df[co].nunique())",
+      "output": "Status\nDeveloping    2426\nDeveloped      512\nName: count, dtype: int64\nLife expectancy     10\nAdult Mortality     10\ndtype: int64\ncount    2928.000000\nmean      164.796448\nstd       124.292079\nmin         1.000000\n25%        74.000000\n50%       144.000000\n75%       228.000000\nmax       723.000000\nName: Adult Mortality, dtype: float64\n193\n",
+      "error": null,
+      "seconds": 3.6
+    },
+    {
+      "attempt": 2,
+      "revision": 0,
+      "step": 2,
+      "code": "d=df[[co,st,l\u0435,am]].dropna().copy()\nd.columns=['c','s','le','am']\nedges=[1.0,74.0,144.0,228.0,723.0]\nd['band']=pd.cut(d['am'],bins=edges,include_lowest=True,labels=['b1','b2','b3','b4'])\nres={}\nfor s in ['Developed','Developing']:\n    g=d[d['s']==s]\n    tab=g.groupby('band',observed=False)['le'].agg(['count','mean','median']).round(3)\n    print(s)\n    print(tab)\n    top=g[g['band']=='b2']['c'].value_counts().head(10)\n    print(top)\n    res[s]={'edges':edges,'band_count':[int(x) for x in tab['count'].tolist()],'band_mean':[float(x) for x in tab['mean'].tolist()],'band_median':[float(x) for x in tab['median'].tolist()],'band2_top_countries':{str(k):int(v) for k,v in top.items()}}\n    record_fact(s.lower()+'_am_bands',res[s],'Per-band n, mean and median Life expectancy by Adult Mortality band (fixed edges 1,74,144,228,723) within '+s+', plus top countries by row count in band b2 (74 to 144)')",
+      "output": "Developed\n      count    mean  median\nband                       \nb1      270  81.032    81.4\nb2      183  78.349    78.4\nb3       57  73.363    73.1\nb4        2  75.500    75.5\nc\nCroatia     12\nBelgium     12\nSlovenia    11\nSlovakia    11\nIreland     10\nDenmark     10\nCzechia     10\nPortugal    10\nGermany      9\nAustria      9\nName: count, dtype: int64\nDeveloping\n      count    mean  median\nband                       \nb1      476  67.716    71.2\nb2      551  75.298    74.8\nb3      667  70.103    69.8\nb4      722  57.702    58.0\nc\nUruguay     16\nSerbia      16\nKuwait      15\nJordan      15\nPanama      15\nViet Nam    15\nMexico      14\nGeorgia     14\nArmenia     14\nFrance      13\nName: count, dtype: int64\n",
+      "error": null,
+      "seconds": 3.53
+    },
+    {
+      "attempt": 3,
+      "revision": 0,
+      "step": 3,
+      "code": "import matplotlib.pyplot as plt\nres2={}\nfig,axes=plt.subplots(1,2,figsize=(10,4),sharey=True)\nfor ax,s in zip(axes,['Developed','Developing']):\n    g=d[d['s']==s].copy()\n    q=g['am'].quantile([0,.25,.5,.75,1]).tolist()\n    g['qb']=pd.cut(g['am'],bins=q,include_lowest=True,labels=['q1','q2','q3','q4'])\n    tab=g.groupby('qb',observed=False)['le'].agg(['count','mean','median']).round(3)\n    top=g[g['qb']=='q2']['c'].value_counts().head(10)\n    print(s); print(tab); print(top)\n    res2[s]={'edges':[round(x,2) for x in q],'n':[int(x) for x in tab['count']],'mean':[float(x) for x in tab['mean']],'median':[float(x) for x in tab['median']],'q2_top':{str(k):int(v) for k,v in top.items()}}\n    record_fact(s.lower()+'_am_quartile_bands',res2[s],'Quartile band edges, n, mean and median Life expectancy by Adult Mortality quartile band within '+s+'; q2 top countries by row count')\n    ax.bar(tab.index.astype(str),tab['mean'])\n    ax.set_title(s+': mean Life expectancy by Adult Mortality quartile band')\n    ax.set_xlabel('Adult Mortality quartile band (q1 lowest to q4 highest)')\n    ax.set_ylabel('Mean Life expectancy (years)')\nplt.tight_layout()\nsave_chart(fig,'am_quartile_bands_by_status','Mean Life expectancy (years) per Adult Mortality quartile band, separately for Developed and Developing countries')",
+      "output": "Developed\n    count    mean  median\nqb                       \nq1    131  79.427    79.7\nq2    131  82.518    81.6\nq3    125  79.993    79.4\nq4    125  74.683    74.7\nc\nAustralia      13\nNorway         10\nCyprus          9\nSweden          9\nMalta           9\nSingapore       9\nJapan           9\nItaly           8\nNetherlands     8\nNew Zealand     6\nName: count, dtype: int64\nDeveloping\n    count    mean  median\nqb                       \nq1    607  69.954   73.60\nq2    605  73.876   73.90\nq3    602  68.137   68.10\nq4    602  56.422   56.75\nc\nLibya                  16\nUruguay                16\nSerbia                 16\nEcuador                15\nViet Nam               15\nJordan                 15\nPanama                 15\nMalaysia               14\nArmenia                14\nAntigua and Barbuda    14\nName: count, dtype: int64\n",
+      "error": null,
+      "seconds": 4.47
+    },
+    {
+      "attempt": 4,
+      "revision": 0,
+      "step": 4,
+      "code": "for s in ['Developed','Developing']: g=d[(d['s']==s)&(d['band']=='b2')]; vc=g['c'].value_counts(); print(s,len(g),g['c'].nunique()); print(vc.head(10)); record_fact(s.lower()+'_am_b2_countries',{'rows':int(len(g)),'countries':int(g['c'].nunique()),'top10':{str(k):int(v) for k,v in vc.head(10).items()}},'Countries with most rows in fixed Adult Mortality band 74 to 144 within '+s)",
+      "output": "Developed 183 26\nc\nCroatia     12\nBelgium     12\nSlovenia    11\nSlovakia    11\nIreland     10\nDenmark     10\nCzechia     10\nPortugal    10\nGermany      9\nAustria      9\nName: count, dtype: int64\nDeveloping 551 59\nc\nUruguay     16\nSerbia      16\nKuwait      15\nJordan      15\nPanama      15\nViet Nam    15\nMexico      14\nGeorgia     14\nArmenia     14\nFrance      13\nName: count, dtype: int64\n",
+      "error": null,
+      "seconds": 3.92
+    }
+  ],
+  "metadata": {
+    "steps": 4
+  },
+  "brief": {
+    "id": "eda_6",
+    "specialist": "eda",
+    "question": "Within Developed and within Developing countries separately, does the Adult Mortality band pattern still show the second band (74 to 144) above the first band (1 to 74), and which countries drive the second band?",
+    "complete_when": "Per Status group, quartile band edges, n, mean and median Life expectancy by Adult Mortality band; list of countries contributing most rows to the second band; a statement of whether the reversal persists within each Status group.",
+    "depends_on": [
+      "eda_2"
+    ],
+    "outputs": []
+  },
+  "revisions": 0,
+  "reviews": [
+    {
+      "reasoning": "Every number in the findings matches the facts it cites: developed_am_bands (n 270/183/57/2, means 81.03/78.35/73.36, medians 81.4/78.4/73.1), developing_am_bands (n 476/551/667/722, means 67.72/75.30/70.10/57.70, medians 71.2/74.8/69.8), both quartile fact sets (edges, n, means, medians), and both b2_countries facts (26 and 59 countries, top-country counts). The code computes these directly from the Developed and Developing subsets of the non-missing Life expectancy and Adult Mortality rows, with band counts summing to 512 and 2416 as expected. The brief's required content is covered: per-Status quartile edges, n, mean and median by band, second-band country lists, and a per-Status statement on whether the reversal persists. The report separates the fixed-band and quartile evidence and flags the narrow Developed quartile bands as weaker. The findings are descriptive mean comparisons, so no inferential claim is stronger than the numbers allow. Automatic checks report no problems. Follow-ups are left empty because the budget is spent.",
+      "verdict": "accept",
+      "feedback": "",
+      "follow_ups": []
+    }
+  ]
+}

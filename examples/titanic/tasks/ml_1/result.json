@@ -1,0 +1,226 @@
+{
+  "task_id": "ml_1",
+  "specialist": "ml",
+  "description": "How well can Survived be predicted from Sex, Pclass, Age, SibSp, Parch, Fare and Embarked compared with a majority-class baseline, and which features matter most?",
+  "code": "# %%\nimport matplotlib.pyplot as plt\nimport numpy as np\nimport pandas as pd\n\nfrom agent.execution.runtime import (\n    df,\n    load,\n    publish,\n    record_fact,\n    record_model,\n    save_chart,\n)\n\n# %%\nfrom sklearn.model_selection import train_test_split\n\nd = df.copy()\nage_median_by_group = d.groupby(['Pclass', 'Sex'])['Age'].transform('median')\nd['Age'] = d['Age'].fillna(age_median_by_group).fillna(d['Age'].median())\nd['Embarked'] = d['Embarked'].fillna(d['Embarked'].mode()[0])\nX = pd.get_dummies(d[['Pclass', 'Sex', 'Age', 'SibSp', 'Parch', 'Fare', 'Embarked']], columns=['Sex', 'Embarked'], drop_first=False, dtype=int)\ny = d['Survived'].astype(int)\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, stratify=y, random_state=42)\npublish('train_test', (X_train, X_test, y_train, y_test))\nprint(X.shape)\nprint(list(X.columns))\nprint(y.value_counts().to_dict())\nprint(X_train.shape, X_test.shape)\nprint(X.isna().sum().sum())\n\n# %%\nfrom sklearn.dummy import DummyClassifier\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.ensemble import RandomForestClassifier\n\nmu = X_train.mean()\nsd = X_train.std()\nXs_train = (X_train - mu) / sd\nXs_test = (X_test - mu) / sd\n\ndummy = DummyClassifier(strategy='most_frequent').fit(X_train, y_train)\nr0 = record_model('ml1_majority_baseline', dummy, X_train, y_train, X_test, y_test, 'Majority-class baseline on the shared stratified split')\n\nlr = LogisticRegression(max_iter=1000).fit(Xs_train, y_train)\nr1 = record_model('ml1_logistic_regression', lr, Xs_train, y_train, Xs_test, y_test, 'Logistic regression on standardized features, shared split')\n\nrf = RandomForestClassifier(n_estimators=300, random_state=42).fit(X_train, y_train)\nr2 = record_model('ml1_random_forest', rf, X_train, y_train, X_test, y_test, 'Random forest, 300 trees, shared split')\n\nprint(r0)\nprint(r1)\nprint(r2)\nprint(dict(zip(X.columns, lr.coef_[0].round(3))))\nprint(dict(zip(X.columns, rf.feature_importances_.round(3))))\n\n# %%\nfig, ax = plt.subplots(figsize=(7, 4))\nnames = ['Majority baseline', 'Logistic regression', 'Random forest']\nacc = [r0['test_accuracy'], r1['test_accuracy'], r2['test_accuracy']]\nauc = [r0['test_roc_auc'], r1['test_roc_auc'], r2['test_roc_auc']]\nx = np.arange(3)\nax.bar(x - 0.2, acc, 0.4, label='Test accuracy')\nax.bar(x + 0.2, auc, 0.4, label='Test ROC AUC')\nax.set_xticks(x)\nax.set_xticklabels(names)\nax.set_ylabel('Score on test set (0 to 1)')\nax.set_ylim(0, 1)\nax.set_title('Test accuracy and ROC AUC by model, shared stratified split')\nax.legend()\nsave_chart(fig, 'ml1_model_comparison', 'Test accuracy and test ROC AUC for the majority-class baseline, logistic regression and random forest on the same split (n_test=223)')\nrecord_fact('ml1_model_scores', {'baseline_test_accuracy': acc[0], 'logreg_test_accuracy': acc[1], 'rf_test_accuracy': acc[2], 'baseline_test_roc_auc': auc[0], 'logreg_test_roc_auc': auc[1], 'rf_test_roc_auc': auc[2]}, 'Test accuracy and ROC AUC for the three models on the shared split')\nprint(acc, auc)\n",
+  "output": "(891, 10)\n['Pclass', 'Age', 'SibSp', 'Parch', 'Fare', 'Sex_female', 'Sex_male', 'Embarked_C', 'Embarked_Q', 'Embarked_S']\n{0: 549, 1: 342}\n(668, 10) (223, 10)\n0\n{'kind': 'classifier', 'train_accuracy': 0.6168, 'test_accuracy': 0.6143, 'baseline_accuracy': 0.6143, 'positive_class': np.int64(1), 'test_precision': 0.0, 'test_recall': 0.0, 'test_f1': 0.0, 'test_roc_auc': 0.5, 'n_train': 668, 'n_test': 223}\n{'kind': 'classifier', 'train_accuracy': 0.8099, 'test_accuracy': 0.7982, 'baseline_accuracy': 0.6143, 'positive_class': np.int64(1), 'test_precision': 0.7531, 'test_recall': 0.7093, 'test_f1': 0.7305, 'test_roc_auc': 0.8417, 'feature_ranking': 'abs_coefficient', 'top_features': {'Pclass': 1.0194, 'Sex_female': 0.6286, 'Sex_male': 0.6286, 'Age': 0.5991, 'SibSp': 0.2763, 'Fare': 0.1205, 'Embarked_S': 0.0936, 'Embarked_Q': 0.0918, 'Embarked_C': 0.0426, 'Parch': 0.0323}, 'n_train': 668, 'n_test': 223}\n{'kind': 'classifier', 'train_accuracy': 0.982, 'test_accuracy': 0.7623, 'baseline_accuracy': 0.6143, 'positive_class': np.int64(1), 'test_precision': 0.726, 'test_recall': 0.6163, 'test_f1': 0.6667, 'test_roc_auc': 0.8284, 'feature_ranking': 'importance', 'top_features': {'Fare': 0.2545, 'Age': 0.2463, 'Sex_male': 0.1542, 'Sex_female': 0.1365, 'Pclass': 0.0859, 'SibSp': 0.0475, 'Parch': 0.0396, 'Embarked_S': 0.0158, 'Embarked_C': 0.0127, 'Embarked_Q': 0.0069}, 'n_train': 668, 'n_test': 223}\n{'Pclass': np.float64(-1.019), 'Age': np.float64(-0.599), 'SibSp': np.float64(-0.276), 'Parch': np.float64(-0.032), 'Fare': np.float64(0.121), 'Sex_female': np.float64(0.629), 'Sex_male': np.float64(-0.629), 'Embarked_C': np.float64(0.043), 'Embarked_Q': np.float64(0.092), 'Embarked_S': np.float64(-0.094)}\n{'Pclass': np.float64(0.086), 'Age': np.float64(0.246), 'SibSp': np.float64(0.047), 'Parch': np.float64(0.04), 'Fare': np.float64(0.254), 'Sex_female': np.float64(0.137), 'Sex_male': np.float64(0.154), 'Embarked_C': np.float64(0.013), 'Embarked_Q': np.float64(0.007), 'Embarked_S': np.float64(0.016)}\n[0.6143, 0.7982, 0.7623] [0.5, 0.8417, 0.8284]\n",
+  "execution_time": 22.759999999999998,
+  "success": true,
+  "error": null,
+  "report": {
+    "status": "complete",
+    "findings": [
+      {
+        "statement": "Feature preparation: Age was imputed with the median of Pclass and Sex groups, then the overall Age median for any remaining gaps; Embarked was filled with its mode; Sex and Embarked were one-hot encoded; Name, Ticket, Cabin and PassengerId were excluded. One stratified split (test_size 0.25, random_state 42, n_train 668, n_test 223) was reused for all three models, and standardization was applied only for logistic regression.",
+        "facts": [
+          "ml1_majority_baseline",
+          "ml1_logistic_regression",
+          "ml1_random_forest"
+        ]
+      },
+      {
+        "statement": "The majority-class baseline reaches test accuracy 0.6143 with ROC AUC 0.5 on the shared stratified split (n_test=223), which is the floor the models are compared against.",
+        "facts": [
+          "ml1_majority_baseline",
+          "ml1_model_scores"
+        ]
+      },
+      {
+        "statement": "On this single split, logistic regression is the best model: test accuracy 0.7982 (vs 0.6143 baseline), test ROC AUC 0.8417, test precision 0.7531 and recall 0.7093. This is the best on this one 223-row test split, not a demonstrated general advantage.",
+        "facts": [
+          "ml1_logistic_regression",
+          "ml1_model_scores"
+        ]
+      },
+      {
+        "statement": "The random forest scores lower on the same split: test accuracy 0.7623 and ROC AUC 0.8284, with train accuracy 0.982, which shows overfitting relative to the test score. The test accuracy gap to logistic regression is 0.036 (0.7982 vs 0.7623) and the AUC gap is 0.013 (0.8417 vs 0.8284). Both gaps rest on one 223-row test split and are small.",
+        "facts": [
+          "ml1_random_forest",
+          "ml1_logistic_regression",
+          "ml1_model_scores"
+        ]
+      },
+      {
+        "statement": "For the best model (logistic regression on standardized features), the largest absolute coefficients are Pclass 1.0194, then Sex (0.6286 for each of the two one-hot columns), Age 0.5991, SibSp 0.2763 and Fare 0.1205; Embarked dummies are 0.04 to 0.09 and Parch is smallest at 0.0323. Only magnitudes are recorded, not signs.",
+        "facts": [
+          "ml1_logistic_regression"
+        ]
+      },
+      {
+        "statement": "The random forest ranks Fare (0.2545) and Age (0.2463) highest by impurity importance, followed by the two Sex columns (0.1542 male, 0.1365 female) and Pclass (0.0859). Its ranking differs from logistic regression, where Pclass dominates, so feature importance depends on the model.",
+        "facts": [
+          "ml1_random_forest",
+          "ml1_logistic_regression"
+        ]
+      }
+    ],
+    "follow_ups": [
+      "Does imputing Age by a title extracted from Name, instead of the Pclass and Sex median, change the logistic regression results?",
+      "Do repeated stratified splits or cross-validation confirm that logistic regression beats the random forest, given the 0.036 accuracy gap on one 223-row test set?",
+      "Does the Age-missing survival gap persist within each Pclass, given that Age-missing rows are mostly Pclass 3?",
+      "Is Cabin deck, derived from Cabin, predictive of survival once Pclass and Fare are controlled for?"
+    ]
+  },
+  "facts": {
+    "ml1_majority_baseline": {
+      "value": {
+        "kind": "classifier",
+        "train_accuracy": 0.6168,
+        "test_accuracy": 0.6143,
+        "baseline_accuracy": 0.6143,
+        "positive_class": 1,
+        "test_precision": 0.0,
+        "test_recall": 0.0,
+        "test_f1": 0.0,
+        "test_roc_auc": 0.5,
+        "n_train": 668,
+        "n_test": 223
+      },
+      "desc": "Majority-class baseline on the shared stratified split",
+      "kind": "model",
+      "cell": 2
+    },
+    "ml1_logistic_regression": {
+      "value": {
+        "kind": "classifier",
+        "train_accuracy": 0.8099,
+        "test_accuracy": 0.7982,
+        "baseline_accuracy": 0.6143,
+        "positive_class": 1,
+        "test_precision": 0.7531,
+        "test_recall": 0.7093,
+        "test_f1": 0.7305,
+        "test_roc_auc": 0.8417,
+        "feature_ranking": "abs_coefficient",
+        "top_features": {
+          "Pclass": 1.0194,
+          "Sex_female": 0.6286,
+          "Sex_male": 0.6286,
+          "Age": 0.5991,
+          "SibSp": 0.2763,
+          "Fare": 0.1205,
+          "Embarked_S": 0.0936,
+          "Embarked_Q": 0.0918,
+          "Embarked_C": 0.0426,
+          "Parch": 0.0323
+        },
+        "n_train": 668,
+        "n_test": 223
+      },
+      "desc": "Logistic regression on standardized features, shared split",
+      "kind": "model",
+      "cell": 2
+    },
+    "ml1_random_forest": {
+      "value": {
+        "kind": "classifier",
+        "train_accuracy": 0.982,
+        "test_accuracy": 0.7623,
+        "baseline_accuracy": 0.6143,
+        "positive_class": 1,
+        "test_precision": 0.726,
+        "test_recall": 0.6163,
+        "test_f1": 0.6667,
+        "test_roc_auc": 0.8284,
+        "feature_ranking": "importance",
+        "top_features": {
+          "Fare": 0.2545,
+          "Age": 0.2463,
+          "Sex_male": 0.1542,
+          "Sex_female": 0.1365,
+          "Pclass": 0.0859,
+          "SibSp": 0.0475,
+          "Parch": 0.0396,
+          "Embarked_S": 0.0158,
+          "Embarked_C": 0.0127,
+          "Embarked_Q": 0.0069
+        },
+        "n_train": 668,
+        "n_test": 223
+      },
+      "desc": "Random forest, 300 trees, shared split",
+      "kind": "model",
+      "cell": 2
+    },
+    "ml1_model_scores": {
+      "value": {
+        "baseline_test_accuracy": 0.6143,
+        "logreg_test_accuracy": 0.7982,
+        "rf_test_accuracy": 0.7623,
+        "baseline_test_roc_auc": 0.5,
+        "logreg_test_roc_auc": 0.8417,
+        "rf_test_roc_auc": 0.8284
+      },
+      "desc": "Test accuracy and ROC AUC for the three models on the shared split",
+      "cell": 3
+    }
+  },
+  "charts": {
+    "ml1_model_comparison": {
+      "file": "charts/ml1_model_comparison.png",
+      "caption": "Test accuracy and test ROC AUC for the majority-class baseline, logistic regression and random forest on the same split (n_test=223)",
+      "cell": 3
+    }
+  },
+  "published": [
+    "ml_1/train_test"
+  ],
+  "artifacts": [],
+  "attempts": [
+    {
+      "attempt": 1,
+      "revision": 0,
+      "step": 1,
+      "code": "from sklearn.model_selection import train_test_split\n\nd = df.copy()\nage_median_by_group = d.groupby(['Pclass', 'Sex'])['Age'].transform('median')\nd['Age'] = d['Age'].fillna(age_median_by_group).fillna(d['Age'].median())\nd['Embarked'] = d['Embarked'].fillna(d['Embarked'].mode()[0])\nX = pd.get_dummies(d[['Pclass', 'Sex', 'Age', 'SibSp', 'Parch', 'Fare', 'Embarked']], columns=['Sex', 'Embarked'], drop_first=False, dtype=int)\ny = d['Survived'].astype(int)\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, stratify=y, random_state=42)\npublish('train_test', (X_train, X_test, y_train, y_test))\nprint(X.shape)\nprint(list(X.columns))\nprint(y.value_counts().to_dict())\nprint(X_train.shape, X_test.shape)\nprint(X.isna().sum().sum())",
+      "output": "(891, 10)\n['Pclass', 'Age', 'SibSp', 'Parch', 'Fare', 'Sex_female', 'Sex_male', 'Embarked_C', 'Embarked_Q', 'Embarked_S']\n{0: 549, 1: 342}\n(668, 10) (223, 10)\n0\n",
+      "error": null,
+      "seconds": 6.6
+    },
+    {
+      "attempt": 2,
+      "revision": 0,
+      "step": 2,
+      "code": "from sklearn.dummy import DummyClassifier\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.ensemble import RandomForestClassifier\n\nmu = X_train.mean()\nsd = X_train.std()\nXs_train = (X_train - mu) / sd\nXs_test = (X_test - mu) / sd\n\ndummy = DummyClassifier(strategy='most_frequent').fit(X_train, y_train)\nr0 = record_model('ml1_majority_baseline', dummy, X_train, y_train, X_test, y_test, 'Majority-class baseline on the shared stratified split')\n\nlr = LogisticRegression(max_iter=1000).fit(Xs_train, y_train)\nr1 = record_model('ml1_logistic_regression', lr, Xs_train, y_train, Xs_test, y_test, 'Logistic regression on standardized features, shared split')\n\nrf = RandomForestClassifier(n_estimators=300, random_state=42).fit(X_train, y_train)\nr2 = record_model('ml1_random_forest', rf, X_train, y_train, X_test, y_test, 'Random forest, 300 trees, shared split')\n\nprint(r0)\nprint(r1)\nprint(r2)\nprint(dict(zip(X.columns, lr.coef_[0].round(3))))\nprint(dict(zip(X.columns, rf.feature_importances_.round(3))))",
+      "output": "{'kind': 'classifier', 'train_accuracy': 0.6168, 'test_accuracy': 0.6143, 'baseline_accuracy': 0.6143, 'positive_class': np.int64(1), 'test_precision': 0.0, 'test_recall': 0.0, 'test_f1': 0.0, 'test_roc_auc': 0.5, 'n_train': 668, 'n_test': 223}\n{'kind': 'classifier', 'train_accuracy': 0.8099, 'test_accuracy': 0.7982, 'baseline_accuracy': 0.6143, 'positive_class': np.int64(1), 'test_precision': 0.7531, 'test_recall': 0.7093, 'test_f1': 0.7305, 'test_roc_auc': 0.8417, 'feature_ranking': 'abs_coefficient', 'top_features': {'Pclass': 1.0194, 'Sex_female': 0.6286, 'Sex_male': 0.6286, 'Age': 0.5991, 'SibSp': 0.2763, 'Fare': 0.1205, 'Embarked_S': 0.0936, 'Embarked_Q': 0.0918, 'Embarked_C': 0.0426, 'Parch': 0.0323}, 'n_train': 668, 'n_test': 223}\n{'kind': 'classifier', 'train_accuracy': 0.982, 'test_accuracy': 0.7623, 'baseline_accuracy': 0.6143, 'positive_class': np.int64(1), 'test_precision': 0.726, 'test_recall': 0.6163, 'test_f1': 0.6667, 'test_roc_auc': 0.8284, 'feature_ranking': 'importance', 'top_features': {'Fare': 0.2545, 'Age': 0.2463, 'Sex_male': 0.1542, 'Sex_female': 0.1365, 'Pclass': 0.0859, 'SibSp': 0.0475, 'Parch': 0.0396, 'Embarked_S': 0.0158, 'Embarked_C': 0.0127, 'Embarked_Q': 0.0069}, 'n_train': 668, 'n_test': 223}\n{'Pclass': np.float64(-1.019), 'Age': np.float64(-0.599), 'SibSp': np.float64(-0.276), 'Parch': np.float64(-0.032), 'Fare': np.float64(0.121), 'Sex_female': np.float64(0.629), 'Sex_male': np.float64(-0.629), 'Embarked_C': np.float64(0.043), 'Embarked_Q': np.float64(0.092), 'Embarked_S': np.float64(-0.094)}\n{'Pclass': np.float64(0.086), 'Age': np.float64(0.246), 'SibSp': np.float64(0.047), 'Parch': np.float64(0.04), 'Fare': np.float64(0.254), 'Sex_female': np.float64(0.137), 'Sex_male': np.float64(0.154), 'Embarked_C': np.float64(0.013), 'Embarked_Q': np.float64(0.007), 'Embarked_S': np.float64(0.016)}\n",
+      "error": null,
+      "seconds": 8.27
+    },
+    {
+      "attempt": 3,
+      "revision": 0,
+      "step": 3,
+      "code": "fig, ax = plt.subplots(figsize=(7, 4))\nnames = ['Majority baseline', 'Logistic regression', 'Random forest']\nacc = [r0['test_accuracy'], r1['test_accuracy'], r2['test_accuracy']]\nauc = [r0['test_roc_auc'], r1['test_roc_auc'], r2['test_roc_auc']]\nx = np.arange(3)\nax.bar(x - 0.2, acc, 0.4, label='Test accuracy')\nax.bar(x + 0.2, auc, 0.4, label='Test ROC AUC')\nax.set_xticks(x)\nax.set_xticklabels(names)\nax.set_ylabel('Score on test set (0 to 1)')\nax.set_ylim(0, 1)\nax.set_title('Test accuracy and ROC AUC by model, shared stratified split')\nax.legend()\nsave_chart(fig, 'ml1_model_comparison', 'Test accuracy and test ROC AUC for the majority-class baseline, logistic regression and random forest on the same split (n_test=223)')\nrecord_fact('ml1_model_scores', {'baseline_test_accuracy': acc[0], 'logreg_test_accuracy': acc[1], 'rf_test_accuracy': acc[2], 'baseline_test_roc_auc': auc[0], 'logreg_test_roc_auc': auc[1], 'rf_test_roc_auc': auc[2]}, 'Test accuracy and ROC AUC for the three models on the shared split')\nprint(acc, auc)",
+      "output": "[0.6143, 0.7982, 0.7623] [0.5, 0.8417, 0.8284]\n",
+      "error": null,
+      "seconds": 7.89
+    }
+  ],
+  "metadata": {
+    "steps": 3
+  },
+  "brief": {
+    "id": "ml_1",
+    "specialist": "ml",
+    "question": "How well can Survived be predicted from Sex, Pclass, Age, SibSp, Parch, Fare and Embarked compared with a majority-class baseline, and which features matter most?",
+    "complete_when": "Features prepared with imputed Age, one-hot Sex and Embarked, and Name, Ticket, Cabin and PassengerId excluded; one stratified train/test split reused for all models; a majority-class baseline score alongside logistic regression and a tree ensemble with accuracy and ROC AUC; feature importance or coefficients reported for the best model.",
+    "depends_on": [
+      "eda_2"
+    ],
+    "outputs": []
+  },
+  "revisions": 1,
+  "reviews": [
+    {
+      "reasoning": "Most findings match the facts: baseline 0.6143 with AUC 0.5, logistic regression accuracy 0.7982, AUC 0.8417, precision 0.7531 and recall 0.7093, random forest accuracy 0.7623 and AUC 0.8284, the coefficient and importance rankings, and the 0.982 train accuracy. The random forest overfitting is stated, as the automatic check requires. Two problems need fixing. First, the accuracy gap between logistic regression and the random forest is misstated: 0.7982 minus 0.7623 is 0.036, not 0.02. The AUC gap of 0.013 is correct. Second, the brief requires a complete answer, and the report does not describe the feature preparation: median Age imputation by Pclass and Sex with overall median fallback, Embarked filled with its mode, one-hot Sex and Embarked, Name, Ticket, Cabin and PassengerId excluded, a 75/25 stratified split with random_state 42 shared by all models, and standardization for logistic regression only. The best-model claim also rests on one 223-row test split; the report says so for the gap, but the word 'best' should be qualified accordingly.",
+      "verdict": "revise",
+      "feedback": "1) Correct the random forest comparison: the test accuracy gap between logistic regression (0.7982, fact ml1_model_scores) and the random forest (0.7623) is 0.036, not 0.02. Keep the AUC gap of 0.013 (0.8417 vs 0.8284). 2) Add a finding describing feature preparation as required by the brief: Age imputed with the median of Pclass and Sex groups, then the overall Age median for any remaining gaps; Embarked filled with its mode; Sex and Embarked one-hot encoded; Name, Ticket, Cabin and PassengerId excluded; one stratified split (test_size 0.25, random_state 42, n_train 668, n_test 223) reused for all three models; standardization applied only for logistic regression. 3) Qualify 'Logistic regression is the best model' as the best on this single split, consistent with the caveat already given for the gap.",
+      "follow_ups": []
+    },
+    {
+      "reasoning": "Every number in the report matches the facts it cites: baseline 0.6143 accuracy and 0.5 AUC, logistic regression 0.7982 accuracy, 0.8417 AUC, precision 0.7531 and recall 0.7093, random forest 0.7623 accuracy and 0.8284 AUC, train accuracy 0.982, the coefficients, and the importances. The derived gaps (0.036 accuracy, 0.013 AUC, 0.22 train-test) are arithmetically correct. The code matches the described preparation: group-median Age imputation, mode Embarked fill, one-hot encoding, excluded identifier and free-text columns, one stratified split reused for all models, and standardization for logistic regression only. The automatic overfitting check is addressed explicitly for the random forest. The majority-baseline check is handled because the baseline is reported as the floor and no model is claimed to beat it by chance. The report says the logistic regression advantage rests on one 223-row split and is not a general result, and it reports importance for the best model as the brief requires. Nothing in the report is stronger than the numbers allow. The remaining limitations (single split, coefficient magnitudes only, impurity importance) are stated in the text. Verdict: accept.",
+      "verdict": "accept",
+      "feedback": "",
+      "follow_ups": []
+    }
+  ]
+}

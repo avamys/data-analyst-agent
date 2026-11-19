@@ -1,0 +1,27 @@
+case: regression_outliers
+source: evals/runs/20261105-140404_current_claude-haiku-5-5/regression_outliers/r1/20261105-141258_properties_claude-haiku-5-5/report.md
+must_find:
+- item: price is strongly right-skewed and has extreme outliers.
+  label: yes
+  note: ''
+- item: size_sqm has a strong positive association with price.
+  label: yes
+  note: ''
+- item: age_years has a negative association with price.
+  label: yes
+  note: ''
+- item: rating shows no meaningful association with price.
+  label: yes
+  note: ''
+must_not_claim:
+- item: rating is a significant or important predictor of price.
+  label: no
+  note: ''
+- item: price is treated as a classification target (accuracy, precision or recall reported
+    for it).
+  label: no
+  note: ''
+caveats:
+- item: outliers
+  label: yes
+  note: 'tested with outliers excluded'

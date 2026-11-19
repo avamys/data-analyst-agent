@@ -1,0 +1,55 @@
+{
+  "model": "claude-sonnet-5-5",
+  "served_by": "claude-sonnet-5-5",
+  "prompt": "983aca5d02a5",
+  "must_find": [
+    {
+      "item": "sales rise over time (an upward trend across the two years).",
+      "quote": "a persistent upward trend shapes the level of sales over the two-year window",
+      "reason": "The report states an upward trend in sales over the window, though with moderate confidence and inferred from model results rather than a direct test.",
+      "verdict": "yes",
+      "quote_found": true
+    },
+    {
+      "item": "sales are higher on weekends than on weekdays.",
+      "quote": "Weekly cycle is the dominant short-term pattern",
+      "reason": "The report identifies weekday patterns and day_of_week importance but never says weekends are higher than weekdays, so the direction is missing.",
+      "verdict": "partly",
+      "quote_found": true
+    },
+    {
+      "item": "Promotion days have higher sales than other days.",
+      "quote": "Promo days average **298.4** sales versus **266.3** on non-promo days, a lift of about **+32 units (+12%)**.",
+      "reason": "The report clearly states promo days have higher sales, with numbers and direction.",
+      "verdict": "yes",
+      "quote_found": true
+    }
+  ],
+  "must_not_claim": [
+    {
+      "item": "sales decline over time.",
+      "quote": "Sales trend upward over the window",
+      "reason": "The report claims an upward trend, not a decline.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "temperature is a significant driver of sales.",
+      "quote": "Temperature has no detectable linear relationship with sales (r = 0.016, p = 0.67).",
+      "reason": "The report rejects temperature as a significant driver.",
+      "verdict": "no",
+      "quote_found": true
+    }
+  ],
+  "caveats": [],
+  "scores": {
+    "finding_recall": 0.8333333333333334,
+    "false_claims": 0.0,
+    "caveat_coverage": null,
+    "quotes_not_found": 0
+  },
+  "usage": {
+    "input_tokens": 7522,
+    "output_tokens": 389
+  }
+}

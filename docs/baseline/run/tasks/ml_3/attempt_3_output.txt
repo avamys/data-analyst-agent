@@ -1,0 +1,29 @@
+=== Model Performance ===
+Model: Random Forest Classifier
+Training Accuracy: 97.89%
+Test Accuracy: 82.12%
+
+Test Set Classification Report:
+              precision    recall  f1-score   support
+
+           0       0.83      0.88      0.85       105
+           1       0.81      0.74      0.77        74
+
+    accuracy                           0.82       179
+   macro avg       0.82      0.81      0.81       179
+weighted avg       0.82      0.82      0.82       179
+
+
+=== Top 10 Important Features ===
+Sex: 0.2714
+Fare: 0.2650
+Age: 0.2500
+Pclass: 0.0870
+SibSp: 0.0537
+Parch: 0.0399
+Embarked: 0.0330
+
+=== Interpretation ===
+The Random Forest model achieved a test accuracy of 82.12%.
+Key features influencing survival include Age, Sex, and Pclass based on importance scores.
+Feature importance helps identify which variables are most predictive of the target 'Survived'.

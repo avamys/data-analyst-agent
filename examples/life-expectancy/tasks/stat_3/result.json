@@ -1,0 +1,375 @@
+{
+  "task_id": "stat_3",
+  "specialist": "statistical",
+  "description": "Do the Schooling, Income composition of resources and HIV/AIDS correlations with Life expectancy hold within each Status group, or do they mostly reflect the Developed-Developing gap?",
+  "code": "# %%\nimport matplotlib.pyplot as plt\nimport numpy as np\nimport pandas as pd\n\nfrom agent.execution.runtime import (\n    df,\n    load,\n    publish,\n    record_fact,\n    record_model,\n    save_chart,\n)\n\n# %%\nprint(df.columns.tolist())\nprint(df['Status'].value_counts(dropna=False))\ncols=['Life expectancy ','Schooling','Income composition of resources','HIV/AIDS']\nc=[x for x in df.columns if x.strip() in ['Life expectancy','Schooling','Income composition of resources','HIV/AIDS','Status']]\nprint(c)\nprint(df[c].isna().sum())\nprint(df.groupby(df['Status'].str.strip())[c[:4]].count())\n\n# %%\nimport scipy.stats as st\nd=df.copy()\nd.columns=[c.strip() for c in d.columns]\nd['Status']=d['Status'].str.strip()\ndrv=['Schooling','Income composition of resources','HIV/AIDS']\ndef block(sub):\n    res={}\n    for v in drv:\n        s=sub[['Life expectancy',v]].dropna()\n        r,_=st.pearsonr(s[v],s['Life expectancy'])\n        rho,_=st.spearmanr(s[v],s['Life expectancy'])\n        res[v]=(len(s),r,rho)\n    return res\ngroups={'pooled':d,'Developed':d[d.Status=='Developed'],'Developing':d[d.Status=='Developing']}\nR={g:block(s) for g,s in groups.items()}\nfor g in R:\n    for v in drv:\n        n,r,rho=R[g][v]\n        print(g,v,n,round(r,3),round(rho,3))\n        key=(g+'_'+v).replace(' ','_').replace('/','_')+'_corr'\n        record_fact(key,{'n':int(n),'pearson_r':float(r),'spearman_rho':float(rho)},'Correlation of '+v+' with Life expectancy, group '+g)\nfor v in drv:\n    n1,r1,_=R['Developed'][v]\n    n2,r2,_=R['Developing'][v]\n    zs=(np.arctanh(r1)-np.arctanh(r2))/np.sqrt(1/(n1-3)+1/(n2-3))\n    p=2*(1-st.norm.cdf(abs(zs)))\n    print('fisher',v,round(zs,3),p)\n    key=('fisher_dev_vs_ing_'+v).replace(' ','_').replace('/','_')\n    record_fact(key,{'z':float(zs),'p_value':float(p)},'Fisher z test of Pearson r, Developed vs Developing, for '+v)\ndef boot(v,B=1000,seed=0):\n    s=d[['Status','Life expectancy',v]].dropna()\n    rng=np.random.default_rng(seed)\n    x0=s[v].values; y0=s['Life expectancy'].values; g0=s.Status.values\n    rp0=np.corrcoef(x0,y0)[0,1]\n    out={}\n    for g in ['Developed','Developing']:\n        m=g0==g\n        out[g]=[rp0-np.corrcoef(x0[m],y0[m])[0,1],[]]\n    for _ in range(B):\n        idx=rng.integers(0,len(s),len(s))\n        x=x0[idx]; y=y0[idx]; gg=g0[idx]\n        rp=np.corrcoef(x,y)[0,1]\n        for g in out:\n            m=gg==g\n            out[g][1].append(rp-np.corrcoef(x[m],y[m])[0,1])\n    return {g:(out[g][0],np.percentile(out[g][1],[2.5,97.5]).tolist()) for g in out}\nfor v in drv:\n    bres=boot(v)\n    for g in bres:\n        est,ci=bres[g]\n        print('boot',v,g,round(est,3),[round(c,3) for c in ci])\n        key=('boot_pooled_minus_within_'+g+'_'+v).replace(' ','_').replace('/','_')\n        record_fact(key,{'diff_pearson_pooled_minus_within':float(est),'ci_low':float(ci[0]),'ci_high':float(ci[1])},'Bootstrap difference of pooled minus within-'+g+' Pearson r for '+v)\n\n# %%\nimport scipy.stats as st\nprint(d.loc[d.Status=='Developed','HIV/AIDS'].describe())\nprint('unique Developed HIV/AIDS values:', d.loc[d.Status=='Developed','HIV/AIDS'].nunique())\nhv=d.loc[d.Status=='Developed',['Life expectancy','HIV/AIDS']].dropna()\nrecord_fact('developed_hiv_unique_values',{'n':int(len(hv)),'n_unique':int(hv['HIV/AIDS'].nunique()),'min':float(hv['HIV/AIDS'].min()),'max':float(hv['HIV/AIDS'].max())},'HIV/AIDS values among Developed rows with Life expectancy present')\ndef fl(x):\n    return None if (x is None or np.isnan(x)) else float(x)\ndef boot_s(v,B=500,seed=1):\n    s=d[['Status','Life expectancy',v]].dropna()\n    x0=s[v].values; y0=s['Life expectancy'].values; g0=s.Status.values\n    rho0=st.spearmanr(x0,y0)[0]\n    gs=['Developed','Developing']\n    out={}\n    for g in gs:\n        m=g0==g\n        out[g]=[rho0-st.spearmanr(x0[m],y0[m])[0],[]] if len(set(x0[m]))>1 else [np.nan,[]]\n    rng=np.random.default_rng(seed)\n    for _ in range(B):\n        idx=rng.integers(0,len(s),len(s))\n        x=x0[idx]; y=y0[idx]; gg=g0[idx]\n        rp=st.spearmanr(x,y)[0]\n        for g in gs:\n            m=gg==g\n            if len(set(x[m]))>1 and len(set(y[m]))>1:\n                out[g][1].append(rp-st.spearmanr(x[m],y[m])[0])\n    res={}\n    for g in gs:\n        arr=out[g][1]\n        ci=np.percentile(arr,[2.5,97.5]).tolist() if len(arr)>0 else [np.nan,np.nan]\n        res[g]=(out[g][0],ci,len(arr))\n    return res\nfor v in ['Schooling','Income composition of resources','HIV/AIDS']:\n    res=boot_s(v)\n    for g in res:\n        est,ci,nb=res[g]\n        print('spearman boot',v,g,est,ci,nb)\n        key=('boot_spearman_pooled_minus_within_'+g+'_'+v).replace(' ','_').replace('/','_')\n        record_fact(key,{'diff_spearman_pooled_minus_within':fl(est),'ci_low':fl(ci[0]),'ci_high':fl(ci[1]),'n_valid_resamples':int(nb)},'Bootstrap difference of pooled minus within-'+g+' Spearman rho for '+v+' (500 resamples; resamples with constant group input skipped)')\n\n# %%\nfig,ax=plt.subplots(figsize=(9,5))\nx=np.arange(len(drv)); w=0.25\nfor i,g in enumerate(['pooled','Developed','Developing']):\n    vals=[float(R[g][v][1]) for v in drv]\n    ax.bar(x+(i-1)*w, vals, w, label=g)\nax.set_xticks(x)\nax.set_xticklabels(['Schooling','Income composition\\nof resources','HIV/AIDS'])\nax.set_ylabel('Pearson r with Life expectancy (correlation coefficient)')\nax.set_title('Pearson r with Life expectancy: pooled rows vs Developed rows vs Developing rows')\nax.axhline(0,color='grey',lw=0.8)\nax.legend(title='Rows used')\nsave_chart(fig,'within_group_pearson','Pearson correlation of each driver with Life expectancy, pooled and within each Status group. The Developed HIV/AIDS bar is absent because HIV/AIDS is constant (0.1) among Developed rows, so r is undefined.')\nplt.close(fig)\n",
+  "output": "['Country', 'Year', 'Status', 'Life expectancy ', 'Adult Mortality', 'infant deaths', 'Alcohol', 'percentage expenditure', 'Hepatitis B', 'Measles ', ' BMI ', 'under-five deaths ', 'Polio', 'Total expenditure', 'Diphtheria ', ' HIV/AIDS', 'GDP', 'Population', ' thinness  1-19 years', ' thinness 5-9 years', 'Income composition of resources', 'Schooling']\nStatus\nDeveloping    2426\nDeveloped      512\nName: count, dtype: int64\n['Status', 'Life expectancy ', ' HIV/AIDS', 'Income composition of resources', 'Schooling']\nStatus                               0\nLife expectancy                     10\n HIV/AIDS                            0\nIncome composition of resources    167\nSchooling                          163\ndtype: int64\n            Status  ...  Income composition of resources\nStatus              ...                                 \nDeveloped      512  ...                              464\nDeveloping    2426  ...                             2307\n\n[2 rows x 4 columns]\n<cell 2>:10: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.\n  r,_=st.pearsonr(s[v],s['Life expectancy'])\n<cell 2>:11: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.\n  rho,_=st.spearmanr(s[v],s['Life expectancy'])\npooled Schooling 2768 0.752 0.814\npooled Income composition of resources 2768 0.725 0.866\npooled HIV/AIDS 2928 -0.557 -0.754\nDeveloped Schooling 464 0.395 0.392\nDeveloped Income composition of resources 464 0.724 0.741\nDeveloped HIV/AIDS 512 nan nan\nDeveloping Schooling 2304 0.688 0.756\nDeveloping Income composition of resources 2304 0.644 0.806\nDeveloping HIV/AIDS 2416 -0.571 -0.758\nfisher Schooling -8.357 0.0\nfisher Income composition of resources 2.957 0.003107251850394732\nfisher HIV/AIDS nan nan\nboot Schooling Developed 0.357 [0.292, 0.421]\nboot Schooling Developing 0.064 [0.054, 0.074]\nboot Income composition of resources Developed 0.001 [-0.051, 0.053]\nboot Income composition of resources Developing 0.081 [0.07, 0.091]\n/workspaces/agents/.venv/lib/python3.12/site-packages/numpy/lib/_function_base_impl.py:3065: RuntimeWarning: invalid value encountered in divide\n  c /= stddev[:, None]\n/workspaces/agents/.venv/lib/python3.12/site-packages/numpy/lib/_function_base_impl.py:3066: RuntimeWarning: invalid value encountered in divide\n  c /= stddev[None, :]\nboot HIV/AIDS Developed -0.557 [nan, nan]\nboot HIV/AIDS Developing 0.014 [0.01, 0.018]\ncount    5.120000e+02\nmean     1.000000e-01\nstd      1.389136e-17\nmin      1.000000e-01\n25%      1.000000e-01\n50%      1.000000e-01\n75%      1.000000e-01\nmax      1.000000e-01\nName: HIV/AIDS, dtype: float64\nunique Developed HIV/AIDS values: 1\nspearman boot Schooling Developed 0.4214843341081052 [0.3584205230264217, 0.4881841455169075] 500\nspearman boot Schooling Developing 0.05781310161248199 [0.04810147891317744, 0.06698469646319488] 500\nspearman boot Income composition of resources Developed 0.12465780142956795 [0.07908839022782835, 0.17570466801602316] 500\nspearman boot Income composition of resources Developing 0.059918556343497964 [0.05208434485296804, 0.06860889167808114] 500\nspearman boot HIV/AIDS Developed nan [nan, nan] 0\nspearman boot HIV/AIDS Developing 0.004037440456373109 [-0.00045240214680111437, 0.008824335182528394] 500\n",
+  "execution_time": 35.46,
+  "success": true,
+  "error": null,
+  "report": {
+    "status": "partial",
+    "findings": [
+      {
+        "statement": "Schooling does not hold within Developed rows in rank terms. The pooled Spearman is 0.814 (n=2768), while within Developed rows it is 0.392 (n=464) and within Developing rows it is 0.756 (n=2304). The pooled minus within-Developed Spearman difference is 0.421 (bootstrap CI 0.358 to 0.488). Within-Developing, the pooled minus within Spearman gap is 0.058 (CI 0.048 to 0.067). The Pearson picture is the same direction: within Developed r is 0.395 against pooled 0.752, and the Fisher test gives z=-8.36. So the Schooling correlation mostly reflects the Developed-Developing gap, with the Developed rank association far below pooled. A strong association remains within Developing rows (r=0.688, Spearman 0.756).",
+        "facts": [
+          "pooled_Schooling_corr",
+          "Developed_Schooling_corr",
+          "Developing_Schooling_corr",
+          "fisher_dev_vs_ing_Schooling",
+          "boot_pooled_minus_within_Developed_Schooling",
+          "boot_spearman_pooled_minus_within_Developed_Schooling",
+          "boot_spearman_pooled_minus_within_Developing_Schooling"
+        ]
+      },
+      {
+        "statement": "Income composition of resources holds within each Status group in the Pearson sense but not in the rank sense. Within Developed rows the Pearson r is 0.724 (n=464), essentially equal to pooled 0.725 (difference 0.001, CI -0.051 to 0.053). Within Developing rows the Pearson r is 0.644 (n=2304), 0.081 below pooled (CI 0.070 to 0.091). For Spearman, the pooled value is 0.866, within Developed is 0.741, and within Developing is 0.806. The pooled minus within-Developed Spearman gap is 0.125 (CI 0.079 to 0.176), and the pooled minus within-Developing Spearman gap is 0.060 (CI 0.052 to 0.069). The rank association is therefore materially weaker than pooled in both groups, and the status gap contributes to the pooled rank strength. The Fisher test for Developed vs Developing Pearson gives z=2.96, p=0.003.",
+        "facts": [
+          "pooled_Income_composition_of_resources_corr",
+          "Developed_Income_composition_of_resources_corr",
+          "Developing_Income_composition_of_resources_corr",
+          "fisher_dev_vs_ing_Income_composition_of_resources",
+          "boot_pooled_minus_within_Developed_Income_composition_of_resources",
+          "boot_pooled_minus_within_Developing_Income_composition_of_resources",
+          "boot_spearman_pooled_minus_within_Developed_Income_composition_of_resources",
+          "boot_spearman_pooled_minus_within_Developing_Income_composition_of_resources"
+        ]
+      },
+      {
+        "statement": "HIV/AIDS cannot be assessed within Developed rows, because all 512 Developed rows with Life expectancy have HIV/AIDS equal to 0.1. Within Developing rows (n=2416) the Pearson r is -0.571 and the Spearman is -0.758, close to pooled -0.557 and -0.754. The pooled minus within-Developing Pearson gap is 0.014 (CI 0.010 to 0.018), and the Spearman gap is 0.004 (CI -0.0005 to 0.009). The association holds within Developing rows and is not a status artefact, but the Developed comparison is untestable.",
+        "facts": [
+          "pooled_HIV_AIDS_corr",
+          "Developing_HIV_AIDS_corr",
+          "developed_hiv_unique_values",
+          "boot_pooled_minus_within_Developing_HIV_AIDS",
+          "boot_spearman_pooled_minus_within_Developing_HIV_AIDS"
+        ]
+      },
+      {
+        "statement": "Caveat: rows are repeated country-year observations, so the Fisher z tests and row-resampling bootstrap CIs are likely too narrow and too significant. The direction and size of the differences are the robust part. Conclusions should be checked with country-level resampling, especially for the small Developed sample (n=464).",
+        "facts": [
+          "fisher_dev_vs_ing_Schooling",
+          "fisher_dev_vs_ing_Income_composition_of_resources"
+        ]
+      }
+    ],
+    "follow_ups": [
+      "Do the within-Developed Schooling and Income composition correlations, both Pearson and Spearman, hold when resampling by country rather than by row, given the small Developed sample (n=464)?",
+      "Why is the within-Developed Schooling Spearman (0.392) so far below its Developing value (0.756), and does the Developed range of schooling restrict the rank association?",
+      "Within Developing rows, does the HIV/AIDS association change between 0.8 and higher prevalence levels?",
+      "Do the GDP correlations also hold within each Status group, or do they mostly reflect the status gap?"
+    ]
+  },
+  "facts": {
+    "pooled_Schooling_corr": {
+      "value": {
+        "n": 2768,
+        "pearson_r": 0.7519754627366979,
+        "spearman_rho": 0.8135410047690934
+      },
+      "desc": "Correlation of Schooling with Life expectancy, group pooled",
+      "cell": 2
+    },
+    "pooled_Income_composition_of_resources_corr": {
+      "value": {
+        "n": 2768,
+        "pearson_r": 0.7247759785960612,
+        "spearman_rho": 0.8657015149223543
+      },
+      "desc": "Correlation of Income composition of resources with Life expectancy, group pooled",
+      "cell": 2
+    },
+    "pooled_HIV_AIDS_corr": {
+      "value": {
+        "n": 2928,
+        "pearson_r": -0.5565562534006934,
+        "spearman_rho": -0.7536418801161249
+      },
+      "desc": "Correlation of HIV/AIDS with Life expectancy, group pooled",
+      "cell": 2
+    },
+    "Developed_Schooling_corr": {
+      "value": {
+        "n": 464,
+        "pearson_r": 0.39521013146457706,
+        "spearman_rho": 0.3920566706609882
+      },
+      "desc": "Correlation of Schooling with Life expectancy, group Developed",
+      "cell": 2
+    },
+    "Developed_Income_composition_of_resources_corr": {
+      "value": {
+        "n": 464,
+        "pearson_r": 0.7240268377185943,
+        "spearman_rho": 0.7410437134927863
+      },
+      "desc": "Correlation of Income composition of resources with Life expectancy, group Developed",
+      "cell": 2
+    },
+    "Developed_HIV_AIDS_corr": {
+      "value": {
+        "n": 512,
+        "pearson_r": null,
+        "spearman_rho": null
+      },
+      "desc": "Correlation of HIV/AIDS with Life expectancy, group Developed",
+      "cell": 2
+    },
+    "Developing_Schooling_corr": {
+      "value": {
+        "n": 2304,
+        "pearson_r": 0.6881189561058065,
+        "spearman_rho": 0.7557279031566114
+      },
+      "desc": "Correlation of Schooling with Life expectancy, group Developing",
+      "cell": 2
+    },
+    "Developing_Income_composition_of_resources_corr": {
+      "value": {
+        "n": 2304,
+        "pearson_r": 0.6441139873603662,
+        "spearman_rho": 0.8057829585788563
+      },
+      "desc": "Correlation of Income composition of resources with Life expectancy, group Developing",
+      "cell": 2
+    },
+    "Developing_HIV_AIDS_corr": {
+      "value": {
+        "n": 2416,
+        "pearson_r": -0.5705963453345724,
+        "spearman_rho": -0.757679320572498
+      },
+      "desc": "Correlation of HIV/AIDS with Life expectancy, group Developing",
+      "cell": 2
+    },
+    "fisher_dev_vs_ing_Schooling": {
+      "value": {
+        "z": -8.356586791654045,
+        "p_value": 0.0
+      },
+      "desc": "Fisher z test of Pearson r, Developed vs Developing, for Schooling",
+      "cell": 2
+    },
+    "fisher_dev_vs_ing_Income_composition_of_resources": {
+      "value": {
+        "z": 2.956923513853246,
+        "p_value": 0.003107251850394732
+      },
+      "desc": "Fisher z test of Pearson r, Developed vs Developing, for Income composition of resources",
+      "cell": 2
+    },
+    "fisher_dev_vs_ing_HIV_AIDS": {
+      "value": {
+        "z": null,
+        "p_value": null
+      },
+      "desc": "Fisher z test of Pearson r, Developed vs Developing, for HIV/AIDS",
+      "cell": 2
+    },
+    "boot_pooled_minus_within_Developed_Schooling": {
+      "value": {
+        "diff_pearson_pooled_minus_within": 0.3567653312721203,
+        "ci_low": 0.29179891576218714,
+        "ci_high": 0.42052848458531156
+      },
+      "desc": "Bootstrap difference of pooled minus within-Developed Pearson r for Schooling",
+      "cell": 2
+    },
+    "boot_pooled_minus_within_Developing_Schooling": {
+      "value": {
+        "diff_pearson_pooled_minus_within": 0.06385650663089104,
+        "ci_low": 0.05428467001828322,
+        "ci_high": 0.07430042312148989
+      },
+      "desc": "Bootstrap difference of pooled minus within-Developing Pearson r for Schooling",
+      "cell": 2
+    },
+    "boot_pooled_minus_within_Developed_Income_composition_of_resources": {
+      "value": {
+        "diff_pearson_pooled_minus_within": 0.0007491408774659147,
+        "ci_low": -0.050530787726015755,
+        "ci_high": 0.053155600499308106
+      },
+      "desc": "Bootstrap difference of pooled minus within-Developed Pearson r for Income composition of resources",
+      "cell": 2
+    },
+    "boot_pooled_minus_within_Developing_Income_composition_of_resources": {
+      "value": {
+        "diff_pearson_pooled_minus_within": 0.08066199123569495,
+        "ci_low": 0.07025619257132625,
+        "ci_high": 0.09138664156571874
+      },
+      "desc": "Bootstrap difference of pooled minus within-Developing Pearson r for Income composition of resources",
+      "cell": 2
+    },
+    "boot_pooled_minus_within_Developed_HIV_AIDS": {
+      "value": {
+        "diff_pearson_pooled_minus_within": -0.5565562534006948,
+        "ci_low": null,
+        "ci_high": null
+      },
+      "desc": "Bootstrap difference of pooled minus within-Developed Pearson r for HIV/AIDS",
+      "cell": 2
+    },
+    "boot_pooled_minus_within_Developing_HIV_AIDS": {
+      "value": {
+        "diff_pearson_pooled_minus_within": 0.014040091933879006,
+        "ci_low": 0.010313706359838849,
+        "ci_high": 0.017719634803326008
+      },
+      "desc": "Bootstrap difference of pooled minus within-Developing Pearson r for HIV/AIDS",
+      "cell": 2
+    },
+    "developed_hiv_unique_values": {
+      "value": {
+        "n": 512,
+        "n_unique": 1,
+        "min": 0.1,
+        "max": 0.1
+      },
+      "desc": "HIV/AIDS values among Developed rows with Life expectancy present",
+      "cell": 3
+    },
+    "boot_spearman_pooled_minus_within_Developed_Schooling": {
+      "value": {
+        "diff_spearman_pooled_minus_within": 0.4214843341081052,
+        "ci_low": 0.3584205230264217,
+        "ci_high": 0.4881841455169075,
+        "n_valid_resamples": 500
+      },
+      "desc": "Bootstrap difference of pooled minus within-Developed Spearman rho for Schooling (500 resamples; resamples with constant group input skipped)",
+      "cell": 3
+    },
+    "boot_spearman_pooled_minus_within_Developing_Schooling": {
+      "value": {
+        "diff_spearman_pooled_minus_within": 0.05781310161248199,
+        "ci_low": 0.04810147891317744,
+        "ci_high": 0.06698469646319488,
+        "n_valid_resamples": 500
+      },
+      "desc": "Bootstrap difference of pooled minus within-Developing Spearman rho for Schooling (500 resamples; resamples with constant group input skipped)",
+      "cell": 3
+    },
+    "boot_spearman_pooled_minus_within_Developed_Income_composition_of_resources": {
+      "value": {
+        "diff_spearman_pooled_minus_within": 0.12465780142956795,
+        "ci_low": 0.07908839022782835,
+        "ci_high": 0.17570466801602316,
+        "n_valid_resamples": 500
+      },
+      "desc": "Bootstrap difference of pooled minus within-Developed Spearman rho for Income composition of resources (500 resamples; resamples with constant group input skipped)",
+      "cell": 3
+    },
+    "boot_spearman_pooled_minus_within_Developing_Income_composition_of_resources": {
+      "value": {
+        "diff_spearman_pooled_minus_within": 0.059918556343497964,
+        "ci_low": 0.05208434485296804,
+        "ci_high": 0.06860889167808114,
+        "n_valid_resamples": 500
+      },
+      "desc": "Bootstrap difference of pooled minus within-Developing Spearman rho for Income composition of resources (500 resamples; resamples with constant group input skipped)",
+      "cell": 3
+    },
+    "boot_spearman_pooled_minus_within_Developed_HIV_AIDS": {
+      "value": {
+        "diff_spearman_pooled_minus_within": null,
+        "ci_low": null,
+        "ci_high": null,
+        "n_valid_resamples": 0
+      },
+      "desc": "Bootstrap difference of pooled minus within-Developed Spearman rho for HIV/AIDS (500 resamples; resamples with constant group input skipped)",
+      "cell": 3
+    },
+    "boot_spearman_pooled_minus_within_Developing_HIV_AIDS": {
+      "value": {
+        "diff_spearman_pooled_minus_within": 0.004037440456373109,
+        "ci_low": -0.00045240214680111437,
+        "ci_high": 0.008824335182528394,
+        "n_valid_resamples": 500
+      },
+      "desc": "Bootstrap difference of pooled minus within-Developing Spearman rho for HIV/AIDS (500 resamples; resamples with constant group input skipped)",
+      "cell": 3
+    }
+  },
+  "charts": {
+    "within_group_pearson": {
+      "file": "charts/within_group_pearson.png",
+      "caption": "Pearson correlation of each driver with Life expectancy, pooled and within each Status group. The Developed HIV/AIDS bar is absent because HIV/AIDS is constant (0.1) among Developed rows, so r is undefined.",
+      "cell": 4
+    }
+  },
+  "published": [],
+  "artifacts": [],
+  "attempts": [
+    {
+      "attempt": 1,
+      "revision": 0,
+      "step": 1,
+      "code": "print(df.columns.tolist())\nprint(df['Status'].value_counts(dropna=False))\ncols=['Life expectancy ','Schooling','Income composition of resources','HIV/AIDS']\nc=[x for x in df.columns if x.strip() in ['Life expectancy','Schooling','Income composition of resources','HIV/AIDS','Status']]\nprint(c)\nprint(df[c].isna().sum())\nprint(df.groupby(df['Status'].str.strip())[c[:4]].count())",
+      "output": "['Country', 'Year', 'Status', 'Life expectancy ', 'Adult Mortality', 'infant deaths', 'Alcohol', 'percentage expenditure', 'Hepatitis B', 'Measles ', ' BMI ', 'under-five deaths ', 'Polio', 'Total expenditure', 'Diphtheria ', ' HIV/AIDS', 'GDP', 'Population', ' thinness  1-19 years', ' thinness 5-9 years', 'Income composition of resources', 'Schooling']\nStatus\nDeveloping    2426\nDeveloped      512\nName: count, dtype: int64\n['Status', 'Life expectancy ', ' HIV/AIDS', 'Income composition of resources', 'Schooling']\nStatus                               0\nLife expectancy                     10\n HIV/AIDS                            0\nIncome composition of resources    167\nSchooling                          163\ndtype: int64\n            Status  ...  Income composition of resources\nStatus              ...                                 \nDeveloped      512  ...                              464\nDeveloping    2426  ...                             2307\n\n[2 rows x 4 columns]\n",
+      "error": null,
+      "seconds": 3.86
+    },
+    {
+      "attempt": 2,
+      "revision": 0,
+      "step": 2,
+      "code": "import scipy.stats as st\nd=df.copy()\nd.columns=[c.strip() for c in d.columns]\nd['Status']=d['Status'].str.strip()\ndrv=['Schooling','Income composition of resources','HIV/AIDS']\ndef block(sub):\n    res={}\n    for v in drv:\n        s=sub[['Life expectancy',v]].dropna()\n        r,_=st.pearsonr(s[v],s['Life expectancy'])\n        rho,_=st.spearmanr(s[v],s['Life expectancy'])\n        res[v]=(len(s),r,rho)\n    return res\ngroups={'pooled':d,'Developed':d[d.Status=='Developed'],'Developing':d[d.Status=='Developing']}\nR={g:block(s) for g,s in groups.items()}\nfor g in R:\n    for v in drv:\n        n,r,rho=R[g][v]\n        print(g,v,n,round(r,3),round(rho,3))\n        key=(g+'_'+v).replace(' ','_').replace('/','_')+'_corr'\n        record_fact(key,{'n':int(n),'pearson_r':float(r),'spearman_rho':float(rho)},'Correlation of '+v+' with Life expectancy, group '+g)\nfor v in drv:\n    n1,r1,_=R['Developed'][v]\n    n2,r2,_=R['Developing'][v]\n    zs=(np.arctanh(r1)-np.arctanh(r2))/np.sqrt(1/(n1-3)+1/(n2-3))\n    p=2*(1-st.norm.cdf(abs(zs)))\n    print('fisher',v,round(zs,3),p)\n    key=('fisher_dev_vs_ing_'+v).replace(' ','_').replace('/','_')\n    record_fact(key,{'z':float(zs),'p_value':float(p)},'Fisher z test of Pearson r, Developed vs Developing, for '+v)\ndef boot(v,B=1000,seed=0):\n    s=d[['Status','Life expectancy',v]].dropna()\n    rng=np.random.default_rng(seed)\n    x0=s[v].values; y0=s['Life expectancy'].values; g0=s.Status.values\n    rp0=np.corrcoef(x0,y0)[0,1]\n    out={}\n    for g in ['Developed','Developing']:\n        m=g0==g\n        out[g]=[rp0-np.corrcoef(x0[m],y0[m])[0,1],[]]\n    for _ in range(B):\n        idx=rng.integers(0,len(s),len(s))\n        x=x0[idx]; y=y0[idx]; gg=g0[idx]\n        rp=np.corrcoef(x,y)[0,1]\n        for g in out:\n            m=gg==g\n            out[g][1].append(rp-np.corrcoef(x[m],y[m])[0,1])\n    return {g:(out[g][0],np.percentile(out[g][1],[2.5,97.5]).tolist()) for g in out}\nfor v in drv:\n    bres=boot(v)\n    for g in bres:\n        est,ci=bres[g]\n        print('boot',v,g,round(est,3),[round(c,3) for c in ci])\n        key=('boot_pooled_minus_within_'+g+'_'+v).replace(' ','_').replace('/','_')\n        record_fact(key,{'diff_pearson_pooled_minus_within':float(est),'ci_low':float(ci[0]),'ci_high':float(ci[1])},'Bootstrap difference of pooled minus within-'+g+' Pearson r for '+v)",
+      "output": "<cell 2>:10: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.\n  r,_=st.pearsonr(s[v],s['Life expectancy'])\n<cell 2>:11: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.\n  rho,_=st.spearmanr(s[v],s['Life expectancy'])\npooled Schooling 2768 0.752 0.814\npooled Income composition of resources 2768 0.725 0.866\npooled HIV/AIDS 2928 -0.557 -0.754\nDeveloped Schooling 464 0.395 0.392\nDeveloped Income composition of resources 464 0.724 0.741\nDeveloped HIV/AIDS 512 nan nan\nDeveloping Schooling 2304 0.688 0.756\nDeveloping Income composition of resources 2304 0.644 0.806\nDeveloping HIV/AIDS 2416 -0.571 -0.758\nfisher Schooling -8.357 0.0\nfisher Income composition of resources 2.957 0.003107251850394732\nfisher HIV/AIDS nan nan\nboot Schooling Developed 0.357 [0.292, 0.421]\nboot Schooling Developing 0.064 [0.054, 0.074]\nboot Income composition of resources Developed 0.001 [-0.051, 0.053]\nboot Income composition of resources Developing 0.081 [0.07, 0.091]\n/workspaces/agents/.venv/lib/python3.12/site-packages/numpy/lib/_function_base_impl.py:3065: RuntimeWarning: invalid value encountered in divide\n  c /= stddev[:, None]\n/workspaces/agents/.venv/lib/python3.12/site-packages/numpy/lib/_function_base_impl.py:3066: RuntimeWarning: invalid value encountered in divide\n  c /= stddev[None, :]\nboot HIV/AIDS Developed -0.557 [nan, nan]\nboot HIV/AIDS Developing 0.014 [0.01, 0.018]\n",
+      "error": null,
+      "seconds": 7.74
+    },
+    {
+      "attempt": 3,
+      "revision": 0,
+      "step": 3,
+      "code": "import scipy.stats as st\nprint(d.loc[d.Status=='Developed','HIV/AIDS'].describe())\nprint('unique Developed HIV/AIDS values:', d.loc[d.Status=='Developed','HIV/AIDS'].nunique())\nhv=d.loc[d.Status=='Developed',['Life expectancy','HIV/AIDS']].dropna()\nrecord_fact('developed_hiv_unique_values',{'n':int(len(hv)),'n_unique':int(hv['HIV/AIDS'].nunique()),'min':float(hv['HIV/AIDS'].min()),'max':float(hv['HIV/AIDS'].max())},'HIV/AIDS values among Developed rows with Life expectancy present')\ndef fl(x):\n    return None if (x is None or np.isnan(x)) else float(x)\ndef boot_s(v,B=500,seed=1):\n    s=d[['Status','Life expectancy',v]].dropna()\n    x0=s[v].values; y0=s['Life expectancy'].values; g0=s.Status.values\n    rho0=st.spearmanr(x0,y0)[0]\n    gs=['Developed','Developing']\n    out={}\n    for g in gs:\n        m=g0==g\n        out[g]=[rho0-st.spearmanr(x0[m],y0[m])[0],[]] if len(set(x0[m]))>1 else [np.nan,[]]\n    rng=np.random.default_rng(seed)\n    for _ in range(B):\n        idx=rng.integers(0,len(s),len(s))\n        x=x0[idx]; y=y0[idx]; gg=g0[idx]\n        rp=st.spearmanr(x,y)[0]\n        for g in gs:\n            m=gg==g\n            if len(set(x[m]))>1 and len(set(y[m]))>1:\n                out[g][1].append(rp-st.spearmanr(x[m],y[m])[0])\n    res={}\n    for g in gs:\n        arr=out[g][1]\n        ci=np.percentile(arr,[2.5,97.5]).tolist() if len(arr)>0 else [np.nan,np.nan]\n        res[g]=(out[g][0],ci,len(arr))\n    return res\nfor v in ['Schooling','Income composition of resources','HIV/AIDS']:\n    res=boot_s(v)\n    for g in res:\n        est,ci,nb=res[g]\n        print('spearman boot',v,g,est,ci,nb)\n        key=('boot_spearman_pooled_minus_within_'+g+'_'+v).replace(' ','_').replace('/','_')\n        record_fact(key,{'diff_spearman_pooled_minus_within':fl(est),'ci_low':fl(ci[0]),'ci_high':fl(ci[1]),'n_valid_resamples':int(nb)},'Bootstrap difference of pooled minus within-'+g+' Spearman rho for '+v+' (500 resamples; resamples with constant group input skipped)')",
+      "output": "count    5.120000e+02\nmean     1.000000e-01\nstd      1.389136e-17\nmin      1.000000e-01\n25%      1.000000e-01\n50%      1.000000e-01\n75%      1.000000e-01\nmax      1.000000e-01\nName: HIV/AIDS, dtype: float64\nunique Developed HIV/AIDS values: 1\nspearman boot Schooling Developed 0.4214843341081052 [0.3584205230264217, 0.4881841455169075] 500\nspearman boot Schooling Developing 0.05781310161248199 [0.04810147891317744, 0.06698469646319488] 500\nspearman boot Income composition of resources Developed 0.12465780142956795 [0.07908839022782835, 0.17570466801602316] 500\nspearman boot Income composition of resources Developing 0.059918556343497964 [0.05208434485296804, 0.06860889167808114] 500\nspearman boot HIV/AIDS Developed nan [nan, nan] 0\nspearman boot HIV/AIDS Developing 0.004037440456373109 [-0.00045240214680111437, 0.008824335182528394] 500\n",
+      "error": null,
+      "seconds": 12.16
+    },
+    {
+      "attempt": 4,
+      "revision": 0,
+      "step": 4,
+      "code": "fig,ax=plt.subplots(figsize=(9,5))\nx=np.arange(len(drv)); w=0.25\nfor i,g in enumerate(['pooled','Developed','Developing']):\n    vals=[float(R[g][v][1]) for v in drv]\n    ax.bar(x+(i-1)*w, vals, w, label=g)\nax.set_xticks(x)\nax.set_xticklabels(['Schooling','Income composition\\nof resources','HIV/AIDS'])\nax.set_ylabel('Pearson r with Life expectancy (correlation coefficient)')\nax.set_title('Pearson r with Life expectancy: pooled rows vs Developed rows vs Developing rows')\nax.axhline(0,color='grey',lw=0.8)\nax.legend(title='Rows used')\nsave_chart(fig,'within_group_pearson','Pearson correlation of each driver with Life expectancy, pooled and within each Status group. The Developed HIV/AIDS bar is absent because HIV/AIDS is constant (0.1) among Developed rows, so r is undefined.')\nplt.close(fig)",
+      "output": "",
+      "error": null,
+      "seconds": 11.7
+    }
+  ],
+  "metadata": {
+    "steps": 4
+  },
+  "brief": {
+    "id": "stat_3",
+    "specialist": "statistical",
+    "question": "Do the Schooling, Income composition of resources and HIV/AIDS correlations with Life expectancy hold within each Status group, or do they mostly reflect the Developed-Developing gap?",
+    "complete_when": "Pearson and Spearman correlations with Life expectancy computed separately within Developed and within Developing rows, with n for each; comparison against the pooled values in eda_2; a test or interval showing whether the within-group coefficients differ from the pooled ones.",
+    "depends_on": [
+      "eda_2"
+    ],
+    "outputs": []
+  },
+  "revisions": 2,
+  "reviews": [
+    {
+      "reasoning": "Numbers match the cited facts: the Pearson and Spearman values, n counts, Fisher z values and bootstrap intervals for Schooling, Income composition and HIV/AIDS all agree with stat_3 facts, and the pooled values agree with eda_2. The HIV/AIDS constancy in Developed rows is correctly stated. Problems: the Fisher tests and row-resampling bootstraps treat repeated country-year rows as independent, which the accepted stat_1 and stat_2 findings flag as making p-values and CIs too narrow; the report has no such caveat. The Income composition conclusion that the association 'is not explained by the status gap' is stronger than the numbers allow, since the within-Developing Pearson is 0.081 below pooled (CI excludes zero) and the within-Developing Spearman gap of 0.060 is omitted. The fact boot_pooled_minus_within_Developed_HIV_AIDS (-0.557) is an artefact of a constant group and should not be used or cited. The brief is otherwise covered. A revision is needed for these points.",
+      "verdict": "revise",
+      "feedback": "1) Add a caveat to the Schooling, Income composition and HIV/AIDS findings that rows are repeated country-year observations, so the Fisher z tests and row-resampling bootstrap CIs are likely too narrow and too significant; state that the direction and size of the differences are the robust part, consistent with the stat_1 and stat_2 caveats. 2) In the Income composition finding, replace 'is not explained by the status gap' with a statement that the association holds within each Status group in the Pearson sense (0.724 Developed, 0.644 Developing) but that the within-Developing Pearson is 0.081 below pooled (CI 0.070 to 0.091) and the within-Developing Spearman is 0.060 below pooled (CI 0.052 to 0.069), so part of the pooled strength is shared with the status gap. 3) Do not cite or use boot_pooled_minus_within_Developed_HIV_AIDS; the Developed HIV/AIDS comparison is untestable and should be reported only as such. 4) Ensure the Schooling conclusion that it 'largely reflects the Developed-Developing gap' is qualified by the within-Developing Pearson of 0.688 remaining strong.",
+      "follow_ups": []
+    },
+    {
+      "reasoning": "Numbers match the recorded facts: the Pearson and Spearman group correlations, n values, Fisher z tests, Pearson bootstrap differences and the HIV/AIDS constant-value check all agree with the stat_3 facts. The brief asks for Spearman comparisons against pooled values with intervals, but the report gives Spearman pooled-minus-within intervals only for Developing rows. The recorded Developed Spearman intervals show large gaps that the report omits: Schooling 0.421 (CI 0.358 to 0.488) and Income composition 0.125 (CI 0.079 to 0.176). The Income finding says the association 'holds within each Status group', which overstates it given the Developed Spearman gap. The HIV/AIDS Developed untestability and the caveats are handled correctly.",
+      "verdict": "revise",
+      "feedback": "Add the within-Developed Spearman comparisons to the Schooling and Income composition findings, citing their facts: Schooling pooled minus within-Developed Spearman is 0.421 (CI 0.358 to 0.488), and Income composition is 0.125 (CI 0.079 to 0.176) from boot_spearman_pooled_minus_within_Developed_Schooling and boot_spearman_pooled_minus_within_Developed_Income_composition_of_resources. State that the Income association holds in the Pearson sense within Developed rows but its rank association is materially weaker than pooled, and that the Developed Schooling Spearman is far below pooled. Revise the Income 'holds within each Status group' wording and the Schooling conclusion to reflect these Spearman gaps.",
+      "follow_ups": []
+    },
+    {
+      "reasoning": "Checked each finding against its cited facts. Schooling: pooled Spearman 0.814 (n=2768), Developed 0.392 (n=464), Developing 0.756 (n=2304), Spearman gaps 0.421 (0.358 to 0.488) and 0.058 (0.048 to 0.067), Pearson Developed 0.395 and Fisher z=-8.36 all match the facts. Income composition: Pearson Developed 0.724, Developing 0.644, pooled 0.725, gaps 0.001 and 0.081, Spearman values 0.866/0.741/0.806, Spearman gaps 0.125 and 0.060, and Fisher z=2.96 (p=0.003) all match. HIV/AIDS: Developed constant at 0.1 (n_unique=1), Developing Pearson -0.571 and Spearman -0.758, Pearson gap 0.014 (0.010 to 0.018) and Spearman gap 0.004 (-0.0005 to 0.009) match. Pooled values agree with eda_2. The brief's requirements (within-group Pearson and Spearman with n, pooled comparison, bootstrap intervals for differences, and a Fisher test) are covered, and the non-independence caveat is stated. The conclusions are proportionate to the numbers. One point to note: fact boot_pooled_minus_within_Developed_HIV_AIDS records -0.5566, which is not a valid difference for a constant group and is not cited by the report, so it should not be used downstream. The automatic checks raised no problems, so I am accepting.",
+      "verdict": "accept",
+      "feedback": "",
+      "follow_ups": []
+    }
+  ]
+}

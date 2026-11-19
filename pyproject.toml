@@ -1,23 +1,68 @@
 [project]
 name = "agent"
 version = "0.1.0"
+description = "Data analyst agent that plans, runs and reports analyses of CSV datasets"
+readme = "README.md"
+license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
-  "ipykernel",
+  "jinja2",
   "matplotlib",
   "langchain",
-  "langchain_experimental",
   "langchain_ollama",
   "langgraph",
-  "mlflow",
+  "langsmith",
   "pandas",
+  "pydantic",
+  "pydantic-settings",
+  "python-dotenv",
   "scikit-learn",
+  "seaborn",
   "scipy",
-  "autogen-core",
-  "autogen-ext[ollama]",
+  "statsmodels",
   "tabulate",
+  "langchain-openai<1",
+  "langchain-anthropic<1",
+  "pyyaml>=6.0.3",
+  "markdown-it-py>=3",
 ]
+
+[project.scripts]
+analyst = "agent.cli:main"
+
+[dependency-groups]
+dev = [
+  "ipykernel",
+  "pytest",
+  "ruff",
+]
+ui = [
+    "streamlit>=1.67.0",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["agent*"]
+include = ["agent*", "app*"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+extend-exclude = [
+  "*.md",               # code blocks in docs are illustrative sketches
+  "docs/baseline/run",  # generated code from the reference run, kept verbatim
+  "evals/heldout",      # kept byte-identical to evals/heldout.sha256
+  "examples/*/tasks",   # scripts the agent wrote in example runs, kept verbatim
+  "evals/heldout2",     # kept byte-identical to evals/heldout2.sha256
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]  # line length is handled by the formatter
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

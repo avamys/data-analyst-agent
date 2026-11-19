@@ -1,0 +1,632 @@
+{
+  "task_id": "eda_4",
+  "specialist": "eda",
+  "description": "Is the rise in mean Life expectancy over 2000 to 2015 the same for Developing and Developed countries, or does the gap between them narrow?",
+  "code": "# %%\nimport matplotlib.pyplot as plt\nimport numpy as np\nimport pandas as pd\n\nfrom agent.execution.runtime import (\n    df,\n    load,\n    publish,\n    record_fact,\n    record_model,\n    save_chart,\n)\n\n# %%\nLE_COL=[c for c in df.columns if c.strip()==\"Life expectancy\"][0]\nd=df[[\"Year\",\"Status\",LE_COL]].copy()\nd.columns=[\"Year\",\"Status\",\"LE\"]\nd[\"Status\"]=d[\"Status\"].astype(str).str.strip()\nd[\"Year\"]=d[\"Year\"].astype(int)\nd=d[(d.Year>=2000)&(d.Year<=2015)]\ndef q1(s): return s.quantile(0.25)\ndef q3(s): return s.quantile(0.75)\naggf=dict(count=\"count\",mean=\"mean\",median=\"median\",sd=\"std\",q1=q1,q3=q3)\ngs=d.groupby([\"Year\",\"Status\"])[\"LE\"].agg(**aggf).round(3)\nprint(gs.unstack(\"Status\").to_string())\nys=d.groupby(\"Year\")[\"LE\"].agg(**aggf).round(3)\nprint(ys.to_string())\ngap=(gs.xs(\"Developed\",level=\"Status\")[\"mean\"]-gs.xs(\"Developing\",level=\"Status\")[\"mean\"]).round(3)\nprint(gap.to_string())\ntbl={}\nfor (y,s),r in gs.iterrows():\n    tbl[f\"{y}_{s}\"]={k:float(v) for k,v in r.items()}\nrecord_fact(\"eda4_le_year_status_stats\",tbl,\"Count, mean, median, SD, Q1, Q3 of Life expectancy by Year and Status, 2000-2015, years\")\nyt={str(y):{k:float(v) for k,v in r.items()} for y,r in ys.iterrows()}\nrecord_fact(\"eda4_le_year_stats\",yt,\"Count, mean, median, SD, Q1, Q3 of Life expectancy by Year, all Status, 2000-2015, years\")\nrecord_fact(\"eda4_gap_by_year\",{str(y):float(v) for y,v in gap.items()},\"Developed minus Developing mean Life expectancy by Year, years\")\n\n# %%\ndev=gs.xs('Developed',level='Status')\ndng=gs.xs('Developing',level='Status')\nrise_dev=float(dev.loc[2015,'mean']-dev.loc[2000,'mean'])\nrise_dng=float(dng.loc[2015,'mean']-dng.loc[2000,'mean'])\ng0=float(gap.loc[2000]); g1=float(gap.loc[2015])\nrecord_fact('eda4_rise_by_status',{'developed_mean_rise':round(rise_dev,3),'developing_mean_rise':round(rise_dng,3),'gap_2000':g0,'gap_2015':g1,'gap_change':round(g1-g0,3)},'Change in mean Life expectancy 2000 to 2015 by Status and change in Developed-Developing mean gap, years')\nfig,ax=plt.subplots(figsize=(8,4.5))\nax.plot(dev.index,dev['mean'],marker='o',label='Developed')\nax.plot(dng.index,dng['mean'],marker='o',label='Developing')\nax.set_title('Mean Life expectancy by Year and Status, 2000-2015')\nax.set_xlabel('Year')\nax.set_ylabel('Mean Life expectancy (years)')\nax.legend()\nax.grid(alpha=0.3)\nsave_chart(fig,'eda4_mean_le_by_status','Mean Life expectancy by Year for Developed and Developing countries, 2000-2015 (years)')\nprint(round(rise_dev,3),round(rise_dng,3),g0,g1)\n\n# %%\nmm=(ys['mean']-ys['median']).round(3)\nprint(mm.to_string())\nrecord_fact('eda4_mean_median_gap_by_year',{str(y):float(v) for y,v in mm.items()},'Mean minus median Life expectancy by Year, all Status, 2000-2015, years')\ncnt=gs['count'].unstack('Status')\nprint(cnt.iloc[[0,-1]].to_string())\nrecord_fact('eda4_rows_by_year_status',{str(y):{s:float(cnt.loc[y,s]) for s in cnt.columns} for y in cnt.index},'Row counts by Year and Status, 2000-2015')\n",
+  "output": "           count                 mean               median                   sd                   q1                   q3           \nStatus Developed Developing Developed Developing Developed Developing Developed Developing Developed Developing Developed Developing\nYear                                                                                                                                \n2000          32        151    76.803     64.620     77.70       67.4     2.744     10.046    75.675      57.40    78.525      72.60\n2001          32        151    77.128     65.010     78.00       67.6     2.948      9.916    75.925      57.55    78.725      73.00\n2002          32        151    77.547     65.191     78.20       67.6     3.049      9.698    76.275      57.95    78.925      73.00\n2003          32        151    77.941     65.207     78.40       67.6     3.614      9.654    76.175      58.00    79.325      73.00\n2004          32        151    78.384     65.371     78.70       68.0     4.331      9.525    75.700      58.20    79.725      73.00\n2005          32        151    78.591     66.009     78.85       68.1     3.449      9.284    77.125      58.75    81.000      73.45\n2006          32        151    79.131     66.450     79.30       68.5     3.959      9.238    76.375      59.25    81.125      73.60\n2007          32        151    79.300     66.861     79.50       68.5     4.028      9.037    77.700      59.95    81.300      73.75\n2008          32        151    78.931     67.414     79.70       68.9     3.622      8.757    76.750      61.40    81.325      73.95\n2009          32        151    79.584     67.894     79.90       69.2     4.005      8.407    76.900      61.70    81.775      74.35\n2010          32        151    80.147     67.909     81.00       69.5     4.277      8.652    77.275      62.00    82.075      74.30\n2011          32        151    80.706     68.524     81.85       71.1     4.269      8.171    77.600      62.25    82.700      74.85\n2012          32        151    80.444     68.898     81.20       69.9     3.821      7.904    77.775      63.10    82.550      74.95\n2013          32        151    80.681     69.234     81.35       71.0     3.810      7.735    78.075      63.95    82.550      74.90\n2014          32        151    81.138     69.502     81.65       71.4     4.162      7.843    78.400      64.20    82.925      75.35\n2015          32        151    80.709     69.690     81.55       71.6     3.461      7.498    78.600      64.60    82.725      75.50\n      count    mean  median      sd     q1     q3\nYear                                             \n2000    183  66.750    71.0  10.296  58.65  74.45\n2001    183  67.129    71.2  10.190  59.00  74.90\n2002    183  67.351    71.4  10.062  59.35  74.80\n2003    183  67.433    71.1  10.128  59.75  74.70\n2004    183  67.646    71.2  10.126  60.70  74.30\n2005    183  68.209    71.6   9.800  63.50  74.95\n2006    183  68.668    72.1   9.815  62.25  75.00\n2007    183  69.036    72.4   9.619  62.05  75.15\n2008    183  69.428    72.4   9.203  62.70  75.35\n2009    183  69.938    72.6   8.989  64.45  76.00\n2010    183  70.049    72.8   9.303  63.45  75.80\n2011    183  70.654    73.3   8.925  63.90  76.10\n2012    183  70.917    73.2   8.562  64.50  76.50\n2013    183  71.236    73.2   8.414  65.60  76.70\n2014    183  71.537    73.6   8.561  65.60  76.85\n2015    183  71.617    73.9   8.124  65.75  76.95\nYear\n2000    12.183\n2001    12.118\n2002    12.356\n2003    12.734\n2004    13.013\n2005    12.582\n2006    12.681\n2007    12.439\n2008    11.517\n2009    11.690\n2010    12.238\n2011    12.182\n2012    11.546\n2013    11.447\n2014    11.636\n2015    11.019\n3.906 5.07 12.183 11.019\nYear\n2000   -4.250\n2001   -4.071\n2002   -4.049\n2003   -3.667\n2004   -3.554\n2005   -3.391\n2006   -3.432\n2007   -3.364\n2008   -2.972\n2009   -2.662\n2010   -2.751\n2011   -2.646\n2012   -2.283\n2013   -1.964\n2014   -2.063\n2015   -2.283\nStatus  Developed  Developing\nYear                         \n2000           32         151\n2015           32         151\n",
+  "execution_time": 10.91,
+  "success": true,
+  "error": null,
+  "report": {
+    "status": "complete",
+    "findings": [
+      {
+        "statement": "Mean Life expectancy rose more for Developing countries than for Developed countries from 2000 to 2015: Developing rose 5.07 years (64.62 to 69.69) and Developed rose 3.91 years (76.80 to 80.71). Row counts are 32 Developed and 151 Developing in every Year, 183 in total per Year.",
+        "facts": [
+          "eda4_rise_by_status",
+          "eda4_le_year_status_stats",
+          "eda4_rows_by_year_status"
+        ]
+      },
+      {
+        "statement": "The Developed-Developing gap in mean Life expectancy narrowed from 12.18 years in 2000 to 11.02 years in 2015, a change of -1.16 years. The gap was not monotonic: it widened to 13.01 in 2004, dipped to 11.52 in 2008, and was 11.02 in 2015.",
+        "facts": [
+          "eda4_gap_by_year",
+          "eda4_rise_by_status"
+        ]
+      },
+      {
+        "statement": "Across all Status groups, the mean minus median Life expectancy gap moved from -4.25 years in 2000 to -2.28 years in 2015, so the mean sits closer to the median by 2015. This is the only spread-related claim supported by the recorded facts.",
+        "facts": [
+          "eda4_mean_median_gap_by_year",
+          "eda4_le_year_stats"
+        ]
+      },
+      {
+        "statement": "Mean and median Life expectancy by Year and Status for 2000 to 2015, with counts, are in the recorded table. Developed 2000 mean 76.80 and median 77.7; Developing 2000 mean 64.62 and median 67.4; Developed 2015 mean 80.71; Developing 2015 mean 69.69. Overall, the Year means rose from 66.75 in 2000 to 71.62 in 2015.",
+        "facts": [
+          "eda4_le_year_status_stats",
+          "eda4_le_year_stats"
+        ]
+      }
+    ],
+    "follow_ups": [
+      "What drives the faster rise in Developing Life expectancy, for example Adult Mortality, HIV/AIDS, schooling or income composition?",
+      "Why did the Developed-Developing gap peak in 2004 and fall to 11.5 years by 2008?",
+      "Are per-Year SD and Q1/Q3 changing for each Status group, which would be needed before any claim about spread?"
+    ]
+  },
+  "facts": {
+    "eda4_le_year_status_stats": {
+      "value": {
+        "2000_Developed": {
+          "count": 32.0,
+          "mean": 76.803,
+          "median": 77.7,
+          "sd": 2.744,
+          "q1": 75.675,
+          "q3": 78.525
+        },
+        "2000_Developing": {
+          "count": 151.0,
+          "mean": 64.62,
+          "median": 67.4,
+          "sd": 10.046,
+          "q1": 57.4,
+          "q3": 72.6
+        },
+        "2001_Developed": {
+          "count": 32.0,
+          "mean": 77.128,
+          "median": 78.0,
+          "sd": 2.948,
+          "q1": 75.925,
+          "q3": 78.725
+        },
+        "2001_Developing": {
+          "count": 151.0,
+          "mean": 65.01,
+          "median": 67.6,
+          "sd": 9.916,
+          "q1": 57.55,
+          "q3": 73.0
+        },
+        "2002_Developed": {
+          "count": 32.0,
+          "mean": 77.547,
+          "median": 78.2,
+          "sd": 3.049,
+          "q1": 76.275,
+          "q3": 78.925
+        },
+        "2002_Developing": {
+          "count": 151.0,
+          "mean": 65.191,
+          "median": 67.6,
+          "sd": 9.698,
+          "q1": 57.95,
+          "q3": 73.0
+        },
+        "2003_Developed": {
+          "count": 32.0,
+          "mean": 77.941,
+          "median": 78.4,
+          "sd": 3.614,
+          "q1": 76.175,
+          "q3": 79.325
+        },
+        "2003_Developing": {
+          "count": 151.0,
+          "mean": 65.207,
+          "median": 67.6,
+          "sd": 9.654,
+          "q1": 58.0,
+          "q3": 73.0
+        },
+        "2004_Developed": {
+          "count": 32.0,
+          "mean": 78.384,
+          "median": 78.7,
+          "sd": 4.331,
+          "q1": 75.7,
+          "q3": 79.725
+        },
+        "2004_Developing": {
+          "count": 151.0,
+          "mean": 65.371,
+          "median": 68.0,
+          "sd": 9.525,
+          "q1": 58.2,
+          "q3": 73.0
+        },
+        "2005_Developed": {
+          "count": 32.0,
+          "mean": 78.591,
+          "median": 78.85,
+          "sd": 3.449,
+          "q1": 77.125,
+          "q3": 81.0
+        },
+        "2005_Developing": {
+          "count": 151.0,
+          "mean": 66.009,
+          "median": 68.1,
+          "sd": 9.284,
+          "q1": 58.75,
+          "q3": 73.45
+        },
+        "2006_Developed": {
+          "count": 32.0,
+          "mean": 79.131,
+          "median": 79.3,
+          "sd": 3.959,
+          "q1": 76.375,
+          "q3": 81.125
+        },
+        "2006_Developing": {
+          "count": 151.0,
+          "mean": 66.45,
+          "median": 68.5,
+          "sd": 9.238,
+          "q1": 59.25,
+          "q3": 73.6
+        },
+        "2007_Developed": {
+          "count": 32.0,
+          "mean": 79.3,
+          "median": 79.5,
+          "sd": 4.028,
+          "q1": 77.7,
+          "q3": 81.3
+        },
+        "2007_Developing": {
+          "count": 151.0,
+          "mean": 66.861,
+          "median": 68.5,
+          "sd": 9.037,
+          "q1": 59.95,
+          "q3": 73.75
+        },
+        "2008_Developed": {
+          "count": 32.0,
+          "mean": 78.931,
+          "median": 79.7,
+          "sd": 3.622,
+          "q1": 76.75,
+          "q3": 81.325
+        },
+        "2008_Developing": {
+          "count": 151.0,
+          "mean": 67.414,
+          "median": 68.9,
+          "sd": 8.757,
+          "q1": 61.4,
+          "q3": 73.95
+        },
+        "2009_Developed": {
+          "count": 32.0,
+          "mean": 79.584,
+          "median": 79.9,
+          "sd": 4.005,
+          "q1": 76.9,
+          "q3": 81.775
+        },
+        "2009_Developing": {
+          "count": 151.0,
+          "mean": 67.894,
+          "median": 69.2,
+          "sd": 8.407,
+          "q1": 61.7,
+          "q3": 74.35
+        },
+        "2010_Developed": {
+          "count": 32.0,
+          "mean": 80.147,
+          "median": 81.0,
+          "sd": 4.277,
+          "q1": 77.275,
+          "q3": 82.075
+        },
+        "2010_Developing": {
+          "count": 151.0,
+          "mean": 67.909,
+          "median": 69.5,
+          "sd": 8.652,
+          "q1": 62.0,
+          "q3": 74.3
+        },
+        "2011_Developed": {
+          "count": 32.0,
+          "mean": 80.706,
+          "median": 81.85,
+          "sd": 4.269,
+          "q1": 77.6,
+          "q3": 82.7
+        },
+        "2011_Developing": {
+          "count": 151.0,
+          "mean": 68.524,
+          "median": 71.1,
+          "sd": 8.171,
+          "q1": 62.25,
+          "q3": 74.85
+        },
+        "2012_Developed": {
+          "count": 32.0,
+          "mean": 80.444,
+          "median": 81.2,
+          "sd": 3.821,
+          "q1": 77.775,
+          "q3": 82.55
+        },
+        "2012_Developing": {
+          "count": 151.0,
+          "mean": 68.898,
+          "median": 69.9,
+          "sd": 7.904,
+          "q1": 63.1,
+          "q3": 74.95
+        },
+        "2013_Developed": {
+          "count": 32.0,
+          "mean": 80.681,
+          "median": 81.35,
+          "sd": 3.81,
+          "q1": 78.075,
+          "q3": 82.55
+        },
+        "2013_Developing": {
+          "count": 151.0,
+          "mean": 69.234,
+          "median": 71.0,
+          "sd": 7.735,
+          "q1": 63.95,
+          "q3": 74.9
+        },
+        "2014_Developed": {
+          "count": 32.0,
+          "mean": 81.138,
+          "median": 81.65,
+          "sd": 4.162,
+          "q1": 78.4,
+          "q3": 82.925
+        },
+        "2014_Developing": {
+          "count": 151.0,
+          "mean": 69.502,
+          "median": 71.4,
+          "sd": 7.843,
+          "q1": 64.2,
+          "q3": 75.35
+        },
+        "2015_Developed": {
+          "count": 32.0,
+          "mean": 80.709,
+          "median": 81.55,
+          "sd": 3.461,
+          "q1": 78.6,
+          "q3": 82.725
+        },
+        "2015_Developing": {
+          "count": 151.0,
+          "mean": 69.69,
+          "median": 71.6,
+          "sd": 7.498,
+          "q1": 64.6,
+          "q3": 75.5
+        }
+      },
+      "desc": "Count, mean, median, SD, Q1, Q3 of Life expectancy by Year and Status, 2000-2015, years",
+      "cell": 1
+    },
+    "eda4_le_year_stats": {
+      "value": {
+        "2000": {
+          "count": 183.0,
+          "mean": 66.75,
+          "median": 71.0,
+          "sd": 10.296,
+          "q1": 58.65,
+          "q3": 74.45
+        },
+        "2001": {
+          "count": 183.0,
+          "mean": 67.129,
+          "median": 71.2,
+          "sd": 10.19,
+          "q1": 59.0,
+          "q3": 74.9
+        },
+        "2002": {
+          "count": 183.0,
+          "mean": 67.351,
+          "median": 71.4,
+          "sd": 10.062,
+          "q1": 59.35,
+          "q3": 74.8
+        },
+        "2003": {
+          "count": 183.0,
+          "mean": 67.433,
+          "median": 71.1,
+          "sd": 10.128,
+          "q1": 59.75,
+          "q3": 74.7
+        },
+        "2004": {
+          "count": 183.0,
+          "mean": 67.646,
+          "median": 71.2,
+          "sd": 10.126,
+          "q1": 60.7,
+          "q3": 74.3
+        },
+        "2005": {
+          "count": 183.0,
+          "mean": 68.209,
+          "median": 71.6,
+          "sd": 9.8,
+          "q1": 63.5,
+          "q3": 74.95
+        },
+        "2006": {
+          "count": 183.0,
+          "mean": 68.668,
+          "median": 72.1,
+          "sd": 9.815,
+          "q1": 62.25,
+          "q3": 75.0
+        },
+        "2007": {
+          "count": 183.0,
+          "mean": 69.036,
+          "median": 72.4,
+          "sd": 9.619,
+          "q1": 62.05,
+          "q3": 75.15
+        },
+        "2008": {
+          "count": 183.0,
+          "mean": 69.428,
+          "median": 72.4,
+          "sd": 9.203,
+          "q1": 62.7,
+          "q3": 75.35
+        },
+        "2009": {
+          "count": 183.0,
+          "mean": 69.938,
+          "median": 72.6,
+          "sd": 8.989,
+          "q1": 64.45,
+          "q3": 76.0
+        },
+        "2010": {
+          "count": 183.0,
+          "mean": 70.049,
+          "median": 72.8,
+          "sd": 9.303,
+          "q1": 63.45,
+          "q3": 75.8
+        },
+        "2011": {
+          "count": 183.0,
+          "mean": 70.654,
+          "median": 73.3,
+          "sd": 8.925,
+          "q1": 63.9,
+          "q3": 76.1
+        },
+        "2012": {
+          "count": 183.0,
+          "mean": 70.917,
+          "median": 73.2,
+          "sd": 8.562,
+          "q1": 64.5,
+          "q3": 76.5
+        },
+        "2013": {
+          "count": 183.0,
+          "mean": 71.236,
+          "median": 73.2,
+          "sd": 8.414,
+          "q1": 65.6,
+          "q3": 76.7
+        },
+        "2014": {
+          "count": 183.0,
+          "mean": 71.537,
+          "median": 73.6,
+          "sd": 8.561,
+          "q1": 65.6,
+          "q3": 76.85
+        },
+        "2015": {
+          "count": 183.0,
+          "mean": 71.617,
+          "median": 73.9,
+          "sd": 8.124,
+          "q1": 65.75,
+          "q3": 76.95
+        }
+      },
+      "desc": "Count, mean, median, SD, Q1, Q3 of Life expectancy by Year, all Status, 2000-2015, years",
+      "cell": 1
+    },
+    "eda4_gap_by_year": {
+      "value": {
+        "2000": 12.183,
+        "2001": 12.118,
+        "2002": 12.356,
+        "2003": 12.734,
+        "2004": 13.013,
+        "2005": 12.582,
+        "2006": 12.681,
+        "2007": 12.439,
+        "2008": 11.517,
+        "2009": 11.69,
+        "2010": 12.238,
+        "2011": 12.182,
+        "2012": 11.546,
+        "2013": 11.447,
+        "2014": 11.636,
+        "2015": 11.019
+      },
+      "desc": "Developed minus Developing mean Life expectancy by Year, years",
+      "cell": 1
+    },
+    "eda4_rise_by_status": {
+      "value": {
+        "developed_mean_rise": 3.906,
+        "developing_mean_rise": 5.07,
+        "gap_2000": 12.183,
+        "gap_2015": 11.019,
+        "gap_change": -1.164
+      },
+      "desc": "Change in mean Life expectancy 2000 to 2015 by Status and change in Developed-Developing mean gap, years",
+      "cell": 2
+    },
+    "eda4_mean_median_gap_by_year": {
+      "value": {
+        "2000": -4.25,
+        "2001": -4.071,
+        "2002": -4.049,
+        "2003": -3.667,
+        "2004": -3.554,
+        "2005": -3.391,
+        "2006": -3.432,
+        "2007": -3.364,
+        "2008": -2.972,
+        "2009": -2.662,
+        "2010": -2.751,
+        "2011": -2.646,
+        "2012": -2.283,
+        "2013": -1.964,
+        "2014": -2.063,
+        "2015": -2.283
+      },
+      "desc": "Mean minus median Life expectancy by Year, all Status, 2000-2015, years",
+      "cell": 3
+    },
+    "eda4_rows_by_year_status": {
+      "value": {
+        "2000": {
+          "Developed": 32.0,
+          "Developing": 151.0
+        },
+        "2001": {
+          "Developed": 32.0,
+          "Developing": 151.0
+        },
+        "2002": {
+          "Developed": 32.0,
+          "Developing": 151.0
+        },
+        "2003": {
+          "Developed": 32.0,
+          "Developing": 151.0
+        },
+        "2004": {
+          "Developed": 32.0,
+          "Developing": 151.0
+        },
+        "2005": {
+          "Developed": 32.0,
+          "Developing": 151.0
+        },
+        "2006": {
+          "Developed": 32.0,
+          "Developing": 151.0
+        },
+        "2007": {
+          "Developed": 32.0,
+          "Developing": 151.0
+        },
+        "2008": {
+          "Developed": 32.0,
+          "Developing": 151.0
+        },
+        "2009": {
+          "Developed": 32.0,
+          "Developing": 151.0
+        },
+        "2010": {
+          "Developed": 32.0,
+          "Developing": 151.0
+        },
+        "2011": {
+          "Developed": 32.0,
+          "Developing": 151.0
+        },
+        "2012": {
+          "Developed": 32.0,
+          "Developing": 151.0
+        },
+        "2013": {
+          "Developed": 32.0,
+          "Developing": 151.0
+        },
+        "2014": {
+          "Developed": 32.0,
+          "Developing": 151.0
+        },
+        "2015": {
+          "Developed": 32.0,
+          "Developing": 151.0
+        }
+      },
+      "desc": "Row counts by Year and Status, 2000-2015",
+      "cell": 3
+    }
+  },
+  "charts": {
+    "eda4_mean_le_by_status": {
+      "file": "charts/eda4_mean_le_by_status.png",
+      "caption": "Mean Life expectancy by Year for Developed and Developing countries, 2000-2015 (years)",
+      "cell": 2
+    }
+  },
+  "published": [],
+  "artifacts": [],
+  "attempts": [
+    {
+      "attempt": 1,
+      "revision": 0,
+      "step": 1,
+      "code": "LE_COL=[c for c in df.columns if c.strip()==\"Life expectancy\"][0]\nd=df[[\"Year\",\"Status\",LE_COL]].copy()\nd.columns=[\"Year\",\"Status\",\"LE\"]\nd[\"Status\"]=d[\"Status\"].astype(str).str.strip()\nd[\"Year\"]=d[\"Year\"].astype(int)\nd=d[(d.Year>=2000)&(d.Year<=2015)]\ndef q1(s): return s.quantile(0.25)\ndef q3(s): return s.quantile(0.75)\naggf=dict(count=\"count\",mean=\"mean\",median=\"median\",sd=\"std\",q1=q1,q3=q3)\ngs=d.groupby([\"Year\",\"Status\"])[\"LE\"].agg(**aggf).round(3)\nprint(gs.unstack(\"Status\").to_string())\nys=d.groupby(\"Year\")[\"LE\"].agg(**aggf).round(3)\nprint(ys.to_string())\ngap=(gs.xs(\"Developed\",level=\"Status\")[\"mean\"]-gs.xs(\"Developing\",level=\"Status\")[\"mean\"]).round(3)\nprint(gap.to_string())\ntbl={}\nfor (y,s),r in gs.iterrows():\n    tbl[f\"{y}_{s}\"]={k:float(v) for k,v in r.items()}\nrecord_fact(\"eda4_le_year_status_stats\",tbl,\"Count, mean, median, SD, Q1, Q3 of Life expectancy by Year and Status, 2000-2015, years\")\nyt={str(y):{k:float(v) for k,v in r.items()} for y,r in ys.iterrows()}\nrecord_fact(\"eda4_le_year_stats\",yt,\"Count, mean, median, SD, Q1, Q3 of Life expectancy by Year, all Status, 2000-2015, years\")\nrecord_fact(\"eda4_gap_by_year\",{str(y):float(v) for y,v in gap.items()},\"Developed minus Developing mean Life expectancy by Year, years\")",
+      "output": "           count                 mean               median                   sd                   q1                   q3           \nStatus Developed Developing Developed Developing Developed Developing Developed Developing Developed Developing Developed Developing\nYear                                                                                                                                \n2000          32        151    76.803     64.620     77.70       67.4     2.744     10.046    75.675      57.40    78.525      72.60\n2001          32        151    77.128     65.010     78.00       67.6     2.948      9.916    75.925      57.55    78.725      73.00\n2002          32        151    77.547     65.191     78.20       67.6     3.049      9.698    76.275      57.95    78.925      73.00\n2003          32        151    77.941     65.207     78.40       67.6     3.614      9.654    76.175      58.00    79.325      73.00\n2004          32        151    78.384     65.371     78.70       68.0     4.331      9.525    75.700      58.20    79.725      73.00\n2005          32        151    78.591     66.009     78.85       68.1     3.449      9.284    77.125      58.75    81.000      73.45\n2006          32        151    79.131     66.450     79.30       68.5     3.959      9.238    76.375      59.25    81.125      73.60\n2007          32        151    79.300     66.861     79.50       68.5     4.028      9.037    77.700      59.95    81.300      73.75\n2008          32        151    78.931     67.414     79.70       68.9     3.622      8.757    76.750      61.40    81.325      73.95\n2009          32        151    79.584     67.894     79.90       69.2     4.005      8.407    76.900      61.70    81.775      74.35\n2010          32        151    80.147     67.909     81.00       69.5     4.277      8.652    77.275      62.00    82.075      74.30\n2011          32        151    80.706     68.524     81.85       71.1     4.269      8.171    77.600      62.25    82.700      74.85\n2012          32        151    80.444     68.898     81.20       69.9     3.821      7.904    77.775      63.10    82.550      74.95\n2013          32        151    80.681     69.234     81.35       71.0     3.810      7.735    78.075      63.95    82.550      74.90\n2014          32        151    81.138     69.502     81.65       71.4     4.162      7.843    78.400      64.20    82.925      75.35\n2015          32        151    80.709     69.690     81.55       71.6     3.461      7.498    78.600      64.60    82.725      75.50\n      count    mean  median      sd     q1     q3\nYear                                             \n2000    183  66.750    71.0  10.296  58.65  74.45\n2001    183  67.129    71.2  10.190  59.00  74.90\n2002    183  67.351    71.4  10.062  59.35  74.80\n2003    183  67.433    71.1  10.128  59.75  74.70\n2004    183  67.646    71.2  10.126  60.70  74.30\n2005    183  68.209    71.6   9.800  63.50  74.95\n2006    183  68.668    72.1   9.815  62.25  75.00\n2007    183  69.036    72.4   9.619  62.05  75.15\n2008    183  69.428    72.4   9.203  62.70  75.35\n2009    183  69.938    72.6   8.989  64.45  76.00\n2010    183  70.049    72.8   9.303  63.45  75.80\n2011    183  70.654    73.3   8.925  63.90  76.10\n2012    183  70.917    73.2   8.562  64.50  76.50\n2013    183  71.236    73.2   8.414  65.60  76.70\n2014    183  71.537    73.6   8.561  65.60  76.85\n2015    183  71.617    73.9   8.124  65.75  76.95\nYear\n2000    12.183\n2001    12.118\n2002    12.356\n2003    12.734\n2004    13.013\n2005    12.582\n2006    12.681\n2007    12.439\n2008    11.517\n2009    11.690\n2010    12.238\n2011    12.182\n2012    11.546\n2013    11.447\n2014    11.636\n2015    11.019\n",
+      "error": null,
+      "seconds": 3.32
+    },
+    {
+      "attempt": 2,
+      "revision": 0,
+      "step": 2,
+      "code": "dev=gs.xs('Developed',level='Status')\ndng=gs.xs('Developing',level='Status')\nrise_dev=float(dev.loc[2015,'mean']-dev.loc[2000,'mean'])\nrise_dng=float(dng.loc[2015,'mean']-dng.loc[2000,'mean'])\ng0=float(gap.loc[2000]); g1=float(gap.loc[2015])\nrecord_fact('eda4_rise_by_status',{'developed_mean_rise':round(rise_dev,3),'developing_mean_rise':round(rise_dng,3),'gap_2000':g0,'gap_2015':g1,'gap_change':round(g1-g0,3)},'Change in mean Life expectancy 2000 to 2015 by Status and change in Developed-Developing mean gap, years')\nfig,ax=plt.subplots(figsize=(8,4.5))\nax.plot(dev.index,dev['mean'],marker='o',label='Developed')\nax.plot(dng.index,dng['mean'],marker='o',label='Developing')\nax.set_title('Mean Life expectancy by Year and Status, 2000-2015')\nax.set_xlabel('Year')\nax.set_ylabel('Mean Life expectancy (years)')\nax.legend()\nax.grid(alpha=0.3)\nsave_chart(fig,'eda4_mean_le_by_status','Mean Life expectancy by Year for Developed and Developing countries, 2000-2015 (years)')\nprint(round(rise_dev,3),round(rise_dng,3),g0,g1)",
+      "output": "3.906 5.07 12.183 11.019\n",
+      "error": null,
+      "seconds": 3.88
+    },
+    {
+      "attempt": 3,
+      "revision": 0,
+      "step": 4,
+      "code": "mm=(ys['mean']-ys['median']).round(3)\nprint(mm.to_string())\nrecord_fact('eda4_mean_median_gap_by_year',{str(y):float(v) for y,v in mm.items()},'Mean minus median Life expectancy by Year, all Status, 2000-2015, years')\ncnt=gs['count'].unstack('Status')\nprint(cnt.iloc[[0,-1]].to_string())\nrecord_fact('eda4_rows_by_year_status',{str(y):{s:float(cnt.loc[y,s]) for s in cnt.columns} for y in cnt.index},'Row counts by Year and Status, 2000-2015')",
+      "output": "Year\n2000   -4.250\n2001   -4.071\n2002   -4.049\n2003   -3.667\n2004   -3.554\n2005   -3.391\n2006   -3.432\n2007   -3.364\n2008   -2.972\n2009   -2.662\n2010   -2.751\n2011   -2.646\n2012   -2.283\n2013   -1.964\n2014   -2.063\n2015   -2.283\nStatus  Developed  Developing\nYear                         \n2000           32         151\n2015           32         151\n",
+      "error": null,
+      "seconds": 3.71
+    }
+  ],
+  "metadata": {
+    "steps": 3
+  },
+  "brief": {
+    "id": "eda_4",
+    "specialist": "eda",
+    "question": "Is the rise in mean Life expectancy over 2000 to 2015 the same for Developing and Developed countries, or does the gap between them narrow?",
+    "complete_when": "Reports mean and median Life expectancy by Year 2000 to 2015 for each Status group, with row counts per group and year, and states whether the Developed-Developing gap widens, narrows or stays flat.",
+    "depends_on": [
+      "eda_1"
+    ],
+    "outputs": []
+  },
+  "revisions": 0,
+  "reviews": [
+    {
+      "reasoning": "Checked the headline numbers against the cited facts. Developing rise 64.62 to 69.69 = 5.07 and Developed rise 76.80 to 80.71 = 3.91 match eda4_rise_by_status and eda4_le_year_status_stats. Row counts of 32 Developed and 151 Developing per Year match eda4_rows_by_year_status. The gap of 12.18 in 2000 and 11.02 in 2015 (change -1.16) matches eda4_gap_by_year and eda4_rise_by_status. The non-monotone path (13.01 in 2004, 11.52 in 2008) matches eda4_gap_by_year. The 2000 medians (77.7 and 67.4) match the status stats, and the Year means 66.75 to 71.62 match eda_1. The mean-minus-median movement from -4.25 to about -2.3 is consistent with eda4_mean_median_gap_by_year and the accepted eda_1 finding. The code computes these as stated, and the automatic checks report no problems. The brief is answered: it gives the gap direction (narrows, not monotone) and the per-group, per-year statistics are recorded as facts. The report is appropriately descriptive and makes no inferential claim it cannot support. Accepting.",
+      "verdict": "accept",
+      "feedback": "",
+      "follow_ups": []
+    }
+  ]
+}

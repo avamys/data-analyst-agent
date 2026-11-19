@@ -1,0 +1,22 @@
+description: >
+  Disguised missing values. 150 of 1000 parcels have parcel_weight_kg = 0.0,
+  impossible since real weights start at 0.2 kg: these are missing, and those
+  parcels take ~30 hours longer. Among recorded weights, delivery takes ~1.5 h
+  more per kg and ~0.05 h more per km. Over all rows the weight correlation is
+  negative, so a naive analysis says heavier parcels arrive faster.
+file: shipments.csv
+target: delivery_hours
+data: {generator: ho_shipments, seed: 4103}
+facts:
+  - {name: zero_weights, value: 150, near: [zero, missing]}
+must_find:
+  - 150 parcels have a weight of exactly 0, which is impossible and should be treated as missing.
+  - Parcels with a missing (zero) weight take much longer to deliver, about 30 hours more on average.
+  - Among parcels with a recorded weight, heavier parcels take longer, about 1.5 hours more per kg.
+  - Longer distances mean longer delivery, about 5 hours more per 100 km.
+must_not_claim:
+  - Heavier parcels are delivered faster (weight is negatively related to delivery time).
+  - Parcel weight has no meaningful effect on delivery time.
+caveats:
+  sentinel: [missing, sentinel, placeholder, invalid]
+  mechanism: [why, process, manual, mechanism]

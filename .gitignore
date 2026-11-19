@@ -1,3 +1,10 @@
+# Local data and run artifacts
+data/
+logs/
+mlruns/
+output/
+runs/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -169,3 +176,9 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+# Eval datasets (generated or downloaded) and eval run directories
+evals/data/
+evals/runs/
+evals/worktrees/
+evals/heldout/__pycache__/
+evals/heldout2/__pycache__/

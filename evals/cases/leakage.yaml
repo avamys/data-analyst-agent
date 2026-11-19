@@ -1,0 +1,23 @@
+description: >
+  Trap: refund_issued follows churn and copies the target in 97.5% of rows.
+  It must be flagged as leakage, not celebrated as a near-perfect predictor.
+  The real predictors are moderate: usage, tenure and the basic plan.
+# The agents see the file name, so it must not hint at the answer
+file: subscriptions.csv
+target: churned
+data: {generator: leakage, seed: 6}
+facts:
+  - {name: churn_rate, value: 0.363, near: [churn]}
+  - {name: refund_agreement, value: 0.975, near: [refund]}
+  - {name: basic_plan_churn, value: 0.427734, near: [basic]}
+must_find:
+  - refund_issued almost exactly reproduces churned (target leakage) and must not be used as a predictor.
+  - Without refund_issued, models predict churn only moderately well, far from perfect.
+  - Customers with lower usage_hours churn more often.
+  - Customers with shorter tenure_months churn more often.
+  - The basic plan has a higher churn rate than the other plans.
+must_not_claim:
+  - A near-perfect model is presented as a genuine predictive result, without flagging leakage.
+  - refund_issued is presented as a cause of churn or a valid predictor of it.
+caveats:
+  leakage: [leak]

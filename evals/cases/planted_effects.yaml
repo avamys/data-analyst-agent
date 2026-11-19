@@ -1,0 +1,21 @@
+description: >
+  Binary outcome with planted effects: feat_a strong, feat_b weak, feat_c none,
+  feat_d moderate with 15% of its values missing at random.
+# The agents see the file name, so it must not hint at the answer
+file: measurements.csv
+target: outcome
+data: {generator: planted_effects, seed: 6}
+facts:
+  - {name: outcome_rate, value: 0.397, near: [outcome, target]}
+  - {name: feat_d_missing, value: 0.15, near: [feat_d]}
+must_find:
+  - feat_a has the strongest association with outcome.
+  - feat_b is associated with outcome, more weakly than feat_a.
+  - feat_d is associated with outcome.
+  - feat_c shows no meaningful association with outcome.
+  - About 15% of feat_d values are missing.
+must_not_claim:
+  - feat_c is a significant or important predictor of outcome.
+  - feat_b is the strongest predictor of outcome.
+caveats:
+  missing_values: [missing]

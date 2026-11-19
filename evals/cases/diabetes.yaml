@@ -1,0 +1,28 @@
+description: >
+  Real data: 768 Pima women (the dataset of OpenML 37, here with readable
+  headers). Missing values in disguise: zeros in Glucose, BloodPressure,
+  SkinThickness, Insulin and BMI are impossible values meaning "missing" (Insulin
+  374, SkinThickness 227). Read as numbers, they hide that blood pressure is
+  higher in positive cases. Expected answers computed in tests/test_eval_cases.py.
+# The agents see the file name, so it must not hint at the answer
+file: patients.csv
+target: Outcome
+data:
+  # Same rows as https://www.openml.org/d/37 (licence: public)
+  url: https://raw.githubusercontent.com/plotly/datasets/master/diabetes.csv
+  sha256: 698c203a14aa31941d2251175330c9199f3ccdb31597abbba2a3e35416257a72
+facts:
+  - {name: outcome_rate, value: 0.348958, near: [Outcome, diabet, positive, target]}
+  - {name: insulin_zeros, value: 374, near: [Insulin]}
+  - {name: skin_zeros, value: 227, near: [SkinThickness, skin]}
+must_find:
+  - Zeros in Glucose, BloodPressure, SkinThickness, Insulin or BMI are impossible values and are treated as missing, not as measurements.
+  - About half of the Insulin values (374) and about 30% of the SkinThickness values (227) are zero.
+  - Glucose has the strongest association with the outcome; positive cases have higher glucose.
+  - BMI and Age are higher in positive cases.
+  - A predictive model is compared with the majority-class baseline (about 65% accuracy) and beats it.
+must_not_claim:
+  - The dataset has no missing values.
+  - Statistics of Insulin, SkinThickness or BloodPressure are computed with the zeros as real values and presented without a caveat.
+caveats:
+  disguised_missing: [zero]

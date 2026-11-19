@@ -1,0 +1,232 @@
+{
+  "task_id": "eda_2",
+  "specialist": "eda",
+  "description": "Where are values missing (Age, Cabin, Embarked), and is missingness related to Survived, Pclass, Sex or Fare?",
+  "code": "# %%\nimport matplotlib.pyplot as plt\nimport numpy as np\nimport pandas as pd\n\nfrom agent.execution.runtime import (\n    df,\n    load,\n    publish,\n    record_fact,\n    record_model,\n    save_chart,\n)\n\n# %%\nmiss = df[['Age','Cabin','Embarked']].isna().sum()\npct = (miss / len(df) * 100).round(2)\nprint(pd.DataFrame({'missing': miss, 'pct': pct}))\nrecord_fact('missing_counts', {'Age': int(miss['Age']), 'Cabin': int(miss['Cabin']), 'Embarked': int(miss['Embarked'])}, 'Missing counts for Age, Cabin, Embarked')\nrecord_fact('missing_pct', {'Age': float(pct['Age']), 'Cabin': float(pct['Cabin']), 'Embarked': float(pct['Embarked'])}, 'Missing percentages for Age, Cabin, Embarked')\nprint(df['Survived'].isna().sum(), df['Pclass'].isna().sum(), df['Sex'].isna().sum(), df['Fare'].isna().sum())\n\n# %%\nd = df.copy()\nd['age_missing'] = d['Age'].isna()\nd['cabin_missing'] = d['Cabin'].isna()\nsr_age = d.groupby('age_missing')['Survived'].agg(['mean','count'])\nsr_cab = d.groupby('cabin_missing')['Survived'].agg(['mean','count'])\nprint(sr_age)\nprint(sr_cab)\nprint(pd.crosstab(d['age_missing'], d['Pclass'], normalize='index').round(3))\nprint(pd.crosstab(d['age_missing'], d['Sex'], normalize='index').round(3))\nprint(d.loc[d['Embarked'].isna(), ['PassengerId','Pclass','Fare','Survived','Sex']])\nrecord_fact('survival_by_age_missing', {'missing': float(sr_age.loc[True,'mean']), 'present': float(sr_age.loc[False,'mean']), 'n_missing': int(sr_age.loc[True,'count']), 'n_present': int(sr_age.loc[False,'count'])}, 'Survival rate for rows with Age missing vs present')\nrecord_fact('survival_by_cabin_missing', {'missing': float(sr_cab.loc[True,'mean']), 'present': float(sr_cab.loc[False,'mean']), 'n_missing': int(sr_cab.loc[True,'count']), 'n_present': int(sr_cab.loc[False,'count'])}, 'Survival rate for rows with Cabin missing vs present')\npc_age = pd.crosstab(d['age_missing'], d['Pclass'], normalize='index')\nsx_age = pd.crosstab(d['age_missing'], d['Sex'], normalize='index')\nrecord_fact('age_missing_pclass_share', {'missing_pclass1': float(pc_age.loc[True,1]), 'missing_pclass2': float(pc_age.loc[True,2]), 'missing_pclass3': float(pc_age.loc[True,3]), 'complete_pclass1': float(pc_age.loc[False,1]), 'complete_pclass2': float(pc_age.loc[False,2]), 'complete_pclass3': float(pc_age.loc[False,3])}, 'Pclass share among Age-missing rows vs Age-complete rows')\nrecord_fact('age_missing_sex_share', {'missing_female': float(sx_age.loc[True,'female']), 'missing_male': float(sx_age.loc[True,'male']), 'complete_female': float(sx_age.loc[False,'female']), 'complete_male': float(sx_age.loc[False,'male'])}, 'Sex share among Age-missing rows vs Age-complete rows')\neb = d[d['Embarked'].isna()]\nrecord_fact('embarked_missing_rows', {'passenger_ids': [int(x) for x in eb['PassengerId']], 'fare': [float(x) for x in eb['Fare']], 'pclass': [int(x) for x in eb['Pclass']], 'survived': [int(x) for x in eb['Survived']]}, 'Rows with Embarked missing: Fare, Pclass, Survived')\n\n# %%\nfig, ax = plt.subplots(figsize=(7,4))\nrates = [sr_age.loc[False,'mean'], sr_age.loc[True,'mean'], sr_cab.loc[False,'mean'], sr_cab.loc[True,'mean']]\nlabels = ['Age present','Age missing','Cabin present','Cabin missing']\nax.bar(labels, rates, color=['#4C72B0','#DD8452','#4C72B0','#DD8452'])\nax.set_title('Survival rate (share of passengers who survived) by Age and Cabin missingness')\nax.set_ylabel('Survival rate (proportion survived)')\nfor i,v in enumerate(rates):\n    ax.text(i, v+0.01, f'{v:.2f}', ha='center')\nsave_chart(fig, 'survival_by_missingness', 'Survival rate for rows with Age or Cabin present vs missing')\nplt.close(fig)\nfare = d.groupby('age_missing')['Fare'].median()\nrecord_fact('fare_median_by_age_missing', {'missing': float(fare.loc[True]), 'present': float(fare.loc[False])}, 'Median Fare for Age-missing vs Age-present rows')\nprint(fare)\n",
+  "output": "          missing    pct\nAge           177  19.87\nCabin         687  77.10\nEmbarked        2   0.22\n0 0 0 0\n                 mean  count\nage_missing                 \nFalse        0.406162    714\nTrue         0.293785    177\n                   mean  count\ncabin_missing                 \nFalse          0.666667    204\nTrue           0.299854    687\nPclass           1      2      3\nage_missing                     \nFalse        0.261  0.242  0.497\nTrue         0.169  0.062  0.768\nSex          female   male\nage_missing               \nFalse         0.366  0.634\nTrue          0.299  0.701\n     PassengerId  Pclass  Fare  Survived     Sex\n61            62       1  80.0         1  female\n829          830       1  80.0         1  female\nage_missing\nFalse    15.7417\nTrue      8.0500\nName: Fare, dtype: float64\n",
+  "execution_time": 10.57,
+  "success": true,
+  "error": null,
+  "report": {
+    "status": "complete",
+    "findings": [
+      {
+        "statement": "Missing values: Cabin 687 of 891 rows (77.10%), Age 177 of 891 (19.87%), Embarked 2 of 891 (0.22%). Survived, Pclass, Sex and Fare have no missing values.",
+        "facts": [
+          "missing_counts",
+          "missing_pct"
+        ]
+      },
+      {
+        "statement": "Descriptively, passengers with Age missing had a survival rate of 29.4% (n=177), versus 40.6% for passengers with Age present (n=714). No significance test was run, and the gap may reflect class composition: 76.8% of Age-missing rows are Pclass 3.",
+        "facts": [
+          "survival_by_age_missing",
+          "age_missing_pclass_share"
+        ]
+      },
+      {
+        "statement": "Descriptively, passengers with Cabin missing had a survival rate of 30.0% (n=687), versus 66.7% for passengers with Cabin present (n=204). No significance test was run. Cabin-missing rows are concentrated in lower classes, so this gap may reflect Pclass rather than missingness itself.",
+        "facts": [
+          "survival_by_cabin_missing"
+        ]
+      },
+      {
+        "statement": "Pclass distribution of Age-missing rows: 76.8% Pclass 3, 16.9% Pclass 1, 6.2% Pclass 2. Among Age-complete rows: 26.1% Pclass 1, 24.2% Pclass 2, and the remainder Pclass 3.",
+        "facts": [
+          "age_missing_pclass_share"
+        ]
+      },
+      {
+        "statement": "Sex distribution of Age-missing rows: 70.1% male and 29.9% female, versus 63.4% male and 36.6% female among Age-complete rows, so Age-missing rows skew slightly male.",
+        "facts": [
+          "age_missing_sex_share"
+        ]
+      },
+      {
+        "statement": "Median Fare is 8.05 for Age-missing rows versus 15.74 for Age-present rows, consistent with Age missingness being concentrated in lower-fare passengers.",
+        "facts": [
+          "fare_median_by_age_missing"
+        ]
+      },
+      {
+        "statement": "The two Embarked-missing rows (PassengerId 62 and 830) are both Pclass 1, both have Fare 80.0, and both survived. Their port of embarkation cannot be inferred from the data. Survival was not analysed for Embarked.",
+        "facts": [
+          "embarked_missing_rows"
+        ]
+      }
+    ],
+    "follow_ups": [
+      "Does Age imputation by Pclass and Sex (or by a title extracted from Name) change model results compared with dropping Age-missing rows?",
+      "Is the Cabin deck (first letter, derived from Cabin) predictive of survival once Pclass is controlled for, given that Cabin is mostly missing?",
+      "Is the Cabin-missing survival gap explained by Pclass and Fare, or does missing Cabin carry independent information?",
+      "Do the Age-missing and Cabin-missing survival gaps persist within each Pclass, and are they statistically significant?"
+    ]
+  },
+  "facts": {
+    "missing_counts": {
+      "value": {
+        "Age": 177,
+        "Cabin": 687,
+        "Embarked": 2
+      },
+      "desc": "Missing counts for Age, Cabin, Embarked",
+      "cell": 1
+    },
+    "missing_pct": {
+      "value": {
+        "Age": 19.87,
+        "Cabin": 77.1,
+        "Embarked": 0.22
+      },
+      "desc": "Missing percentages for Age, Cabin, Embarked",
+      "cell": 1
+    },
+    "survival_by_age_missing": {
+      "value": {
+        "missing": 0.2937853107344633,
+        "present": 0.4061624649859944,
+        "n_missing": 177,
+        "n_present": 714
+      },
+      "desc": "Survival rate for rows with Age missing vs present",
+      "cell": 2
+    },
+    "survival_by_cabin_missing": {
+      "value": {
+        "missing": 0.29985443959243085,
+        "present": 0.6666666666666666,
+        "n_missing": 687,
+        "n_present": 204
+      },
+      "desc": "Survival rate for rows with Cabin missing vs present",
+      "cell": 2
+    },
+    "age_missing_pclass_share": {
+      "value": {
+        "missing_pclass1": 0.1694915254237288,
+        "missing_pclass2": 0.062146892655367235,
+        "missing_pclass3": 0.768361581920904,
+        "complete_pclass1": 0.2605042016806723,
+        "complete_pclass2": 0.242296918767507,
+        "complete_pclass3": 0.49719887955182074
+      },
+      "desc": "Pclass share among Age-missing rows vs Age-complete rows",
+      "cell": 2
+    },
+    "age_missing_sex_share": {
+      "value": {
+        "missing_female": 0.2994350282485876,
+        "missing_male": 0.7005649717514124,
+        "complete_female": 0.36554621848739494,
+        "complete_male": 0.634453781512605
+      },
+      "desc": "Sex share among Age-missing rows vs Age-complete rows",
+      "cell": 2
+    },
+    "embarked_missing_rows": {
+      "value": {
+        "passenger_ids": [
+          62,
+          830
+        ],
+        "fare": [
+          80.0,
+          80.0
+        ],
+        "pclass": [
+          1,
+          1
+        ],
+        "survived": [
+          1,
+          1
+        ]
+      },
+      "desc": "Rows with Embarked missing: Fare, Pclass, Survived",
+      "cell": 2
+    },
+    "fare_median_by_age_missing": {
+      "value": {
+        "missing": 8.05,
+        "present": 15.7417
+      },
+      "desc": "Median Fare for Age-missing vs Age-present rows",
+      "cell": 3
+    }
+  },
+  "charts": {
+    "survival_by_missingness": {
+      "file": "charts/survival_by_missingness.png",
+      "caption": "Survival rate for rows with Age or Cabin present vs missing",
+      "cell": 3
+    }
+  },
+  "published": [],
+  "artifacts": [],
+  "attempts": [
+    {
+      "attempt": 1,
+      "revision": 0,
+      "step": 1,
+      "code": "miss = df[['Age','Cabin','Embarked']].isna().sum()\npct = (miss / len(df) * 100).round(2)\nprint(pd.DataFrame({'missing': miss, 'pct': pct}))\nrecord_fact('missing_counts', {'Age': int(miss['Age']), 'Cabin': int(miss['Cabin']), 'Embarked': int(miss['Embarked'])}, 'Missing counts for Age, Cabin, Embarked')\nrecord_fact('missing_pct', {'Age': float(pct['Age']), 'Cabin': float(pct['Cabin']), 'Embarked': float(pct['Embarked'])}, 'Missing percentages for Age, Cabin, Embarked')\nprint(df['Survived'].isna().sum(), df['Pclass'].isna().sum(), df['Sex'].isna().sum(), df['Fare'].isna().sum())",
+      "output": "          missing    pct\nAge           177  19.87\nCabin         687  77.10\nEmbarked        2   0.22\n0 0 0 0\n",
+      "error": null,
+      "seconds": 3.29
+    },
+    {
+      "attempt": 2,
+      "revision": 0,
+      "step": 2,
+      "code": "d = df.copy()\nd['age_missing'] = d['Age'].isna()\nd['cabin_missing'] = d['Cabin'].isna()\nsr_age = d.groupby('age_missing')['Survived'].agg(['mean','count'])\nsr_cab = d.groupby('cabin_missing')['Survived'].agg(['mean','count'])\nprint(sr_age)\nprint(sr_cab)\nprint(pd.crosstab(d['age_missing'], d['Pclass'], normalize='index').round(3))\nprint(pd.crosstab(d['age_missing'], d['Sex'], normalize='index').round(3))\nprint(d.loc[d['Embarked'].isna(), ['PassengerId','Pclass','Fare','Survived','Sex']])\nrecord_fact('survival_by_age_missing', {'missing': float(sr_age.loc[True,'mean']), 'present': float(sr_age.loc[False,'mean']), 'n_missing': int(sr_age.loc[True,'count']), 'n_present': int(sr_age.loc[False,'count'])}, 'Survival rate for rows with Age missing vs present')\nrecord_fact('survival_by_cabin_missing', {'missing': float(sr_cab.loc[True,'mean']), 'present': float(sr_cab.loc[False,'mean']), 'n_missing': int(sr_cab.loc[True,'count']), 'n_present': int(sr_cab.loc[False,'count'])}, 'Survival rate for rows with Cabin missing vs present')\npc_age = pd.crosstab(d['age_missing'], d['Pclass'], normalize='index')\nsx_age = pd.crosstab(d['age_missing'], d['Sex'], normalize='index')\nrecord_fact('age_missing_pclass_share', {'missing_pclass1': float(pc_age.loc[True,1]), 'missing_pclass2': float(pc_age.loc[True,2]), 'missing_pclass3': float(pc_age.loc[True,3]), 'complete_pclass1': float(pc_age.loc[False,1]), 'complete_pclass2': float(pc_age.loc[False,2]), 'complete_pclass3': float(pc_age.loc[False,3])}, 'Pclass share among Age-missing rows vs Age-complete rows')\nrecord_fact('age_missing_sex_share', {'missing_female': float(sx_age.loc[True,'female']), 'missing_male': float(sx_age.loc[True,'male']), 'complete_female': float(sx_age.loc[False,'female']), 'complete_male': float(sx_age.loc[False,'male'])}, 'Sex share among Age-missing rows vs Age-complete rows')\neb = d[d['Embarked'].isna()]\nrecord_fact('embarked_missing_rows', {'passenger_ids': [int(x) for x in eb['PassengerId']], 'fare': [float(x) for x in eb['Fare']], 'pclass': [int(x) for x in eb['Pclass']], 'survived': [int(x) for x in eb['Survived']]}, 'Rows with Embarked missing: Fare, Pclass, Survived')",
+      "output": "                 mean  count\nage_missing                 \nFalse        0.406162    714\nTrue         0.293785    177\n                   mean  count\ncabin_missing                 \nFalse          0.666667    204\nTrue           0.299854    687\nPclass           1      2      3\nage_missing                     \nFalse        0.261  0.242  0.497\nTrue         0.169  0.062  0.768\nSex          female   male\nage_missing               \nFalse         0.366  0.634\nTrue          0.299  0.701\n     PassengerId  Pclass  Fare  Survived     Sex\n61            62       1  80.0         1  female\n829          830       1  80.0         1  female\n",
+      "error": null,
+      "seconds": 3.65
+    },
+    {
+      "attempt": 3,
+      "revision": 0,
+      "step": 3,
+      "code": "fig, ax = plt.subplots(figsize=(7,4))\nrates = [sr_age.loc[False,'mean'], sr_age.loc[True,'mean'], sr_cab.loc[False,'mean'], sr_cab.loc[True,'mean']]\nlabels = ['Age present','Age missing','Cabin present','Cabin missing']\nax.bar(labels, rates, color=['#4C72B0','#DD8452','#4C72B0','#DD8452'])\nax.set_title('Survival rate (share of passengers who survived) by Age and Cabin missingness')\nax.set_ylabel('Survival rate (proportion survived)')\nfor i,v in enumerate(rates):\n    ax.text(i, v+0.01, f'{v:.2f}', ha='center')\nsave_chart(fig, 'survival_by_missingness', 'Survival rate for rows with Age or Cabin present vs missing')\nplt.close(fig)\nfare = d.groupby('age_missing')['Fare'].median()\nrecord_fact('fare_median_by_age_missing', {'missing': float(fare.loc[True]), 'present': float(fare.loc[False])}, 'Median Fare for Age-missing vs Age-present rows')\nprint(fare)",
+      "output": "age_missing\nFalse    15.7417\nTrue      8.0500\nName: Fare, dtype: float64\n",
+      "error": null,
+      "seconds": 3.63
+    }
+  ],
+  "metadata": {
+    "steps": 3
+  },
+  "brief": {
+    "id": "eda_2",
+    "specialist": "eda",
+    "question": "Where are values missing (Age, Cabin, Embarked), and is missingness related to Survived, Pclass, Sex or Fare?",
+    "complete_when": "Missing counts and percentages per column; survival rate for rows with Age missing versus present, and for Cabin missing versus present; Pclass and Sex distribution of missing-Age rows compared with complete rows; the Embarked rows missing and their Fare and Pclass.",
+    "depends_on": [],
+    "outputs": []
+  },
+  "revisions": 1,
+  "reviews": [
+    {
+      "reasoning": "Counts, percentages, survival rates, Pclass and Sex shares, and Fare medians all match the recorded facts, and the automatic checks are clean. Three statements go beyond the evidence. The Cabin gap is called the largest of 'the three columns', but Embarked survival was never compared, so this holds only for Age versus Cabin. The Cherbourg claim comes from outside the data and no fact supports it. The '52 of 177' figure is a derived number not in the facts. The report also calls the missingness associations strong without any significance test, and does not note that Cabin and Age missingness are concentrated in Pclass 3, so the survival gaps may partly reflect class.",
+      "verdict": "revise",
+      "feedback": "1) Remove 'this is the largest gap of the three columns' and restrict the comparison to the two columns whose survival was computed (Age and Cabin); Embarked survival was not analysed. 2) Remove the claim that a Fare of 80 is consistent with Cherbourg, since nothing in the data supports the port. 3) Remove the derived '52 of 177' count; cite only the recorded rates and counts. 4) Soften 'strongly associated' and 'associated with lower survival' to descriptive wording, state that no significance test was run, and note that Age- and Cabin-missing rows are concentrated in Pclass 3 (Age-missing 76.8% Pclass 3 per the facts), so the survival gaps may reflect class rather than missingness itself.",
+      "follow_ups": [
+        {
+          "id": "eda_4",
+          "specialist": "eda",
+          "question": "Do the Age-missing and Cabin-missing survival gaps persist within each Pclass and within each Sex?",
+          "complete_when": "For each Pclass (1, 2, 3) and each Sex, survival rate and n for rows with Age missing versus present, and with Cabin missing versus present, with a note on where a cell is too small to read.",
+          "depends_on": [
+            "eda_2"
+          ],
+          "outputs": []
+        }
+      ]
+    },
+    {
+      "reasoning": "Checked each finding against its cited facts. Missing counts and percentages (177, 687, 2; 19.87%, 77.1%, 0.22%) match missing_counts and missing_pct. Survival rates by Age (29.4% vs 40.6%) and Cabin (30.0% vs 66.7%) match survival_by_age_missing and survival_by_cabin_missing. Pclass and Sex shares match age_missing_pclass_share and age_missing_sex_share. The median Fare figures match fare_median_by_age_missing (15.7417 rounds to 15.74). The Embarked rows (PassengerId 62 and 830, Pclass 1, Fare 80.0, survived) match embarked_missing_rows. The Age-missing and Age-present counts reconcile with the overall 342 survivors (38.4% of 891). The report hedges the survival gaps as descriptive with no significance test, which is appropriate. The brief's required elements are all present. One weak point: the statement that Cabin-missing rows are concentrated in lower classes has no computed fact behind it, since the code never tabulated Cabin by Pclass. It is hedged as 'may reflect', so I am not sending the task back for it, but the final report should not treat it as established. The automatic checks reported no problems.",
+      "verdict": "accept",
+      "feedback": "",
+      "follow_ups": []
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "model": "claude-sonnet-5-5",
+  "served_by": "claude-sonnet-5-5",
+  "prompt": "983aca5d02a5",
+  "must_find": [
+    {
+      "item": "price is strongly right-skewed and has extreme outliers.",
+      "quote": "Price departs significantly from a normal distribution and is skewed. Such skew commonly inflates RMSE and reduces fit on the raw scale",
+      "reason": "The report states price is right-skewed, but it gives no magnitude and no outlier evidence, and it says outlier counts were not reported.",
+      "verdict": "partly",
+      "quote_found": true
+    },
+    {
+      "item": "size_sqm has a strong positive association with price.",
+      "quote": "size_sqm ranks first by permutation importance. The direction and magnitude of its effect (for example, price change per square meter) were not reported.",
+      "reason": "The report names size as the top feature but explicitly says it did not report the direction or magnitude of the effect.",
+      "verdict": "partly",
+      "quote_found": true
+    },
+    {
+      "item": "age_years has a negative association with price.",
+      "quote": "The direction or magnitude of any feature's effect on price.",
+      "reason": "The report says it cannot determine the age effect or its direction, so it does not state a negative association.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "rating shows no meaningful association with price.",
+      "quote": "Whether rating matters at all.",
+      "reason": "The report says it cannot determine whether rating relates to price, so it does not state the null finding.",
+      "verdict": "no",
+      "quote_found": true
+    }
+  ],
+  "must_not_claim": [
+    {
+      "item": "rating is a significant or important predictor of price.",
+      "quote": "Whether rating matters at all.",
+      "reason": "The report does not claim rating is an important predictor and calls its effect unknown.",
+      "verdict": "no",
+      "quote_found": true
+    },
+    {
+      "item": "price is treated as a classification target (accuracy, precision or recall reported for it).",
+      "quote": "Classification metrics (accuracy, precision, recall) do not apply to this regression task and were not computed.",
+      "reason": "The report mentions classification metrics only to reject them and treats price as a regression target.",
+      "verdict": "no",
+      "quote_found": true
+    }
+  ],
+  "caveats": [
+    {
+      "item": "outliers (e.g. mentioning: outlier)",
+      "quote": "Outlier counts and thresholds for any variable",
+      "reason": "The report lists outlier analysis as missing and recommends outlier influence analysis, which treats outliers as a limitation.",
+      "verdict": "yes",
+      "quote_found": true
+    }
+  ],
+  "scores": {
+    "finding_recall": 0.25,
+    "false_claims": 0.0,
+    "caveat_coverage": 1.0,
+    "quotes_not_found": 0
+  },
+  "usage": {
+    "input_tokens": 6796,
+    "output_tokens": 564
+  }
+}

@@ -1,0 +1,33 @@
+description: >
+  Real data: 891 Titanic passengers. Ground truth from the claim-by-claim checks
+  of the reference runs (docs/baseline/annotations.md, docs/progress/).
+# The agents see the file name, so it must not hint at the answer
+file: titanic.csv
+target: Survived
+data:
+  # Same 891 rows as Kaggle's train.csv
+  url: https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv
+  sha256: 4a437fde05fe5264e1701a7387ac6fb75393772ba38bb2c9c566405af5af4bd7
+facts:
+  - {name: survival_rate, value: 0.383838, near: [surviv]}
+  - {name: female_survival, value: 0.742038, near: [female, women]}
+  - {name: male_survival, value: 0.188908, near: [male, men]}
+  - {name: first_class_survival, value: 0.62963, near: [class, Pclass]}
+  - {name: third_class_survival, value: 0.242363, near: [class, Pclass]}
+  - {name: missing_age, value: 177, near: [Age]}
+  - {name: missing_cabin, value: 687, near: [Cabin]}
+must_find:
+  - Women survived at a much higher rate than men (about 74% against 19%).
+  - Survival falls with passenger class, highest in first class and lowest in third.
+  - Passengers who survived had paid higher fares on average.
+  - Passengers without a recorded cabin survived less often than those with one.
+  - Passengers with a missing Age survived less often than those with a recorded Age.
+  - A predictive model is compared with the majority-class baseline (about 62% accuracy) and beats it.
+  - Model results include precision, recall or F1, not only accuracy.
+must_not_claim:
+  - Most passengers survived.
+  - Men survived at a higher rate than women.
+  - Third-class passengers survived at a higher rate than first-class passengers.
+  - Age is the strongest predictor of survival.
+caveats:
+  missing_cabin: [Cabin]

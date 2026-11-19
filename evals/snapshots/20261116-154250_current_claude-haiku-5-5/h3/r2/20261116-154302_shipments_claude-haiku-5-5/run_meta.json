@@ -1,0 +1,172 @@
+{
+  "status": "ok",
+  "run_id": "808c5d87-603d-4cfd-a5dc-5a861a3ce8c1",
+  "started": "2026-11-16T15:43:02",
+  "command": [
+    "run.py",
+    "/workspaces/agents/evals/data/shipments.csv",
+    "--target",
+    "delivery_hours",
+    "--model",
+    "claude-haiku-5-5",
+    "--provider",
+    "anthropic"
+  ],
+  "commit": "8a83b62",
+  "dirty": false,
+  "network_blocked": true,
+  "parallel_tasks": 3,
+  "settings": {
+    "preset": "local",
+    "model_provider": "anthropic",
+    "ollama_base_url": "http://host.docker.internal:11434",
+    "ollama_model": "qwen3.5:9b",
+    "openrouter_base_url": "https://openrouter.ai/api/v1",
+    "openrouter_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "openrouter_reasoning": true,
+    "anthropic_model": "claude-haiku-5-5",
+    "analyst_model": "claude-haiku-5-5",
+    "coder_model": "claude-haiku-5-5",
+    "reporter_model": "claude-haiku-5-5",
+    "llm_reasoning": false,
+    "llm_num_ctx": 16384,
+    "llm_max_tokens": 4096,
+    "anthropic_max_tokens": 16000,
+    "anthropic_report_max_tokens": 32000,
+    "lead_effort": null,
+    "specialist_effort": null,
+    "llm_timeout_s": 900,
+    "llm_num_gpu": 17,
+    "llm_retries": 1,
+    "lead_temperature": 0.2,
+    "eda_temperature": 0.3,
+    "statistical_temperature": 0.2,
+    "ml_temperature": 0.1,
+    "reporter_temperature": 0.3,
+    "max_tasks": 6,
+    "max_follow_ups": 2,
+    "max_revisions": 1,
+    "max_parallel_tasks": null,
+    "max_specialist_steps": 5,
+    "max_report_rewrites": 1,
+    "code_timeout_s": 300,
+    "max_cell_output_chars": 3000,
+    "prompt_fact_chars": 200,
+    "review_script_chars": 8000,
+    "plan_description_chars": 1000,
+    "overfit_gap": 0.1,
+    "near_perfect_score": 0.99,
+    "baseline_margin": 0.02,
+    "leakage_score": 0.9,
+    "imbalance_ratio": 2.0,
+    "number_check_max_label": 10,
+    "number_check_conventions": [
+      0.05
+    ],
+    "judge_model": "claude-sonnet-5-5",
+    "runs_directory": "/workspaces/agents/evals/runs/20261116-154250_current_claude-haiku-5-5/h3/r2",
+    "log_level": "INFO"
+  },
+  "nodes": [
+    {
+      "node": "profile",
+      "seconds": 2.5
+    },
+    {
+      "node": "plan",
+      "seconds": 7.1
+    },
+    {
+      "node": "run_task",
+      "seconds": 44.4
+    },
+    {
+      "node": "review",
+      "seconds": 11.4
+    },
+    {
+      "node": "run_task",
+      "seconds": 28.0
+    },
+    {
+      "node": "review",
+      "seconds": 9.1
+    },
+    {
+      "node": "run_task",
+      "seconds": 49.4
+    },
+    {
+      "node": "review",
+      "seconds": 8.1
+    },
+    {
+      "node": "run_task",
+      "seconds": 0.0
+    },
+    {
+      "node": "review",
+      "seconds": 9.3
+    },
+    {
+      "node": "run_task",
+      "seconds": 0.1
+    },
+    {
+      "node": "review",
+      "seconds": 10.7
+    },
+    {
+      "node": "run_task",
+      "seconds": 21.2
+    },
+    {
+      "node": "review",
+      "seconds": 11.1
+    },
+    {
+      "node": "run_task",
+      "seconds": 0.0
+    },
+    {
+      "node": "review",
+      "seconds": 8.0
+    },
+    {
+      "node": "run_task",
+      "seconds": 24.5
+    },
+    {
+      "node": "review",
+      "seconds": 9.3
+    },
+    {
+      "node": "run_task",
+      "seconds": 0.0
+    },
+    {
+      "node": "review",
+      "seconds": 7.2
+    },
+    {
+      "node": "report",
+      "seconds": 21.2
+    }
+  ],
+  "finished": "2026-11-16T15:47:48",
+  "seconds": 283.0,
+  "llm_calls": 43,
+  "input_tokens": 305220,
+  "output_tokens": 59370,
+  "tasks_completed": 6,
+  "tasks_failed": 0,
+  "unverified_numbers": [],
+  "context": {
+    "largest_prompt_tokens": 16127,
+    "window_warnings": [],
+    "prompt_cuts": {
+      "dataset description": 1,
+      "fact value": 169
+    }
+  }
+}

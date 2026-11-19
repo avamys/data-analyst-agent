@@ -1,0 +1,196 @@
+{
+  "status": "ok",
+  "run_id": "99a5c584-11b1-4deb-8116-0576a56555fe",
+  "started": "2026-11-16T14:21:46",
+  "command": [
+    "run.py",
+    "/workspaces/agents/evals/data/visits.csv",
+    "--target",
+    "repeat_visit",
+    "--model",
+    "claude-haiku-5-5",
+    "--provider",
+    "anthropic"
+  ],
+  "commit": "cdcd62e",
+  "dirty": false,
+  "network_blocked": true,
+  "parallel_tasks": 3,
+  "settings": {
+    "preset": "local",
+    "model_provider": "anthropic",
+    "ollama_base_url": "http://host.docker.internal:11434",
+    "ollama_model": "qwen3.5:9b",
+    "openrouter_base_url": "https://openrouter.ai/api/v1",
+    "openrouter_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "openrouter_reasoning": true,
+    "anthropic_model": "claude-haiku-5-5",
+    "analyst_model": "claude-haiku-5-5",
+    "coder_model": "claude-haiku-5-5",
+    "reporter_model": "claude-haiku-5-5",
+    "llm_reasoning": false,
+    "llm_num_ctx": 16384,
+    "llm_max_tokens": 4096,
+    "anthropic_max_tokens": 16000,
+    "anthropic_report_max_tokens": 32000,
+    "lead_effort": null,
+    "specialist_effort": null,
+    "llm_timeout_s": 900,
+    "llm_num_gpu": 17,
+    "llm_retries": 1,
+    "lead_temperature": 0.2,
+    "eda_temperature": 0.3,
+    "statistical_temperature": 0.2,
+    "ml_temperature": 0.1,
+    "reporter_temperature": 0.3,
+    "max_tasks": 6,
+    "max_follow_ups": 2,
+    "max_revisions": 1,
+    "max_parallel_tasks": null,
+    "max_specialist_steps": 5,
+    "max_report_rewrites": 1,
+    "code_timeout_s": 300,
+    "max_cell_output_chars": 3000,
+    "prompt_fact_chars": 200,
+    "review_script_chars": 8000,
+    "plan_description_chars": 1000,
+    "overfit_gap": 0.1,
+    "near_perfect_score": 0.99,
+    "baseline_margin": 0.02,
+    "leakage_score": 0.9,
+    "imbalance_ratio": 2.0,
+    "number_check_max_label": 10,
+    "number_check_conventions": [
+      0.05
+    ],
+    "judge_model": "claude-sonnet-5-5",
+    "runs_directory": "/workspaces/agents/evals/runs/20261116-140723_current_claude-haiku-5-5/h1/r3",
+    "log_level": "INFO"
+  },
+  "nodes": [
+    {
+      "node": "profile",
+      "seconds": 2.2
+    },
+    {
+      "node": "plan",
+      "seconds": 6.8
+    },
+    {
+      "node": "run_task",
+      "seconds": 19.4
+    },
+    {
+      "node": "review",
+      "seconds": 6.6
+    },
+    {
+      "node": "run_task",
+      "seconds": 0.0
+    },
+    {
+      "node": "review",
+      "seconds": 7.1
+    },
+    {
+      "node": "run_task",
+      "seconds": 49.7
+    },
+    {
+      "node": "review",
+      "seconds": 9.3
+    },
+    {
+      "node": "run_task",
+      "seconds": 59.5
+    },
+    {
+      "node": "review",
+      "seconds": 15.5
+    },
+    {
+      "node": "run_task",
+      "seconds": 28.4
+    },
+    {
+      "node": "review",
+      "seconds": 9.2
+    },
+    {
+      "node": "run_task",
+      "seconds": 13.5
+    },
+    {
+      "node": "review",
+      "seconds": 6.1
+    },
+    {
+      "node": "run_task",
+      "seconds": 0.0
+    },
+    {
+      "node": "review",
+      "seconds": 10.8
+    },
+    {
+      "node": "run_task",
+      "seconds": 16.8
+    },
+    {
+      "node": "review",
+      "seconds": 7.4
+    },
+    {
+      "node": "run_task",
+      "seconds": 0.0
+    },
+    {
+      "node": "review",
+      "seconds": 9.7
+    },
+    {
+      "node": "run_task",
+      "seconds": 12.7
+    },
+    {
+      "node": "review",
+      "seconds": 12.8
+    },
+    {
+      "node": "run_task",
+      "seconds": 0.0
+    },
+    {
+      "node": "review",
+      "seconds": 11.2
+    },
+    {
+      "node": "run_task",
+      "seconds": 43.1
+    },
+    {
+      "node": "review",
+      "seconds": 8.9
+    },
+    {
+      "node": "report",
+      "seconds": 56.5
+    }
+  ],
+  "finished": "2026-11-16T14:28:52",
+  "seconds": 423.6,
+  "llm_calls": 52,
+  "input_tokens": 386360,
+  "output_tokens": 80518,
+  "tasks_completed": 7,
+  "tasks_failed": 0,
+  "unverified_numbers": [],
+  "context": {
+    "largest_prompt_tokens": 33878,
+    "window_warnings": [],
+    "prompt_cuts": {
+      "dataset description": 1,
+      "fact value": 109
+    }
+  }
+}

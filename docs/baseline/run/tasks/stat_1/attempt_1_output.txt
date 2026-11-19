@@ -1,0 +1,22 @@
+=== Chi-Square Tests for Categorical Features vs Survival ===
+
+=== Chi-Square Test: Sex vs Survival ===
+Test Statistic (χ²): 263.05
+P-value: 0.0000
+Degrees of Freedom: 1
+Effect Size (Cramér's V): 0.543
+Conclusion: Significant association between Sex and Survival (p < 0.05)
+------------------------------------------------------------
+=== Chi-Square Test: Pclass vs Survival ===
+Test Statistic (χ²): 102.89
+P-value: 0.0000
+Degrees of Freedom: 2
+Effect Size (Cramér's V): 0.340
+Conclusion: Significant association between Pclass and Survival (p < 0.05)
+------------------------------------------------------------
+=== Chi-Square Test: Embarked vs Survival (excluding missing values) ===
+Test Statistic (χ²): 26.49
+P-value: 0.0000
+Degrees of Freedom: 2
+Effect Size (Cramér's V): 0.173
+Conclusion: Significant association between Embarked port and Survival (p < 0.05)

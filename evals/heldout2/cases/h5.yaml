@@ -1,0 +1,24 @@
+description: >
+  Disguised missing values in the target, of the kind the profile SHOWS: 99 is
+  the column's max against a median of about 7 (it is not the most common
+  value). 125 of 900 stays have stay_rating = 99, outside the 1-10 scale: the
+  guest gave no rating. These are concentrated in agency bookings (87 of 270)
+  vs direct (16 of 320) and website (22 of 310). Among rated stays, agency
+  bookings rate ~1.1 points lower than direct and suites ~1.1 points higher than
+  standard rooms. With the 99s left in, agency guests average ~36 vs ~12 for
+  direct, so a naive analysis says agency guests are happier.
+file: lakeside_hotel_stays.csv
+target: stay_rating
+data: {generator: h5_hotel_stays, seed: 2611}
+facts:
+  - {name: unrated_stays, value: 125, near: ["99", missing, unrated, "no rating"]}
+must_find:
+  - 125 stays have a rating of 99, outside the 1-10 scale, which marks a missing rating and should be excluded from rating averages.
+  - Missing ratings are concentrated in agency bookings, about a third of agency stays against 5-7% of direct and website stays.
+  - Among rated stays, agency bookings are rated about 1 point lower than direct bookings (roughly 6 vs 7 out of 10).
+  - Among rated stays, suites are rated about 1 point higher than standard rooms.
+must_not_claim:
+  - Guests who book through an agency rate their stays higher than guests who book directly.
+caveats:
+  sentinel: [missing, sentinel, placeholder, invalid]
+  nonresponse: [not random, response rate, non-response, selection, bias]

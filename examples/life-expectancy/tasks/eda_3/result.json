@@ -1,0 +1,434 @@
+{
+  "task_id": "eda_3",
+  "specialist": "eda",
+  "description": "Where are values missing, and is missingness related to Status, Year, or Life expectancy?",
+  "code": "# %%\nimport matplotlib.pyplot as plt\nimport numpy as np\nimport pandas as pd\n\nfrom agent.execution.runtime import (\n    df,\n    load,\n    publish,\n    record_fact,\n    record_model,\n    save_chart,\n)\n\n# %%\nd = df.copy()\nd.columns = [c.strip() for c in d.columns]\nprint(d.dtypes.to_string())\nmiss = d.isna().sum()\npct = (miss / len(d) * 100).round(2)\nprint(pd.DataFrame({'missing': miss, 'pct': pct}).to_string())\nprint(d['Status'].value_counts(dropna=False).to_string())\nprint(d['Year'].min(), d['Year'].max(), d['Year'].nunique())\n\n# %%\nimport scipy.stats as st\ncols = ['Hepatitis B', 'Population', 'GDP', 'Alcohol', 'Total expenditure']\nle = d['Life expectancy']\nm = d[cols].isna()\nbs = (m.groupby(d['Status']).mean() * 100).round(2)\nby = (m.groupby(d['Year']).mean() * 100).round(1)\nprint(bs.to_string())\nprint(by.to_string())\nres = {}\nfor c in cols:\n    ok = le.notna()\n    a = le[ok & d[c].isna()]\n    b = le[ok & d[c].notna()]\n    t = st.ttest_ind(a, b, equal_var=False)\n    res[c] = {'n_missing_with_le': int(len(a)), 'mean_le_missing': round(float(a.mean()), 2), 'mean_le_present': round(float(b.mean()), 2), 't': round(float(t.statistic), 3), 'p': float(t.pvalue)}\nprint(pd.DataFrame(res).T.to_string())\nrecord_fact('eda3_missing_pct', {c: float(pct[c]) for c in d.columns}, 'Percent missing per column, all 22 columns')\nrecord_fact('eda3_missing_by_status', bs.to_dict(), 'Percent missing for focus columns per Status group')\nrecord_fact('eda3_missing_by_year', by.rename(index=str).to_dict(), 'Percent missing for focus columns per Year')\nrecord_fact('eda3_le_by_missing', res, 'Mean Life expectancy for rows with vs without each focus value, Welch t-test')\n\n# %%\nimport scipy.stats as st\nd15 = d[d['Year'] < 2015]\nres15 = {}\nfor c in ['Alcohol', 'Total expenditure']:\n    miss_all = d[c].isna()\n    share2015 = float((miss_all & (d['Year'] == 2015)).sum() / miss_all.sum() * 100)\n    ok = d15['Life expectancy'].notna()\n    a = d15.loc[ok & d15[c].isna(), 'Life expectancy']\n    b = d15.loc[ok & d15[c].notna(), 'Life expectancy']\n    t = st.ttest_ind(a, b, equal_var=False)\n    res15[c] = {'share_missing_in_2015_pct': round(share2015, 2), 'n_missing_pre2015_with_le': int(len(a)), 'mean_le_missing_pre2015': round(float(a.mean()), 2), 'mean_le_present_pre2015': round(float(b.mean()), 2), 't': round(float(t.statistic), 3), 'p': float(t.pvalue)}\nprint(pd.DataFrame(res15).T.to_string())\nrecord_fact('eda3_le_by_missing_excl_2015', res15, 'Alcohol and Total expenditure Life expectancy comparison excluding 2015, Welch t-test')\nfig, ax = plt.subplots(figsize=(8, 4))\nfor c in cols:\n    ax.plot(by.index, by[c], marker='o', label=c)\nax.set_title('Percent of rows missing per Year, focus columns')\nax.set_xlabel('Year')\nax.set_ylabel('Rows missing (%)')\nax.legend(fontsize=8)\nplt.tight_layout()\nsave_chart(fig, 'eda3_missing_by_year', 'Percent of rows missing per Year for Hepatitis B, Population, GDP, Alcohol and Total expenditure')\n\n# %%\nle = d['Life expectancy']\nok = le.notna()\nte = d['Total expenditure']\npres = ok & te.notna()\npre = d['Year'] < 2015\nv = {'te_present_mean_all': round(float(le[pres].mean()), 2), 'te_present_n': int(pres.sum()), 'te_missing_mean_all': round(float(le[ok & te.isna()].mean()), 2), 'te_missing_n': int((ok & te.isna()).sum()), 'te_present_mean_pre2015': round(float(le[pres & pre].mean()), 2), 'full_le_mean': round(float(le[ok].mean()), 2), 'te_nonmissing_rows': int(te.notna().sum())}\nprint(v)\nrecord_fact('eda3_te_check', v, 'Total expenditure present-row Life expectancy mean check, all rows and pre-2015, with full-sample mean')\nprint(bs.to_string())\nprint(by[['Population', 'GDP', 'Total expenditure', 'Alcohol']].to_string())\nprint(pd.DataFrame(res).T.to_string())\nprint(te.describe().round(3).to_string())\n\n# %%\nimport statsmodels.formula.api as smf\nle = d['Life expectancy']\nok = le.notna()\nte = d['Total expenditure']\npres = ok & te.notna()\ny15 = d['Year'] == 2015\nn_pre_pres = int((pres & ~y15).sum())\nn_15_pres = int((pres & y15).sum())\nver = {'te_present_2015_n': n_15_pres, 'te_present_2015_mean': round(float(le[pres & y15].mean()), 2) if n_15_pres > 0 else None, 'te_present_pre2015_n': n_pre_pres, 'te_present_pre2015_mean': round(float(le[pres & ~y15].mean()), 2), 'te_present_all_n': int(pres.sum()), 'te_present_all_mean': round(float(le[pres].mean()), 2), 'te_missing_2015_with_le_n': int((ok & te.isna() & y15).sum())}\nprint(ver)\nrecord_fact('eda3_te_verify', ver, 'Total expenditure present-row Life expectancy means split by 2015 and pre-2015, with counts')\ndd = d[ok].copy()\ndd['hepB_miss'] = dd['Hepatitis B'].isna().astype(int)\nm = smf.ols('Q(\"Life expectancy\") ~ hepB_miss + C(Status) + Year', data=dd).fit()\nreg = {'hepB_miss_coef': round(float(m.params['hepB_miss']), 3), 'hepB_miss_p': float(m.pvalues['hepB_miss']), 'hepB_miss_ci_low': round(float(m.conf_int().loc['hepB_miss', 0]), 3), 'hepB_miss_ci_high': round(float(m.conf_int().loc['hepB_miss', 1]), 3), 'n': int(m.nobs), 'r2': round(float(m.rsquared), 3)}\nprint(reg)\nrecord_fact('eda3_hepB_adjusted', reg, 'OLS of Life expectancy on Hepatitis B missing indicator, controlling for Status and Year')\n\n# %%\nprint(pd.DataFrame(res).T.to_string())\nprint(bs.to_string())\nprint(by[['Population', 'GDP', 'Total expenditure', 'Alcohol']].to_string())\n\n# %%\nexpected = {'Population': 22.2, 'GDP': 15.2, 'Total expenditure': 7.7, 'Income composition of resources': 5.7, 'Schooling': 5.5, 'Polio': 0.6, 'Diphtheria': 0.6, 'BMI': 1.2, 'thinness 1-19 years': 1.2, 'thinness 5-9 years': 1.2}\nfor c, v in expected.items():\n    print(repr(c), pct.get(c), v)\nprint(pct[pct > 0].sort_values(ascending=False).to_string())\nprint(int((pct == 0).sum()), 'columns with 0 percent missing')\nprint(list(pct.index))\n",
+  "output": "Country                             object\nYear                                 int64\nStatus                              object\nLife expectancy                    float64\nAdult Mortality                    float64\ninfant deaths                        int64\nAlcohol                            float64\npercentage expenditure             float64\nHepatitis B                        float64\nMeasles                              int64\nBMI                                float64\nunder-five deaths                    int64\nPolio                              float64\nTotal expenditure                  float64\nDiphtheria                         float64\nHIV/AIDS                           float64\nGDP                                float64\nPopulation                         float64\nthinness  1-19 years               float64\nthinness 5-9 years                 float64\nIncome composition of resources    float64\nSchooling                          float64\n                                 missing    pct\nCountry                                0   0.00\nYear                                   0   0.00\nStatus                                 0   0.00\nLife expectancy                       10   0.34\nAdult Mortality                       10   0.34\ninfant deaths                          0   0.00\nAlcohol                              194   6.60\npercentage expenditure                 0   0.00\nHepatitis B                          553  18.82\nMeasles                                0   0.00\nBMI                                   34   1.16\nunder-five deaths                      0   0.00\nPolio                                 19   0.65\nTotal expenditure                    226   7.69\nDiphtheria                            19   0.65\nHIV/AIDS                               0   0.00\nGDP                                  448  15.25\nPopulation                           652  22.19\nthinness  1-19 years                  34   1.16\nthinness 5-9 years                    34   1.16\nIncome composition of resources      167   5.68\nSchooling                            163   5.55\nStatus\nDeveloping    2426\nDeveloped      512\n2000 2015 16\n            Hepatitis B  Population    GDP  Alcohol  Total expenditure\nStatus                                                                \nDeveloped         33.79       18.75  12.50     5.47               6.25\nDeveloping        15.66       22.92  15.83     6.84               8.00\n      Hepatitis B  Population   GDP  Alcohol  Total expenditure\nYear                                                           \n2000         53.6        21.9  15.8      0.5                2.2\n2001         48.1        21.9  15.3      0.5                2.2\n2002         38.3        21.9  15.3      0.5                2.2\n2003         28.4        21.9  15.3      0.5                1.6\n2004         24.6        21.9  14.8      0.5                1.6\n2005         19.7        21.9  14.8      1.1                1.6\n2006         17.5        21.9  14.8      0.5                1.6\n2007         13.1        21.9  14.8      0.5                1.6\n2008         10.9        21.9  14.8      0.5                1.6\n2009          9.3        21.9  14.8      0.5                1.6\n2010          8.2        21.9  14.8      0.5                1.6\n2011          7.1        21.9  14.8      0.5                1.6\n2012          7.1        22.4  15.8      0.5                1.1\n2013          5.7        25.4  17.1      1.0                1.0\n2014          5.5        22.4  15.3      0.5                1.1\n2015          4.9        22.4  15.8     96.7               98.9\n                   n_missing_with_le  mean_le_missing  mean_le_present      t             p\nHepatitis B                    553.0            66.12            69.95 -6.707  4.244686e-11\nPopulation                     644.0            71.14            68.69  6.470  1.406659e-10\nGDP                            443.0            68.41            69.37 -2.096  3.647270e-02\nAlcohol                        193.0            70.02            69.17  1.248  2.131996e-01\nTotal expenditure              226.0            69.22            69.23 -0.006  9.951399e-01\n                   share_missing_in_2015_pct  n_missing_pre2015_with_le  mean_le_missing_pre2015  mean_le_present_pre2015       t             p\nAlcohol                                91.24                       16.0                    54.89                    69.15 -10.093  3.227156e-08\nTotal expenditure                      80.09                       45.0                    59.58                    69.22  -7.705  8.135122e-10\n{'te_present_mean_all': 69.23, 'te_present_n': 2702, 'te_missing_mean_all': 69.22, 'te_missing_n': 226, 'te_present_mean_pre2015': 69.22, 'full_le_mean': 69.22, 'te_nonmissing_rows': 2712}\n            Hepatitis B  Population    GDP  Alcohol  Total expenditure\nStatus                                                                \nDeveloped         33.79       18.75  12.50     5.47               6.25\nDeveloping        15.66       22.92  15.83     6.84               8.00\n      Population   GDP  Total expenditure  Alcohol\nYear                                              \n2000        21.9  15.8                2.2      0.5\n2001        21.9  15.3                2.2      0.5\n2002        21.9  15.3                2.2      0.5\n2003        21.9  15.3                1.6      0.5\n2004        21.9  14.8                1.6      0.5\n2005        21.9  14.8                1.6      1.1\n2006        21.9  14.8                1.6      0.5\n2007        21.9  14.8                1.6      0.5\n2008        21.9  14.8                1.6      0.5\n2009        21.9  14.8                1.6      0.5\n2010        21.9  14.8                1.6      0.5\n2011        21.9  14.8                1.6      0.5\n2012        22.4  15.8                1.1      0.5\n2013        25.4  17.1                1.0      1.0\n2014        22.4  15.3                1.1      0.5\n2015        22.4  15.8               98.9     96.7\n                   n_missing_with_le  mean_le_missing  mean_le_present      t             p\nHepatitis B                    553.0            66.12            69.95 -6.707  4.244686e-11\nPopulation                     644.0            71.14            68.69  6.470  1.406659e-10\nGDP                            443.0            68.41            69.37 -2.096  3.647270e-02\nAlcohol                        193.0            70.02            69.17  1.248  2.131996e-01\nTotal expenditure              226.0            69.22            69.23 -0.006  9.951399e-01\ncount    2712.000\nmean        5.938\nstd         2.498\nmin         0.370\n25%         4.260\n50%         5.755\n75%         7.492\nmax        17.600\n{'te_present_2015_n': 2, 'te_present_2015_mean': 71.4, 'te_present_pre2015_n': 2700, 'te_present_pre2015_mean': 69.22, 'te_present_all_n': 2702, 'te_present_all_mean': 69.23, 'te_missing_2015_with_le_n': 181}\n{'hepB_miss_coef': -5.239, 'hepB_miss_p': 1.5878249646890423e-36, 'hepB_miss_ci_low': -6.042, 'hepB_miss_ci_high': -4.436, 'n': 2928, 'r2': 0.301}\n                   n_missing_with_le  mean_le_missing  mean_le_present      t             p\nHepatitis B                    553.0            66.12            69.95 -6.707  4.244686e-11\nPopulation                     644.0            71.14            68.69  6.470  1.406659e-10\nGDP                            443.0            68.41            69.37 -2.096  3.647270e-02\nAlcohol                        193.0            70.02            69.17  1.248  2.131996e-01\nTotal expenditure              226.0            69.22            69.23 -0.006  9.951399e-01\n            Hepatitis B  Population    GDP  Alcohol  Total expenditure\nStatus                                                                \nDeveloped         33.79       18.75  12.50     5.47               6.25\nDeveloping        15.66       22.92  15.83     6.84               8.00\n      Population   GDP  Total expenditure  Alcohol\nYear                                              \n2000        21.9  15.8                2.2      0.5\n2001        21.9  15.3                2.2      0.5\n2002        21.9  15.3                2.2      0.5\n2003        21.9  15.3                1.6      0.5\n2004        21.9  14.8                1.6      0.5\n2005        21.9  14.8                1.6      1.1\n2006        21.9  14.8                1.6      0.5\n2007        21.9  14.8                1.6      0.5\n2008        21.9  14.8                1.6      0.5\n2009        21.9  14.8                1.6      0.5\n2010        21.9  14.8                1.6      0.5\n2011        21.9  14.8                1.6      0.5\n2012        22.4  15.8                1.1      0.5\n2013        25.4  17.1                1.0      1.0\n2014        22.4  15.3                1.1      0.5\n2015        22.4  15.8               98.9     96.7\n'Population' 22.19 22.2\n'GDP' 15.25 15.2\n'Total expenditure' 7.69 7.7\n'Income composition of resources' 5.68 5.7\n'Schooling' 5.55 5.5\n'Polio' 0.65 0.6\n'Diphtheria' 0.65 0.6\n'BMI' 1.16 1.2\n'thinness 1-19 years' None 1.2\n'thinness 5-9 years' 1.16 1.2\nPopulation                         22.19\nHepatitis B                        18.82\nGDP                                15.25\nTotal expenditure                   7.69\nAlcohol                             6.60\nIncome composition of resources     5.68\nSchooling                           5.55\nthinness 5-9 years                  1.16\nthinness  1-19 years                1.16\nBMI                                 1.16\nPolio                               0.65\nDiphtheria                          0.65\nLife expectancy                     0.34\nAdult Mortality                     0.34\n8 columns with 0 percent missing\n['Country', 'Year', 'Status', 'Life expectancy', 'Adult Mortality', 'infant deaths', 'Alcohol', 'percentage expenditure', 'Hepatitis B', 'Measles', 'BMI', 'under-five deaths', 'Polio', 'Total expenditure', 'Diphtheria', 'HIV/AIDS', 'GDP', 'Population', 'thinness  1-19 years', 'thinness 5-9 years', 'Income composition of resources', 'Schooling']\n",
+  "execution_time": 46.64,
+  "success": true,
+  "error": null,
+  "report": {
+    "status": "complete",
+    "findings": [
+      {
+        "statement": "Missing percentages (from eda3_missing_pct, two decimals): Population 22.19%, GDP 15.25%, Total expenditure 7.69%, Income composition of resources 5.68%, Schooling 5.55%, Polio 0.65%, Diphtheria 0.65%, BMI 1.16%, thinness 1-19 years 1.16%, thinness 5-9 years 1.16%. These match the lead's figures to one decimal (22.2, 15.2, 7.7, 5.7, 5.5, 0.6, 0.6, 1.2, 1.2, 1.2). Also Hepatitis B 18.82%, Alcohol 6.60%, Life expectancy 0.34% and Adult Mortality 0.34%. The remaining 8 columns (Country, Year, Status, infant deaths, percentage expenditure, Measles, under-five deaths, HIV/AIDS) have 0% missing.",
+        "facts": [
+          "eda3_missing_pct"
+        ]
+      },
+      {
+        "statement": "Share missing per Status group: Hepatitis B 33.79% Developed vs 15.66% Developing; Alcohol 5.47% Developed vs 6.84% Developing; Total expenditure 6.25% Developed vs 8.00% Developing; Population 18.75% Developed vs 22.92% Developing; GDP 12.5% Developed vs 15.83% Developing.",
+        "facts": [
+          "eda3_missing_by_status"
+        ]
+      },
+      {
+        "statement": "Share missing per Year: Population is 21.9% in 2000-2011, 22.4% in 2012, 25.4% in 2013, 22.4% in 2014 and 22.4% in 2015. GDP ranges 14.8-15.8% across years. Total expenditure is 2.2% in 2000, 1.0-1.6% in 2003-2014, and 98.9% in 2015. Alcohol is about 0.5% in most years and 96.7% in 2015. Hepatitis B falls from 53.6% in 2000 to 7.1% in 2011 and 2012.",
+        "facts": [
+          "eda3_missing_by_year"
+        ]
+      },
+      {
+        "statement": "On all rows, with Welch t-tests: rows missing Hepatitis B have mean Life expectancy 66.12 vs 69.95 when present (t = -6.71, p = 4.2e-11). Rows missing Population have 71.14 vs 68.69 (t = 6.47, p = 1.4e-10), so missing Population is linked to higher Life expectancy. Rows missing GDP have 68.41 vs 69.37 (t = -2.10, p = 0.036). Rows missing Alcohol have 70.02 vs 69.17 (t = 1.25, p = 0.21), which is not significant. Rows missing Total expenditure have 69.22 vs 69.23 (t = -0.006, p = 0.995), which shows no association.",
+        "facts": [
+          "eda3_le_by_missing"
+        ]
+      },
+      {
+        "statement": "The all-row Total expenditure null is mostly a Year effect. Total expenditure is missing for 98.9% of 2015 rows, so the all-row comparison is mostly 2015 rows against earlier years. Excluding 2015, rows missing Total expenditure have mean Life expectancy 59.58 vs 69.22 when present (t = -7.71, p = 8.1e-10). The count of pre-2015 rows with Total expenditure missing and Life expectancy present is recorded in that fact, but it is not restated here.",
+        "facts": [
+          "eda3_le_by_missing_excl_2015",
+          "eda3_missing_by_year"
+        ]
+      },
+      {
+        "statement": "The excluding-2015 Alcohol comparison rests on only 16 pre-2015 rows with Alcohol missing and Life expectancy present (mean 54.89 vs 69.15, t = -10.09, p = 3.2e-8). With 16 rows the p-value is fragile and should not be treated as strong evidence, although 91.24% of missing Alcohol values fall in 2015.",
+        "facts": [
+          "eda3_le_by_missing_excl_2015"
+        ]
+      },
+      {
+        "statement": "Hepatitis B association, qualified: the raw gap of 3.8 years may reflect Year and Status, because Hepatitis B missingness falls over time while Life expectancy rises over time, and Hepatitis B missingness is higher in Developed countries. Controlling for Status and Year in an OLS model, the missing indicator has coefficient -5.24 years (95% CI -6.04 to -4.44, p = 1.6e-36, n = 2928, R2 = 0.301). The association survives these controls but is not fully explained by them. The t-tests and OLS p-values assume independent rows; the rows are repeated country-year observations, so the p-values are overstated and a country-clustered analysis is needed.",
+        "facts": [
+          "eda3_le_by_missing",
+          "eda3_hepB_adjusted",
+          "eda3_missing_by_status",
+          "eda3_missing_by_year"
+        ]
+      },
+      {
+        "statement": "Total expenditure check: the present-row Life expectancy mean is 69.23 (n = 2702), the missing-row mean is 69.22 (n = 226), and the full-sample mean is 69.22 (n = 2928). The present-row mean is computed correctly from the filtered rows, and the counts sum to 2928. Its agreement with the full-sample mean is a coincidence at two decimals: the present mean is 69.23, the missing mean is 69.22, and the pre-2015 present mean is 69.22 (n = 2700). Only 2 rows with Total expenditure present fall in 2015, with mean 71.4.",
+        "facts": [
+          "eda3_te_check",
+          "eda3_te_verify"
+        ]
+      }
+    ],
+    "follow_ups": [
+      "Does the Life expectancy association with missing Hepatitis B, Population, GDP, Alcohol and Total expenditure persist in a regression with Status and Year, using standard errors clustered by country?",
+      "Why is Total expenditure missing for 98.9% of 2015 rows, and does the pre-2015 gap of 59.58 vs 69.22 years for missing Total expenditure reflect a country-level pattern?",
+      "Are Population and GDP missing rows concentrated in particular countries, and does that concentration explain their association with Life expectancy?"
+    ]
+  },
+  "facts": {
+    "eda3_missing_pct": {
+      "value": {
+        "Country": 0.0,
+        "Year": 0.0,
+        "Status": 0.0,
+        "Life expectancy": 0.34,
+        "Adult Mortality": 0.34,
+        "infant deaths": 0.0,
+        "Alcohol": 6.6,
+        "percentage expenditure": 0.0,
+        "Hepatitis B": 18.82,
+        "Measles": 0.0,
+        "BMI": 1.16,
+        "under-five deaths": 0.0,
+        "Polio": 0.65,
+        "Total expenditure": 7.69,
+        "Diphtheria": 0.65,
+        "HIV/AIDS": 0.0,
+        "GDP": 15.25,
+        "Population": 22.19,
+        "thinness  1-19 years": 1.16,
+        "thinness 5-9 years": 1.16,
+        "Income composition of resources": 5.68,
+        "Schooling": 5.55
+      },
+      "desc": "Percent missing per column, all 22 columns",
+      "cell": 2
+    },
+    "eda3_missing_by_status": {
+      "value": {
+        "Hepatitis B": {
+          "Developed": 33.79,
+          "Developing": 15.66
+        },
+        "Population": {
+          "Developed": 18.75,
+          "Developing": 22.92
+        },
+        "GDP": {
+          "Developed": 12.5,
+          "Developing": 15.83
+        },
+        "Alcohol": {
+          "Developed": 5.47,
+          "Developing": 6.84
+        },
+        "Total expenditure": {
+          "Developed": 6.25,
+          "Developing": 8.0
+        }
+      },
+      "desc": "Percent missing for focus columns per Status group",
+      "cell": 2
+    },
+    "eda3_missing_by_year": {
+      "value": {
+        "Hepatitis B": {
+          "2000": 53.6,
+          "2001": 48.1,
+          "2002": 38.3,
+          "2003": 28.4,
+          "2004": 24.6,
+          "2005": 19.7,
+          "2006": 17.5,
+          "2007": 13.1,
+          "2008": 10.9,
+          "2009": 9.3,
+          "2010": 8.2,
+          "2011": 7.1,
+          "2012": 7.1,
+          "2013": 5.7,
+          "2014": 5.5,
+          "2015": 4.9
+        },
+        "Population": {
+          "2000": 21.9,
+          "2001": 21.9,
+          "2002": 21.9,
+          "2003": 21.9,
+          "2004": 21.9,
+          "2005": 21.9,
+          "2006": 21.9,
+          "2007": 21.9,
+          "2008": 21.9,
+          "2009": 21.9,
+          "2010": 21.9,
+          "2011": 21.9,
+          "2012": 22.4,
+          "2013": 25.4,
+          "2014": 22.4,
+          "2015": 22.4
+        },
+        "GDP": {
+          "2000": 15.8,
+          "2001": 15.3,
+          "2002": 15.3,
+          "2003": 15.3,
+          "2004": 14.8,
+          "2005": 14.8,
+          "2006": 14.8,
+          "2007": 14.8,
+          "2008": 14.8,
+          "2009": 14.8,
+          "2010": 14.8,
+          "2011": 14.8,
+          "2012": 15.8,
+          "2013": 17.1,
+          "2014": 15.3,
+          "2015": 15.8
+        },
+        "Alcohol": {
+          "2000": 0.5,
+          "2001": 0.5,
+          "2002": 0.5,
+          "2003": 0.5,
+          "2004": 0.5,
+          "2005": 1.1,
+          "2006": 0.5,
+          "2007": 0.5,
+          "2008": 0.5,
+          "2009": 0.5,
+          "2010": 0.5,
+          "2011": 0.5,
+          "2012": 0.5,
+          "2013": 1.0,
+          "2014": 0.5,
+          "2015": 96.7
+        },
+        "Total expenditure": {
+          "2000": 2.2,
+          "2001": 2.2,
+          "2002": 2.2,
+          "2003": 1.6,
+          "2004": 1.6,
+          "2005": 1.6,
+          "2006": 1.6,
+          "2007": 1.6,
+          "2008": 1.6,
+          "2009": 1.6,
+          "2010": 1.6,
+          "2011": 1.6,
+          "2012": 1.1,
+          "2013": 1.0,
+          "2014": 1.1,
+          "2015": 98.9
+        }
+      },
+      "desc": "Percent missing for focus columns per Year",
+      "cell": 2
+    },
+    "eda3_le_by_missing": {
+      "value": {
+        "Hepatitis B": {
+          "n_missing_with_le": 553,
+          "mean_le_missing": 66.12,
+          "mean_le_present": 69.95,
+          "t": -6.707,
+          "p": 4.24468643179984e-11
+        },
+        "Population": {
+          "n_missing_with_le": 644,
+          "mean_le_missing": 71.14,
+          "mean_le_present": 68.69,
+          "t": 6.47,
+          "p": 1.406659325667638e-10
+        },
+        "GDP": {
+          "n_missing_with_le": 443,
+          "mean_le_missing": 68.41,
+          "mean_le_present": 69.37,
+          "t": -2.096,
+          "p": 0.03647269868010093
+        },
+        "Alcohol": {
+          "n_missing_with_le": 193,
+          "mean_le_missing": 70.02,
+          "mean_le_present": 69.17,
+          "t": 1.248,
+          "p": 0.2131996192521149
+        },
+        "Total expenditure": {
+          "n_missing_with_le": 226,
+          "mean_le_missing": 69.22,
+          "mean_le_present": 69.23,
+          "t": -0.006,
+          "p": 0.9951398589733566
+        }
+      },
+      "desc": "Mean Life expectancy for rows with vs without each focus value, Welch t-test",
+      "cell": 2
+    },
+    "eda3_le_by_missing_excl_2015": {
+      "value": {
+        "Alcohol": {
+          "share_missing_in_2015_pct": 91.24,
+          "n_missing_pre2015_with_le": 16,
+          "mean_le_missing_pre2015": 54.89,
+          "mean_le_present_pre2015": 69.15,
+          "t": -10.093,
+          "p": 3.227155993126542e-08
+        },
+        "Total expenditure": {
+          "share_missing_in_2015_pct": 80.09,
+          "n_missing_pre2015_with_le": 45,
+          "mean_le_missing_pre2015": 59.58,
+          "mean_le_present_pre2015": 69.22,
+          "t": -7.705,
+          "p": 8.135121760530811e-10
+        }
+      },
+      "desc": "Alcohol and Total expenditure Life expectancy comparison excluding 2015, Welch t-test",
+      "cell": 3
+    },
+    "eda3_te_check": {
+      "value": {
+        "te_present_mean_all": 69.23,
+        "te_present_n": 2702,
+        "te_missing_mean_all": 69.22,
+        "te_missing_n": 226,
+        "te_present_mean_pre2015": 69.22,
+        "full_le_mean": 69.22,
+        "te_nonmissing_rows": 2712
+      },
+      "desc": "Total expenditure present-row Life expectancy mean check, all rows and pre-2015, with full-sample mean",
+      "cell": 4
+    },
+    "eda3_te_verify": {
+      "value": {
+        "te_present_2015_n": 2,
+        "te_present_2015_mean": 71.4,
+        "te_present_pre2015_n": 2700,
+        "te_present_pre2015_mean": 69.22,
+        "te_present_all_n": 2702,
+        "te_present_all_mean": 69.23,
+        "te_missing_2015_with_le_n": 181
+      },
+      "desc": "Total expenditure present-row Life expectancy means split by 2015 and pre-2015, with counts",
+      "cell": 5
+    },
+    "eda3_hepB_adjusted": {
+      "value": {
+        "hepB_miss_coef": -5.239,
+        "hepB_miss_p": 1.5878249646890423e-36,
+        "hepB_miss_ci_low": -6.042,
+        "hepB_miss_ci_high": -4.436,
+        "n": 2928,
+        "r2": 0.301
+      },
+      "desc": "OLS of Life expectancy on Hepatitis B missing indicator, controlling for Status and Year",
+      "cell": 5
+    }
+  },
+  "charts": {
+    "eda3_missing_by_year": {
+      "file": "charts/eda3_missing_by_year.png",
+      "caption": "Percent of rows missing per Year for Hepatitis B, Population, GDP, Alcohol and Total expenditure",
+      "cell": 3
+    }
+  },
+  "published": [],
+  "artifacts": [],
+  "attempts": [
+    {
+      "attempt": 1,
+      "revision": 0,
+      "step": 1,
+      "code": "d = df.copy()\nd.columns = [c.strip() for c in d.columns]\nprint(d.dtypes.to_string())\nmiss = d.isna().sum()\npct = (miss / len(d) * 100).round(2)\nprint(pd.DataFrame({'missing': miss, 'pct': pct}).to_string())\nprint(d['Status'].value_counts(dropna=False).to_string())\nprint(d['Year'].min(), d['Year'].max(), d['Year'].nunique())",
+      "output": "Country                             object\nYear                                 int64\nStatus                              object\nLife expectancy                    float64\nAdult Mortality                    float64\ninfant deaths                        int64\nAlcohol                            float64\npercentage expenditure             float64\nHepatitis B                        float64\nMeasles                              int64\nBMI                                float64\nunder-five deaths                    int64\nPolio                              float64\nTotal expenditure                  float64\nDiphtheria                         float64\nHIV/AIDS                           float64\nGDP                                float64\nPopulation                         float64\nthinness  1-19 years               float64\nthinness 5-9 years                 float64\nIncome composition of resources    float64\nSchooling                          float64\n                                 missing    pct\nCountry                                0   0.00\nYear                                   0   0.00\nStatus                                 0   0.00\nLife expectancy                       10   0.34\nAdult Mortality                       10   0.34\ninfant deaths                          0   0.00\nAlcohol                              194   6.60\npercentage expenditure                 0   0.00\nHepatitis B                          553  18.82\nMeasles                                0   0.00\nBMI                                   34   1.16\nunder-five deaths                      0   0.00\nPolio                                 19   0.65\nTotal expenditure                    226   7.69\nDiphtheria                            19   0.65\nHIV/AIDS                               0   0.00\nGDP                                  448  15.25\nPopulation                           652  22.19\nthinness  1-19 years                  34   1.16\nthinness 5-9 years                    34   1.16\nIncome composition of resources      167   5.68\nSchooling                            163   5.55\nStatus\nDeveloping    2426\nDeveloped      512\n2000 2015 16\n",
+      "error": null,
+      "seconds": 3.74
+    },
+    {
+      "attempt": 2,
+      "revision": 0,
+      "step": 2,
+      "code": "import scipy.stats as st\ncols = ['Hepatitis B', 'Population', 'GDP', 'Alcohol', 'Total expenditure']\nle = d['Life expectancy']\nm = d[cols].isna()\nbs = (m.groupby(d['Status']).mean() * 100).round(2)\nby = (m.groupby(d['Year']).mean() * 100).round(1)\nprint(bs.to_string())\nprint(by.to_string())\nres = {}\nfor c in cols:\n    ok = le.notna()\n    a = le[ok & d[c].isna()]\n    b = le[ok & d[c].notna()]\n    t = st.ttest_ind(a, b, equal_var=False)\n    res[c] = {'n_missing_with_le': int(len(a)), 'mean_le_missing': round(float(a.mean()), 2), 'mean_le_present': round(float(b.mean()), 2), 't': round(float(t.statistic), 3), 'p': float(t.pvalue)}\nprint(pd.DataFrame(res).T.to_string())\nrecord_fact('eda3_missing_pct', {c: float(pct[c]) for c in d.columns}, 'Percent missing per column, all 22 columns')\nrecord_fact('eda3_missing_by_status', bs.to_dict(), 'Percent missing for focus columns per Status group')\nrecord_fact('eda3_missing_by_year', by.rename(index=str).to_dict(), 'Percent missing for focus columns per Year')\nrecord_fact('eda3_le_by_missing', res, 'Mean Life expectancy for rows with vs without each focus value, Welch t-test')",
+      "output": "            Hepatitis B  Population    GDP  Alcohol  Total expenditure\nStatus                                                                \nDeveloped         33.79       18.75  12.50     5.47               6.25\nDeveloping        15.66       22.92  15.83     6.84               8.00\n      Hepatitis B  Population   GDP  Alcohol  Total expenditure\nYear                                                           \n2000         53.6        21.9  15.8      0.5                2.2\n2001         48.1        21.9  15.3      0.5                2.2\n2002         38.3        21.9  15.3      0.5                2.2\n2003         28.4        21.9  15.3      0.5                1.6\n2004         24.6        21.9  14.8      0.5                1.6\n2005         19.7        21.9  14.8      1.1                1.6\n2006         17.5        21.9  14.8      0.5                1.6\n2007         13.1        21.9  14.8      0.5                1.6\n2008         10.9        21.9  14.8      0.5                1.6\n2009          9.3        21.9  14.8      0.5                1.6\n2010          8.2        21.9  14.8      0.5                1.6\n2011          7.1        21.9  14.8      0.5                1.6\n2012          7.1        22.4  15.8      0.5                1.1\n2013          5.7        25.4  17.1      1.0                1.0\n2014          5.5        22.4  15.3      0.5                1.1\n2015          4.9        22.4  15.8     96.7               98.9\n                   n_missing_with_le  mean_le_missing  mean_le_present      t             p\nHepatitis B                    553.0            66.12            69.95 -6.707  4.244686e-11\nPopulation                     644.0            71.14            68.69  6.470  1.406659e-10\nGDP                            443.0            68.41            69.37 -2.096  3.647270e-02\nAlcohol                        193.0            70.02            69.17  1.248  2.131996e-01\nTotal expenditure              226.0            69.22            69.23 -0.006  9.951399e-01\n",
+      "error": null,
+      "seconds": 6.79
+    },
+    {
+      "attempt": 3,
+      "revision": 0,
+      "step": 3,
+      "code": "import scipy.stats as st\nd15 = d[d['Year'] < 2015]\nres15 = {}\nfor c in ['Alcohol', 'Total expenditure']:\n    miss_all = d[c].isna()\n    share2015 = float((miss_all & (d['Year'] == 2015)).sum() / miss_all.sum() * 100)\n    ok = d15['Life expectancy'].notna()\n    a = d15.loc[ok & d15[c].isna(), 'Life expectancy']\n    b = d15.loc[ok & d15[c].notna(), 'Life expectancy']\n    t = st.ttest_ind(a, b, equal_var=False)\n    res15[c] = {'share_missing_in_2015_pct': round(share2015, 2), 'n_missing_pre2015_with_le': int(len(a)), 'mean_le_missing_pre2015': round(float(a.mean()), 2), 'mean_le_present_pre2015': round(float(b.mean()), 2), 't': round(float(t.statistic), 3), 'p': float(t.pvalue)}\nprint(pd.DataFrame(res15).T.to_string())\nrecord_fact('eda3_le_by_missing_excl_2015', res15, 'Alcohol and Total expenditure Life expectancy comparison excluding 2015, Welch t-test')\nfig, ax = plt.subplots(figsize=(8, 4))\nfor c in cols:\n    ax.plot(by.index, by[c], marker='o', label=c)\nax.set_title('Percent of rows missing per Year, focus columns')\nax.set_xlabel('Year')\nax.set_ylabel('Rows missing (%)')\nax.legend(fontsize=8)\nplt.tight_layout()\nsave_chart(fig, 'eda3_missing_by_year', 'Percent of rows missing per Year for Hepatitis B, Population, GDP, Alcohol and Total expenditure')",
+      "output": "                   share_missing_in_2015_pct  n_missing_pre2015_with_le  mean_le_missing_pre2015  mean_le_present_pre2015       t             p\nAlcohol                                91.24                       16.0                    54.89                    69.15 -10.093  3.227156e-08\nTotal expenditure                      80.09                       45.0                    59.58                    69.22  -7.705  8.135122e-10\n",
+      "error": null,
+      "seconds": 6.64
+    },
+    {
+      "attempt": 4,
+      "revision": 1,
+      "step": 1,
+      "code": "le = d['Life expectancy']\nok = le.notna()\nte = d['Total expenditure']\npres = ok & te.notna()\npre = d['Year'] < 2015\nv = {'te_present_mean_all': round(float(le[pres].mean()), 2), 'te_present_n': int(pres.sum()), 'te_missing_mean_all': round(float(le[ok & te.isna()].mean()), 2), 'te_missing_n': int((ok & te.isna()).sum()), 'te_present_mean_pre2015': round(float(le[pres & pre].mean()), 2), 'full_le_mean': round(float(le[ok].mean()), 2), 'te_nonmissing_rows': int(te.notna().sum())}\nprint(v)\nrecord_fact('eda3_te_check', v, 'Total expenditure present-row Life expectancy mean check, all rows and pre-2015, with full-sample mean')\nprint(bs.to_string())\nprint(by[['Population', 'GDP', 'Total expenditure', 'Alcohol']].to_string())\nprint(pd.DataFrame(res).T.to_string())\nprint(te.describe().round(3).to_string())",
+      "output": "{'te_present_mean_all': 69.23, 'te_present_n': 2702, 'te_missing_mean_all': 69.22, 'te_missing_n': 226, 'te_present_mean_pre2015': 69.22, 'full_le_mean': 69.22, 'te_nonmissing_rows': 2712}\n            Hepatitis B  Population    GDP  Alcohol  Total expenditure\nStatus                                                                \nDeveloped         33.79       18.75  12.50     5.47               6.25\nDeveloping        15.66       22.92  15.83     6.84               8.00\n      Population   GDP  Total expenditure  Alcohol\nYear                                              \n2000        21.9  15.8                2.2      0.5\n2001        21.9  15.3                2.2      0.5\n2002        21.9  15.3                2.2      0.5\n2003        21.9  15.3                1.6      0.5\n2004        21.9  14.8                1.6      0.5\n2005        21.9  14.8                1.6      1.1\n2006        21.9  14.8                1.6      0.5\n2007        21.9  14.8                1.6      0.5\n2008        21.9  14.8                1.6      0.5\n2009        21.9  14.8                1.6      0.5\n2010        21.9  14.8                1.6      0.5\n2011        21.9  14.8                1.6      0.5\n2012        22.4  15.8                1.1      0.5\n2013        25.4  17.1                1.0      1.0\n2014        22.4  15.3                1.1      0.5\n2015        22.4  15.8               98.9     96.7\n                   n_missing_with_le  mean_le_missing  mean_le_present      t             p\nHepatitis B                    553.0            66.12            69.95 -6.707  4.244686e-11\nPopulation                     644.0            71.14            68.69  6.470  1.406659e-10\nGDP                            443.0            68.41            69.37 -2.096  3.647270e-02\nAlcohol                        193.0            70.02            69.17  1.248  2.131996e-01\nTotal expenditure              226.0            69.22            69.23 -0.006  9.951399e-01\ncount    2712.000\nmean        5.938\nstd         2.498\nmin         0.370\n25%         4.260\n50%         5.755\n75%         7.492\nmax        17.600\n",
+      "error": null,
+      "seconds": 6.67
+    },
+    {
+      "attempt": 5,
+      "revision": 1,
+      "step": 2,
+      "code": "import statsmodels.formula.api as smf\nle = d['Life expectancy']\nok = le.notna()\nte = d['Total expenditure']\npres = ok & te.notna()\ny15 = d['Year'] == 2015\nn_pre_pres = int((pres & ~y15).sum())\nn_15_pres = int((pres & y15).sum())\nver = {'te_present_2015_n': n_15_pres, 'te_present_2015_mean': round(float(le[pres & y15].mean()), 2) if n_15_pres > 0 else None, 'te_present_pre2015_n': n_pre_pres, 'te_present_pre2015_mean': round(float(le[pres & ~y15].mean()), 2), 'te_present_all_n': int(pres.sum()), 'te_present_all_mean': round(float(le[pres].mean()), 2), 'te_missing_2015_with_le_n': int((ok & te.isna() & y15).sum())}\nprint(ver)\nrecord_fact('eda3_te_verify', ver, 'Total expenditure present-row Life expectancy means split by 2015 and pre-2015, with counts')\ndd = d[ok].copy()\ndd['hepB_miss'] = dd['Hepatitis B'].isna().astype(int)\nm = smf.ols('Q(\"Life expectancy\") ~ hepB_miss + C(Status) + Year', data=dd).fit()\nreg = {'hepB_miss_coef': round(float(m.params['hepB_miss']), 3), 'hepB_miss_p': float(m.pvalues['hepB_miss']), 'hepB_miss_ci_low': round(float(m.conf_int().loc['hepB_miss', 0]), 3), 'hepB_miss_ci_high': round(float(m.conf_int().loc['hepB_miss', 1]), 3), 'n': int(m.nobs), 'r2': round(float(m.rsquared), 3)}\nprint(reg)\nrecord_fact('eda3_hepB_adjusted', reg, 'OLS of Life expectancy on Hepatitis B missing indicator, controlling for Status and Year')",
+      "output": "{'te_present_2015_n': 2, 'te_present_2015_mean': 71.4, 'te_present_pre2015_n': 2700, 'te_present_pre2015_mean': 69.22, 'te_present_all_n': 2702, 'te_present_all_mean': 69.23, 'te_missing_2015_with_le_n': 181}\n{'hepB_miss_coef': -5.239, 'hepB_miss_p': 1.5878249646890423e-36, 'hepB_miss_ci_low': -6.042, 'hepB_miss_ci_high': -4.436, 'n': 2928, 'r2': 0.301}\n",
+      "error": null,
+      "seconds": 8.15
+    },
+    {
+      "attempt": 6,
+      "revision": 1,
+      "step": 3,
+      "code": "print(pd.DataFrame(res).T.to_string())\nprint(bs.to_string())\nprint(by[['Population', 'GDP', 'Total expenditure', 'Alcohol']].to_string())",
+      "output": "                   n_missing_with_le  mean_le_missing  mean_le_present      t             p\nHepatitis B                    553.0            66.12            69.95 -6.707  4.244686e-11\nPopulation                     644.0            71.14            68.69  6.470  1.406659e-10\nGDP                            443.0            68.41            69.37 -2.096  3.647270e-02\nAlcohol                        193.0            70.02            69.17  1.248  2.131996e-01\nTotal expenditure              226.0            69.22            69.23 -0.006  9.951399e-01\n            Hepatitis B  Population    GDP  Alcohol  Total expenditure\nStatus                                                                \nDeveloped         33.79       18.75  12.50     5.47               6.25\nDeveloping        15.66       22.92  15.83     6.84               8.00\n      Population   GDP  Total expenditure  Alcohol\nYear                                              \n2000        21.9  15.8                2.2      0.5\n2001        21.9  15.3                2.2      0.5\n2002        21.9  15.3                2.2      0.5\n2003        21.9  15.3                1.6      0.5\n2004        21.9  14.8                1.6      0.5\n2005        21.9  14.8                1.6      1.1\n2006        21.9  14.8                1.6      0.5\n2007        21.9  14.8                1.6      0.5\n2008        21.9  14.8                1.6      0.5\n2009        21.9  14.8                1.6      0.5\n2010        21.9  14.8                1.6      0.5\n2011        21.9  14.8                1.6      0.5\n2012        22.4  15.8                1.1      0.5\n2013        25.4  17.1                1.0      1.0\n2014        22.4  15.3                1.1      0.5\n2015        22.4  15.8               98.9     96.7\n",
+      "error": null,
+      "seconds": 7.71
+    },
+    {
+      "attempt": 7,
+      "revision": 2,
+      "step": 1,
+      "code": "expected = {'Population': 22.2, 'GDP': 15.2, 'Total expenditure': 7.7, 'Income composition of resources': 5.7, 'Schooling': 5.5, 'Polio': 0.6, 'Diphtheria': 0.6, 'BMI': 1.2, 'thinness 1-19 years': 1.2, 'thinness 5-9 years': 1.2}\nfor c, v in expected.items():\n    print(repr(c), pct.get(c), v)\nprint(pct[pct > 0].sort_values(ascending=False).to_string())\nprint(int((pct == 0).sum()), 'columns with 0 percent missing')\nprint(list(pct.index))",
+      "output": "'Population' 22.19 22.2\n'GDP' 15.25 15.2\n'Total expenditure' 7.69 7.7\n'Income composition of resources' 5.68 5.7\n'Schooling' 5.55 5.5\n'Polio' 0.65 0.6\n'Diphtheria' 0.65 0.6\n'BMI' 1.16 1.2\n'thinness 1-19 years' None 1.2\n'thinness 5-9 years' 1.16 1.2\nPopulation                         22.19\nHepatitis B                        18.82\nGDP                                15.25\nTotal expenditure                   7.69\nAlcohol                             6.60\nIncome composition of resources     5.68\nSchooling                           5.55\nthinness 5-9 years                  1.16\nthinness  1-19 years                1.16\nBMI                                 1.16\nPolio                               0.65\nDiphtheria                          0.65\nLife expectancy                     0.34\nAdult Mortality                     0.34\n8 columns with 0 percent missing\n['Country', 'Year', 'Status', 'Life expectancy', 'Adult Mortality', 'infant deaths', 'Alcohol', 'percentage expenditure', 'Hepatitis B', 'Measles', 'BMI', 'under-five deaths', 'Polio', 'Total expenditure', 'Diphtheria', 'HIV/AIDS', 'GDP', 'Population', 'thinness  1-19 years', 'thinness 5-9 years', 'Income composition of resources', 'Schooling']\n",
+      "error": null,
+      "seconds": 6.94
+    }
+  ],
+  "metadata": {
+    "steps": 7
+  },
+  "brief": {
+    "id": "eda_3",
+    "specialist": "eda",
+    "question": "Where are values missing, and is missingness related to Status, Year, or Life expectancy?",
+    "complete_when": "Reports the missing percentage per column; for Hepatitis B, Population, GDP, Alcohol and Total expenditure, the share missing per Status group and per Year; and the mean Life expectancy for rows with versus without each of these values, with a test of the difference.",
+    "depends_on": [
+      "eda_1"
+    ],
+    "outputs": []
+  },
+  "revisions": 2,
+  "reviews": [
+    {
+      "reasoning": "The missing-percentage facts and the Hepatitis B Life expectancy comparison match the code. The report is incomplete against the brief and overstates some associations. Brief gaps: Population, GDP, Alcohol and Total expenditure are missing from the per-Status and per-Year shares, the Alcohol Developing share and all Total expenditure shares are not stated, and the full-sample Life expectancy comparison (with vs without) is reported only for Hepatitis B and only excluding 2015 for Alcohol and Total expenditure. Overstatement: the Hepatitis B finding calls missingness 'related' to Life expectancy without noting that missingness falls with Year and is concentrated in Developing and early years, so the gap is confounded, and the country-year rows are not independent, which the stat_1 caveat already covers. The excluding-2015 Alcohol result rests on only 16 rows and should be flagged as fragile. Verification: the Total expenditure present-row mean of 69.22 equals the overall mean from eda_1 and should be checked against the code. The fact strings are truncated, so the Total expenditure and Population/GDP values cannot be verified from what was supplied.",
+      "verdict": "revise",
+      "feedback": "Add to the findings what the brief requires: (1) share missing per Status group for Alcohol (Developing value) and Total expenditure (both groups), and share missing per Year for Population, GDP and Total expenditure, taken from eda3_missing_by_status and eda3_missing_by_year. (2) Mean Life expectancy with vs without each value, with Welch t and p, for Population, GDP, Alcohol and Total expenditure on all rows, taken from eda3_le_by_missing, not only Hepatitis B and the excluding-2015 subset. (3) Qualify the Hepatitis B finding: missingness falls over time and Life expectancy rises over time, and Status is also involved, so the gap may reflect Year and Status; state that the test assumes independent rows, which they are not. (4) Note that the excluding-2015 Alcohol comparison uses only 16 missing rows, so its p-value is fragile. (5) Verify that the Total expenditure present-row mean of 69.22 is computed correctly, since it equals the full-sample mean in eda_1, and confirm the Total expenditure values against the code output.",
+      "follow_ups": []
+    },
+    {
+      "reasoning": "The code matches the stated methods: missingness is grouped by Status and Year, Welch t-tests compare Life expectancy with and without each value, and the OLS controls for Status and Year. The key numbers agree with the cited facts, and the caveats on 2015 confounding, the 16-row Alcohol result, and non-independent rows are appropriate. The brief asks for the missing percentage per column, but the findings state it only for Life expectancy, Adult Mortality, Alcohol, Hepatitis B, Country, Year, Status, infant deaths, percentage expenditure and Measles, plus a pointer to the fact. The profile shows empties in Polio, BMI, Diphtheria, both thinness columns, Income composition, Schooling, Population, GDP and Total expenditure, and those percentages are missing from the report text. The brief requires the per-column report, so the report is incomplete.",
+      "verdict": "revise",
+      "feedback": "Add the missing percentage for every column that has empty cells in the dataset profile, stated in the findings text and not only by reference to the fact: Population 22.2%, GDP 15.2%, Total expenditure 7.7%, Income composition of resources 5.7%, Schooling 5.5%, Polio 0.6%, Diphtheria 0.6%, BMI 1.2%, thinness 1-19 years 1.2%, and thinness 5-9 years 1.2%. Confirm each figure against eda3_missing_pct. Also state that the remaining columns have 0% missing. Keep the rest of the report as it is.",
+      "follow_ups": []
+    },
+    {
+      "reasoning": "The missing-percentage figures match the profile (for example Total expenditure 226 of 2938 rows = 7.7%, Hepatitis B 553 rows with Life expectancy present). The Status and Year splits, the Welch tests and the Hepatitis B OLS match the cited facts. The 2015 concentration of Total expenditure and Alcohol missingness is stated correctly, and the 16-row Alcohol comparison is properly flagged as fragile. The independence caveat for the country-year rows is stated. The brief's required elements are all present. The automatic checks found no problems, and the remaining unverifiable year-level percentages are taken as reported from the facts.",
+      "verdict": "accept",
+      "feedback": "",
+      "follow_ups": []
+    }
+  ]
+}

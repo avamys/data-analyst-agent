@@ -1,0 +1,167 @@
+{
+  "task_id": "ml_1",
+  "specialist": "ml",
+  "description": "What is a clean, leakage-aware feature table and a stratified train/test split for predicting churned?",
+  "code": "# %%\nimport matplotlib.pyplot as plt\nimport numpy as np\nimport pandas as pd\n\nfrom agent.execution.runtime import (\n    df,\n    load,\n    publish,\n    record_fact,\n    record_model,\n    save_chart,\n)\n\n# %%\nprint(df.dtypes)\nprint(df.head(3))\nprint(df['plan'].value_counts(dropna=False))\nprint(df['churned'].value_counts(normalize=True).round(4))\nprint(df['refund_issued'].value_counts(dropna=False).head(10))\nprint(df.isna().sum())\n\n# %%\nfrom sklearn.model_selection import train_test_split\nX_base = pd.concat([df[['usage_hours', 'tenure_months']], pd.get_dummies(df['plan'], prefix='plan', dtype=int)], axis=1)\nX_no = X_base.copy()\nX_with = X_base.assign(refund_issued=df['refund_issued'].astype(int))\ny = df['churned'].astype(int)\nidx = np.arange(len(df))\ntr_idx, te_idx = train_test_split(idx, test_size=0.2, stratify=y, random_state=42)\nX_train_no_leak = X_no.iloc[tr_idx]\nX_test_no_leak = X_no.iloc[te_idx]\nX_train_with_refund = X_with.iloc[tr_idx]\nX_test_with_refund = X_with.iloc[te_idx]\ny_train = y.iloc[tr_idx]\ny_test = y.iloc[te_idx]\nbaseline_acc = float((y_test == 0).mean())\nsplit_data = {'X_train_no_leak': X_train_no_leak, 'X_test_no_leak': X_test_no_leak, 'X_train_with_refund': X_train_with_refund, 'X_test_with_refund': X_test_with_refund, 'y_train': y_train, 'y_test': y_test, 'feature_names': {'no_leak': list(X_no.columns), 'with_refund': list(X_with.columns)}}\npublish('split_data', split_data)\nrecord_fact('split_sizes', {'n_train': len(tr_idx), 'n_test': len(te_idx), 'test_size': 0.2, 'random_state': 42}, 'Stratified 80/20 split sizes')\nrecord_fact('split_class_rates', {'train_churn_rate': float(y_train.mean()), 'test_churn_rate': float(y_test.mean())}, 'Churn rate in each split')\nrecord_fact('baseline_always_0_test_accuracy', {'test_accuracy': baseline_acc}, 'Test accuracy of always predicting class 0')\nrecord_fact('feature_sets', {'no_leak_features': list(X_no.columns), 'with_refund_features': list(X_with.columns)}, 'Feature sets; with_refund is comparison only')\nprint(X_no.shape, X_with.shape, len(tr_idx), len(te_idx))\nprint(round(baseline_acc, 4), round(float(y_train.mean()), 4), round(float(y_test.mean()), 4))\n\n# %%\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.metrics import accuracy_score\nc = DecisionTreeClassifier(max_depth=3, random_state=42).fit(X_train_with_refund[['refund_issued']], y_train)\ntr = accuracy_score(y_train, c.predict(X_train_with_refund[['refund_issued']]))\nte = accuracy_score(y_test, c.predict(X_test_with_refund[['refund_issued']]))\nrecord_fact('refund_only_leak_check', {'train_accuracy': float(tr), 'test_accuracy': float(te)}, 'Leakage check: shallow tree on refund_issued alone')\nprint(round(tr, 3), round(te, 3))\n",
+  "output": "usage_hours      float64\ntenure_months      int64\nplan              object\nrefund_issued      int64\nchurned            int64\ndtype: object\n   usage_hours  tenure_months   plan  refund_issued  churned\n0         30.4             70    pro              0        0\n1          3.1             62  basic              0        0\n2          8.7             71    pro              0        0\nplan\nbasic    512\nplus     297\npro      191\nName: count, dtype: int64\nchurned\n0    0.637\n1    0.363\nName: proportion, dtype: float64\nrefund_issued\n0    632\n1    368\nName: count, dtype: int64\nusage_hours      0\ntenure_months    0\nplan             0\nrefund_issued    0\nchurned          0\ndtype: int64\n(1000, 5) (1000, 6) 800 200\n0.635 0.3625 0.365\n0.974 0.98\n",
+  "execution_time": 23.25,
+  "success": true,
+  "error": null,
+  "report": {
+    "status": "complete",
+    "findings": [
+      {
+        "statement": "Automatic leakage check: refund_issued alone predicts churned almost perfectly (lead's profile score 0.975; my shallow-tree check gave train accuracy 0.974 and test accuracy 0.98). It is therefore excluded from the primary no_leak feature set for leakage reasons and appears only in the with_refund set, which is for comparison only and must not be used as evidence of a churn driver.",
+        "facts": [
+          "feature_sets",
+          "refund_only_leak_check"
+        ]
+      },
+      {
+        "statement": "The leakage-free feature table has 5 columns: usage_hours and tenure_months as numeric, plus one-hot plan_basic, plan_plus and plan_pro. refund_issued is excluded from it. A comparison set adds refund_issued as a sixth column and is labelled for comparison only.",
+        "facts": [
+          "feature_sets"
+        ]
+      },
+      {
+        "statement": "The 80/20 split is stratified on churned with random_state 42, giving 800 training rows and 200 test rows. The churn rate is 0.3625 in train and 0.365 in test, so the stratification held.",
+        "facts": [
+          "split_sizes",
+          "split_class_rates"
+        ]
+      },
+      {
+        "statement": "Always predicting class 0 gives a test accuracy of 0.635 (63.5%) on this split. This is close to the expected figure of about 63.7%, and the small gap comes from the particular split.",
+        "facts": [
+          "baseline_always_0_test_accuracy",
+          "split_class_rates"
+        ]
+      }
+    ],
+    "follow_ups": [
+      "Does refund_issued carry real signal for churn once the leakage question is settled, and does it only help because it is recorded after the churn event?",
+      "Is the 0.5-point gap between the 63.5% test baseline and the expected 63.7% stable across other random seeds?"
+    ]
+  },
+  "facts": {
+    "split_sizes": {
+      "value": {
+        "n_train": 800,
+        "n_test": 200,
+        "test_size": 0.2,
+        "random_state": 42
+      },
+      "desc": "Stratified 80/20 split sizes",
+      "cell": 2
+    },
+    "split_class_rates": {
+      "value": {
+        "train_churn_rate": 0.3625,
+        "test_churn_rate": 0.365
+      },
+      "desc": "Churn rate in each split",
+      "cell": 2
+    },
+    "baseline_always_0_test_accuracy": {
+      "value": {
+        "test_accuracy": 0.635
+      },
+      "desc": "Test accuracy of always predicting class 0",
+      "cell": 2
+    },
+    "feature_sets": {
+      "value": {
+        "no_leak_features": [
+          "usage_hours",
+          "tenure_months",
+          "plan_basic",
+          "plan_plus",
+          "plan_pro"
+        ],
+        "with_refund_features": [
+          "usage_hours",
+          "tenure_months",
+          "plan_basic",
+          "plan_plus",
+          "plan_pro",
+          "refund_issued"
+        ]
+      },
+      "desc": "Feature sets; with_refund is comparison only",
+      "cell": 2
+    },
+    "refund_only_leak_check": {
+      "value": {
+        "train_accuracy": 0.97375,
+        "test_accuracy": 0.98
+      },
+      "desc": "Leakage check: shallow tree on refund_issued alone",
+      "cell": 3
+    }
+  },
+  "charts": {},
+  "published": [
+    "ml_1/split_data"
+  ],
+  "artifacts": [],
+  "attempts": [
+    {
+      "attempt": 1,
+      "revision": 0,
+      "step": 1,
+      "code": "print(df.dtypes)\nprint(df.head(3))\nprint(df['plan'].value_counts(dropna=False))\nprint(df['churned'].value_counts(normalize=True).round(4))\nprint(df['refund_issued'].value_counts(dropna=False).head(10))\nprint(df.isna().sum())",
+      "output": "usage_hours      float64\ntenure_months      int64\nplan              object\nrefund_issued      int64\nchurned            int64\ndtype: object\n   usage_hours  tenure_months   plan  refund_issued  churned\n0         30.4             70    pro              0        0\n1          3.1             62  basic              0        0\n2          8.7             71    pro              0        0\nplan\nbasic    512\nplus     297\npro      191\nName: count, dtype: int64\nchurned\n0    0.637\n1    0.363\nName: proportion, dtype: float64\nrefund_issued\n0    632\n1    368\nName: count, dtype: int64\nusage_hours      0\ntenure_months    0\nplan             0\nrefund_issued    0\nchurned          0\ndtype: int64\n",
+      "error": null,
+      "seconds": 5.32
+    },
+    {
+      "attempt": 2,
+      "revision": 0,
+      "step": 2,
+      "code": "from sklearn.model_selection import train_test_split\nX_base = pd.concat([df[['usage_hours', 'tenure_months']], pd.get_dummies(df['plan'], prefix='plan', dtype=int)], axis=1)\nX_no = X_base.copy()\nX_with = X_base.assign(refund_issued=df['refund_issued'].astype(int))\ny = df['churned'].astype(int)\nidx = np.arange(len(df))\ntr_idx, te_idx = train_test_split(idx, test_size=0.2, stratify=y, random_state=42)\nX_train_no_leak = X_no.iloc[tr_idx]\nX_test_no_leak = X_no.iloc[te_idx]\nX_train_with_refund = X_with.iloc[tr_idx]\nX_test_with_refund = X_with.iloc[te_idx]\ny_train = y.iloc[tr_idx]\ny_test = y.iloc[te_idx]\nbaseline_acc = float((y_test == 0).mean())\nsplit_data = {'X_train_no_leak': X_train_no_leak, 'X_test_no_leak': X_test_no_leak, 'X_train_with_refund': X_train_with_refund, 'X_test_with_refund': X_test_with_refund, 'y_train': y_train, 'y_test': y_test, 'feature_names': {'no_leak': list(X_no.columns), 'with_refund': list(X_with.columns)}}\npublish('split_data', split_data)\nrecord_fact('split_sizes', {'n_train': len(tr_idx), 'n_test': len(te_idx), 'test_size': 0.2, 'random_state': 42}, 'Stratified 80/20 split sizes')\nrecord_fact('split_class_rates', {'train_churn_rate': float(y_train.mean()), 'test_churn_rate': float(y_test.mean())}, 'Churn rate in each split')\nrecord_fact('baseline_always_0_test_accuracy', {'test_accuracy': baseline_acc}, 'Test accuracy of always predicting class 0')\nrecord_fact('feature_sets', {'no_leak_features': list(X_no.columns), 'with_refund_features': list(X_with.columns)}, 'Feature sets; with_refund is comparison only')\nprint(X_no.shape, X_with.shape, len(tr_idx), len(te_idx))\nprint(round(baseline_acc, 4), round(float(y_train.mean()), 4), round(float(y_test.mean()), 4))",
+      "output": "(1000, 5) (1000, 6) 800 200\n0.635 0.3625 0.365\n",
+      "error": null,
+      "seconds": 9.8
+    },
+    {
+      "attempt": 3,
+      "revision": 1,
+      "step": 1,
+      "code": "from sklearn.tree import DecisionTreeClassifier\nfrom sklearn.metrics import accuracy_score\nc = DecisionTreeClassifier(max_depth=3, random_state=42).fit(X_train_with_refund[['refund_issued']], y_train)\ntr = accuracy_score(y_train, c.predict(X_train_with_refund[['refund_issued']]))\nte = accuracy_score(y_test, c.predict(X_test_with_refund[['refund_issued']]))\nrecord_fact('refund_only_leak_check', {'train_accuracy': float(tr), 'test_accuracy': float(te)}, 'Leakage check: shallow tree on refund_issued alone')\nprint(round(tr, 3), round(te, 3))",
+      "output": "0.974 0.98\n",
+      "error": null,
+      "seconds": 8.13
+    }
+  ],
+  "metadata": {
+    "steps": 3
+  },
+  "brief": {
+    "id": "ml_1",
+    "specialist": "ml",
+    "question": "What is a clean, leakage-aware feature table and a stratified train/test split for predicting churned?",
+    "complete_when": "One-hot encodes plan; keeps usage_hours and tenure_months as numeric; builds two feature sets, one without refund_issued (primary) and one with it (for comparison only), clearly labelled; uses an 80/20 split stratified on churned with a fixed random seed; reports the baseline accuracy of always predicting class 0 on the test set (about 63.7%).",
+    "depends_on": [],
+    "outputs": [
+      {
+        "name": "split_data",
+        "contents": "Python dict with keys X_train_no_leak, X_test_no_leak, X_train_with_refund, X_test_with_refund, y_train, y_test, and feature_names for each set, all built from the same stratified split with a fixed seed."
+      }
+    ]
+  },
+  "revisions": 1,
+  "reviews": [
+    {
+      "reasoning": "The split sizes (800/200), the stratified churn rates (0.3625 train, 0.365 test), the one-hot plan columns, and the test baseline of 0.635 are consistent with the code and the profile's 63.7% class-0 share. The report's findings and facts agree with each other. However, the automatic check flagged refund_issued as a near-perfect predictor of churn (0.975), and the report never states this warning in a finding. It only says refund_issued is excluded from the primary set and placed in a comparison set. The automatic check requires the problem to be fixed or stated in a finding, so the report must name it. Revise to add that finding.",
+      "verdict": "revise",
+      "feedback": "Add a finding stating the automatic leakage check: refund_issued alone predicts churned almost perfectly (profile score 0.975), so it is excluded from the primary no_leak feature set for leakage reasons and appears only in the with_refund set, which is for comparison only and must not be used as evidence of a churn driver. Cite the feature_sets fact for this. Keep all other findings as they are.",
+      "follow_ups": []
+    },
+    {
+      "reasoning": "All cited numbers match the facts: split sizes 800/200 with random_state 42, churn rates 0.3625 and 0.365, baseline test accuracy 0.635 (which is 1 minus the 0.365 test churn rate), and the leakage check at 0.974 train and 0.98 test. The feature sets match the brief: plan is one-hot encoded, refund_issued is excluded from the primary no_leak set, and with_refund is labelled for comparison only. split_data is published. The leakage warning is stated and handled in the first finding. One sentence attributes the 63.5% vs 63.7% gap to the particular split, which is a causal guess the code does not test; it is minor and does not change any result, so I am not sending the task back for it. The accepted findings are consistent with this report.",
+      "verdict": "accept",
+      "feedback": "",
+      "follow_ups": []
+    }
+  ]
+}

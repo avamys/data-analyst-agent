@@ -1,0 +1,369 @@
+{
+  "task_id": "eda_2",
+  "specialist": "eda",
+  "description": "How does mean Life expectancy differ across bands of the key numeric drivers Adult Mortality, Schooling, BMI, Income composition of resources, HIV/AIDS and GDP?",
+  "code": "# %%\nimport matplotlib.pyplot as plt\nimport numpy as np\nimport pandas as pd\n\nfrom agent.execution.runtime import (\n    df,\n    load,\n    publish,\n    record_fact,\n    record_model,\n    save_chart,\n)\n\n# %%\ncols = {'LE':'Life expectancy ','AM':'Adult Mortality','SCH':'Schooling','BMI':' BMI ','ICR':'Income composition of resources','HIV':' HIV/AIDS','GDP':'GDP'}\nprint([repr(c) for c in df.columns])\nprint(df.dtypes.value_counts())\nfor k,c in cols.items():\n    print(k, repr(c), c in df.columns, int(df[c].isna().sum()) if c in df.columns else None)\nprint(df.shape)\n\n# %%\nfrom scipy import stats\nLE = 'Life expectancy '\ndrivers = [('am','Adult Mortality','Adult Mortality'),('sch','Schooling','Schooling'),('bmi','BMI',' BMI '),('icr','Income composition of resources','Income composition of resources'),('hiv','HIV/AIDS',' HIV/AIDS'),('gdp','GDP','GDP')]\nfor key, label, c in drivers:\n    sub = df[[LE, c]].dropna()\n    qs = sub[c].quantile([0, .25, .5, .75, 1.0]).values\n    band = pd.qcut(sub[c], 4, labels=False, duplicates='drop')\n    g = sub.groupby(band)[LE].agg(['count','mean','median'])\n    edges = [float(x) for x in qs]\n    r = stats.pearsonr(sub[c], sub[LE])[0]\n    rho = stats.spearmanr(sub[c], sub[LE])[0]\n    record_fact(f'{key}_quartiles', {'n': int(len(sub)), 'edges': edges, 'band_count': [int(x) for x in g['count']], 'band_mean': [round(float(x),3) for x in g['mean']], 'band_median': [float(x) for x in g['median']], 'pearson_r': float(r), 'spearman_rho': float(rho)}, f'{label}: quartile band edges, Life expectancy mean and median per band, Pearson and Spearman with Life expectancy')\n    print(label, len(sub), [round(x,2) for x in qs])\n    print(g.round(2))\n    print('pearson', round(r,3), 'spearman', round(rho,3))\n    fig, ax = plt.subplots(figsize=(6,4))\n    ax.scatter(sub[c], sub[LE], s=6, alpha=0.4)\n    ax.set_title(f'Life expectancy vs {label}, rows with both values')\n    ax.set_xlabel(label)\n    ax.set_ylabel('Life expectancy (years)')\n    save_chart(fig, f'scatter_{key}', f'Scatter of Life expectancy (years) against {label}, one point per row')\n    plt.close(fig)\n\n# %%\nimport matplotlib.pyplot as plt\nLE = 'Life expectancy '\ndrivers = [('am','Adult Mortality','Adult Mortality'),('sch','Schooling','Schooling'),('bmi','BMI',' BMI '),('icr','Income composition of resources','Income composition of resources'),('hiv','HIV/AIDS',' HIV/AIDS'),('gdp','GDP','GDP')]\nfor key, label, c in drivers:\n    sub = df[[LE, c]].dropna()\n    fig, ax = plt.subplots(figsize=(6,4))\n    ax.scatter(sub[c], sub[LE], s=6, alpha=0.4)\n    ax.set_title(f'Life expectancy vs {label}, rows with both values')\n    ax.set_xlabel(label)\n    ax.set_ylabel('Life expectancy (years)')\n    save_chart(fig, f'scatter_{key}', f'Scatter of Life expectancy (years) against {label}, plotting only rows with both Life expectancy and {label} present, one point per row')\n    plt.close(fig)\n",
+  "output": "[\"'Country'\", \"'Year'\", \"'Status'\", \"'Life expectancy '\", \"'Adult Mortality'\", \"'infant deaths'\", \"'Alcohol'\", \"'percentage expenditure'\", \"'Hepatitis B'\", \"'Measles '\", \"' BMI '\", \"'under-five deaths '\", \"'Polio'\", \"'Total expenditure'\", \"'Diphtheria '\", \"' HIV/AIDS'\", \"'GDP'\", \"'Population'\", \"' thinness  1-19 years'\", \"' thinness 5-9 years'\", \"'Income composition of resources'\", \"'Schooling'\"]\nfloat64    16\nint64       4\nobject      2\nName: count, dtype: int64\nLE 'Life expectancy ' True 10\nAM 'Adult Mortality' True 10\nSCH 'Schooling' True 163\nBMI ' BMI ' True 34\nICR 'Income composition of resources' True 167\nHIV ' HIV/AIDS' True 0\nGDP 'GDP' True 448\n(2938, 22)\nAdult Mortality 2928 [np.float64(1.0), np.float64(74.0), np.float64(144.0), np.float64(228.0), np.float64(723.0)]\n                 count   mean  median\nAdult Mortality                      \n0                  746  72.54   75.35\n1                  734  76.06   75.40\n2                  724  70.36   71.00\n3                  724  57.75   58.00\npearson -0.696 spearman -0.65\nSchooling 2768 [np.float64(0.0), np.float64(10.1), np.float64(12.3), np.float64(14.3), np.float64(20.7)]\n           count   mean  median\nSchooling                      \n0            704  58.73    58.8\n1            683  67.66    68.9\n2            714  73.26    73.9\n3            667  78.10    78.6\npearson 0.752 spearman 0.814\nBMI 2896 [np.float64(1.0), np.float64(19.3), np.float64(43.35), np.float64(56.1), np.float64(77.6)]\n       count   mean  median\n BMI                       \n0        728  63.07    62.9\n1        720  64.48    65.0\n2        727  73.06    73.5\n3        721  76.81    76.5\npearson 0.568 spearman 0.585\nIncome composition of resources 2768 [np.float64(0.0), np.float64(0.49), np.float64(0.68), np.float64(0.78), np.float64(0.95)]\n                                 count   mean  median\nIncome composition of resources                      \n0                                  695  58.29    58.4\n1                                  692  67.12    67.9\n2                                  689  73.19    73.6\n3                                  692  78.86    78.8\npearson 0.725 spearman 0.866\nHIV/AIDS 2928 [np.float64(0.1), np.float64(0.1), np.float64(0.1), np.float64(0.8), np.float64(50.6)]\n           count   mean  median\n HIV/AIDS                      \n0           2217  73.30    73.8\n1            711  56.53    56.4\npearson -0.557 spearman -0.754\nGDP 2485 [np.float64(1.68), np.float64(463.85), np.float64(1764.97), np.float64(5932.9), np.float64(119172.74)]\n     count   mean  median\nGDP                      \n0      622  62.05    62.3\n1      621  66.12    66.6\n2      621  72.40    73.4\n3      621  76.92    76.9\npearson 0.461 spearman 0.642\n",
+  "execution_time": 21.37,
+  "success": true,
+  "error": null,
+  "report": {
+    "status": "complete",
+    "findings": [
+      {
+        "statement": "Schooling: Life expectancy rises across quartile bands, with band means 58.73, 67.66, 73.26 and 78.10 years (medians 58.8, 68.9, 73.9, 78.6). Band edges are 0.0, 10.1, 12.3, 14.3 and 20.7 years of schooling. Pearson r is 0.752 and Spearman rho is 0.814 (n=2768).",
+        "facts": [
+          "sch_quartiles"
+        ]
+      },
+      {
+        "statement": "Income composition of resources: band means rise from 58.29 to 67.12, 73.19 and 78.86 years, with medians 58.4, 67.9, 73.6 and 78.8. Band edges are 0.000, 0.493, 0.677, 0.779 and 0.948. Pearson r is 0.725 and Spearman rho is 0.866 (n=2768), the strongest rank association of the six drivers.",
+        "facts": [
+          "icr_quartiles"
+        ]
+      },
+      {
+        "statement": "Adult Mortality: the relation is negative but not monotone. Band means are 72.54, 76.06, 70.36 and 57.75 years, so the second band (edges 74 to 144) is higher than the first (edges 1 to 74). Medians are 75.35, 75.40, 71.00 and 58.00. Band edges are 1, 74, 144, 228 and 723. Pearson r is -0.696 and Spearman rho is -0.650 (n=2928).",
+        "facts": [
+          "am_quartiles"
+        ]
+      },
+      {
+        "statement": "BMI: band means are 63.07, 64.48, 73.06 and 76.81 years, with medians 62.9, 65.0, 73.5 and 76.5. The jump occurs between the second and third bands. Band edges are 1.0, 19.3, 43.35, 56.1 and 77.6. Pearson r is 0.568 and Spearman rho is 0.585 (n=2896).",
+        "facts": [
+          "bmi_quartiles"
+        ]
+      },
+      {
+        "statement": "HIV/AIDS: quartile edges collapse, so there are only two bands, split at 0.8 (the unit is not given in the dataset profile; edges 0.1, 0.8 and 50.6). The band at or below 0.8 has 2217 rows with mean 73.30 and median 73.8. The band above 0.8 has 711 rows with mean 56.53 and median 56.4. Pearson r is -0.557 and Spearman rho is -0.754 (n=2928).",
+        "facts": [
+          "hiv_quartiles"
+        ]
+      },
+      {
+        "statement": "GDP: band means rise from 62.05 to 66.12, 72.40 and 76.92 years, with medians 62.3, 66.6, 73.4 and 76.9. Band edges are 1.68, 463.85, 1764.97, 5932.90 and 119172.74 USD. Pearson r is 0.461 and Spearman rho is 0.642 (n=2485, rows with GDP missing excluded). The Pearson value is well below the Spearman value, which is consistent with the very skewed GDP range.",
+        "facts": [
+          "gdp_quartiles"
+        ]
+      }
+    ],
+    "follow_ups": [
+      "Do Adult Mortality, HIV/AIDS, schooling and income composition overlap with Developed versus Developing status, so that the driver effects partly reflect the status gap?",
+      "Why does Life expectancy in the second Adult Mortality band (74 to 144) sit above the first band (1 to 74)? Check for outliers or country-level clusters.",
+      "Where does the HIV/AIDS effect change between 0.8 and higher prevalence levels, given that the quartile split collapses to two bands?",
+      "Are the GDP correlations driven by a few very high-GDP countries, given the Pearson and Spearman gap?"
+    ]
+  },
+  "facts": {
+    "am_quartiles": {
+      "value": {
+        "n": 2928,
+        "edges": [
+          1.0,
+          74.0,
+          144.0,
+          228.0,
+          723.0
+        ],
+        "band_count": [
+          746,
+          734,
+          724,
+          724
+        ],
+        "band_mean": [
+          72.536,
+          76.059,
+          70.359,
+          57.751
+        ],
+        "band_median": [
+          75.35,
+          75.4,
+          71.0,
+          58.0
+        ],
+        "pearson_r": -0.6963593137699761,
+        "spearman_rho": -0.6500069678928209
+      },
+      "desc": "Adult Mortality: quartile band edges, Life expectancy mean and median per band, Pearson and Spearman with Life expectancy",
+      "cell": 2
+    },
+    "sch_quartiles": {
+      "value": {
+        "n": 2768,
+        "edges": [
+          0.0,
+          10.1,
+          12.3,
+          14.3,
+          20.7
+        ],
+        "band_count": [
+          704,
+          683,
+          714,
+          667
+        ],
+        "band_mean": [
+          58.731,
+          67.663,
+          73.259,
+          78.1
+        ],
+        "band_median": [
+          58.8,
+          68.9,
+          73.9,
+          78.6
+        ],
+        "pearson_r": 0.7519754627366979,
+        "spearman_rho": 0.8135410047690934
+      },
+      "desc": "Schooling: quartile band edges, Life expectancy mean and median per band, Pearson and Spearman with Life expectancy",
+      "cell": 2
+    },
+    "bmi_quartiles": {
+      "value": {
+        "n": 2896,
+        "edges": [
+          1.0,
+          19.3,
+          43.349999999999994,
+          56.1,
+          77.6
+        ],
+        "band_count": [
+          728,
+          720,
+          727,
+          721
+        ],
+        "band_mean": [
+          63.069,
+          64.484,
+          73.061,
+          76.811
+        ],
+        "band_median": [
+          62.9,
+          65.0,
+          73.5,
+          76.5
+        ],
+        "pearson_r": 0.5676935475459861,
+        "spearman_rho": 0.5852526491358018
+      },
+      "desc": "BMI: quartile band edges, Life expectancy mean and median per band, Pearson and Spearman with Life expectancy",
+      "cell": 2
+    },
+    "icr_quartiles": {
+      "value": {
+        "n": 2768,
+        "edges": [
+          0.0,
+          0.493,
+          0.677,
+          0.77925,
+          0.948
+        ],
+        "band_count": [
+          695,
+          692,
+          689,
+          692
+        ],
+        "band_mean": [
+          58.293,
+          67.119,
+          73.191,
+          78.86
+        ],
+        "band_median": [
+          58.4,
+          67.9,
+          73.6,
+          78.8
+        ],
+        "pearson_r": 0.7247759785960612,
+        "spearman_rho": 0.8657015149223543
+      },
+      "desc": "Income composition of resources: quartile band edges, Life expectancy mean and median per band, Pearson and Spearman with Life expectancy",
+      "cell": 2
+    },
+    "hiv_quartiles": {
+      "value": {
+        "n": 2928,
+        "edges": [
+          0.1,
+          0.1,
+          0.1,
+          0.8,
+          50.6
+        ],
+        "band_count": [
+          2217,
+          711
+        ],
+        "band_mean": [
+          73.297,
+          56.527
+        ],
+        "band_median": [
+          73.8,
+          56.4
+        ],
+        "pearson_r": -0.5565562534006934,
+        "spearman_rho": -0.7536418801161249
+      },
+      "desc": "HIV/AIDS: quartile band edges, Life expectancy mean and median per band, Pearson and Spearman with Life expectancy",
+      "cell": 2
+    },
+    "gdp_quartiles": {
+      "value": {
+        "n": 2485,
+        "edges": [
+          1.68135,
+          463.852618,
+          1764.97387,
+          5932.899677,
+          119172.7418
+        ],
+        "band_count": [
+          622,
+          621,
+          621,
+          621
+        ],
+        "band_mean": [
+          62.048,
+          66.124,
+          72.401,
+          76.92
+        ],
+        "band_median": [
+          62.3,
+          66.6,
+          73.4,
+          76.9
+        ],
+        "pearson_r": 0.46145519262073836,
+        "spearman_rho": 0.642470938054315
+      },
+      "desc": "GDP: quartile band edges, Life expectancy mean and median per band, Pearson and Spearman with Life expectancy",
+      "cell": 2
+    }
+  },
+  "charts": {
+    "scatter_am": {
+      "file": "charts/scatter_am.png",
+      "caption": "Scatter of Life expectancy (years) against Adult Mortality, plotting only rows with both Life expectancy and Adult Mortality present, one point per row",
+      "cell": 3
+    },
+    "scatter_sch": {
+      "file": "charts/scatter_sch.png",
+      "caption": "Scatter of Life expectancy (years) against Schooling, plotting only rows with both Life expectancy and Schooling present, one point per row",
+      "cell": 3
+    },
+    "scatter_bmi": {
+      "file": "charts/scatter_bmi.png",
+      "caption": "Scatter of Life expectancy (years) against BMI, plotting only rows with both Life expectancy and BMI present, one point per row",
+      "cell": 3
+    },
+    "scatter_icr": {
+      "file": "charts/scatter_icr.png",
+      "caption": "Scatter of Life expectancy (years) against Income composition of resources, plotting only rows with both Life expectancy and Income composition of resources present, one point per row",
+      "cell": 3
+    },
+    "scatter_hiv": {
+      "file": "charts/scatter_hiv.png",
+      "caption": "Scatter of Life expectancy (years) against HIV/AIDS, plotting only rows with both Life expectancy and HIV/AIDS present, one point per row",
+      "cell": 3
+    },
+    "scatter_gdp": {
+      "file": "charts/scatter_gdp.png",
+      "caption": "Scatter of Life expectancy (years) against GDP, plotting only rows with both Life expectancy and GDP present, one point per row",
+      "cell": 3
+    }
+  },
+  "published": [],
+  "artifacts": [],
+  "attempts": [
+    {
+      "attempt": 1,
+      "revision": 0,
+      "step": 1,
+      "code": "cols = {'LE':'Life expectancy ','AM':'Adult Mortality','SCH':'Schooling','BMI':' BMI ','ICR':'Income composition of resources','HIV':' HIV/AIDS','GDP':'GDP'}\nprint([repr(c) for c in df.columns])\nprint(df.dtypes.value_counts())\nfor k,c in cols.items():\n    print(k, repr(c), c in df.columns, int(df[c].isna().sum()) if c in df.columns else None)\nprint(df.shape)",
+      "output": "[\"'Country'\", \"'Year'\", \"'Status'\", \"'Life expectancy '\", \"'Adult Mortality'\", \"'infant deaths'\", \"'Alcohol'\", \"'percentage expenditure'\", \"'Hepatitis B'\", \"'Measles '\", \"' BMI '\", \"'under-five deaths '\", \"'Polio'\", \"'Total expenditure'\", \"'Diphtheria '\", \"' HIV/AIDS'\", \"'GDP'\", \"'Population'\", \"' thinness  1-19 years'\", \"' thinness 5-9 years'\", \"'Income composition of resources'\", \"'Schooling'\"]\nfloat64    16\nint64       4\nobject      2\nName: count, dtype: int64\nLE 'Life expectancy ' True 10\nAM 'Adult Mortality' True 10\nSCH 'Schooling' True 163\nBMI ' BMI ' True 34\nICR 'Income composition of resources' True 167\nHIV ' HIV/AIDS' True 0\nGDP 'GDP' True 448\n(2938, 22)\n",
+      "error": null,
+      "seconds": 3.59
+    },
+    {
+      "attempt": 2,
+      "revision": 0,
+      "step": 2,
+      "code": "from scipy import stats\nLE = 'Life expectancy '\ndrivers = [('am','Adult Mortality','Adult Mortality'),('sch','Schooling','Schooling'),('bmi','BMI',' BMI '),('icr','Income composition of resources','Income composition of resources'),('hiv','HIV/AIDS',' HIV/AIDS'),('gdp','GDP','GDP')]\nfor key, label, c in drivers:\n    sub = df[[LE, c]].dropna()\n    qs = sub[c].quantile([0, .25, .5, .75, 1.0]).values\n    band = pd.qcut(sub[c], 4, labels=False, duplicates='drop')\n    g = sub.groupby(band)[LE].agg(['count','mean','median'])\n    edges = [float(x) for x in qs]\n    r = stats.pearsonr(sub[c], sub[LE])[0]\n    rho = stats.spearmanr(sub[c], sub[LE])[0]\n    record_fact(f'{key}_quartiles', {'n': int(len(sub)), 'edges': edges, 'band_count': [int(x) for x in g['count']], 'band_mean': [round(float(x),3) for x in g['mean']], 'band_median': [float(x) for x in g['median']], 'pearson_r': float(r), 'spearman_rho': float(rho)}, f'{label}: quartile band edges, Life expectancy mean and median per band, Pearson and Spearman with Life expectancy')\n    print(label, len(sub), [round(x,2) for x in qs])\n    print(g.round(2))\n    print('pearson', round(r,3), 'spearman', round(rho,3))\n    fig, ax = plt.subplots(figsize=(6,4))\n    ax.scatter(sub[c], sub[LE], s=6, alpha=0.4)\n    ax.set_title(f'Life expectancy vs {label}, rows with both values')\n    ax.set_xlabel(label)\n    ax.set_ylabel('Life expectancy (years)')\n    save_chart(fig, f'scatter_{key}', f'Scatter of Life expectancy (years) against {label}, one point per row')\n    plt.close(fig)",
+      "output": "Adult Mortality 2928 [np.float64(1.0), np.float64(74.0), np.float64(144.0), np.float64(228.0), np.float64(723.0)]\n                 count   mean  median\nAdult Mortality                      \n0                  746  72.54   75.35\n1                  734  76.06   75.40\n2                  724  70.36   71.00\n3                  724  57.75   58.00\npearson -0.696 spearman -0.65\nSchooling 2768 [np.float64(0.0), np.float64(10.1), np.float64(12.3), np.float64(14.3), np.float64(20.7)]\n           count   mean  median\nSchooling                      \n0            704  58.73    58.8\n1            683  67.66    68.9\n2            714  73.26    73.9\n3            667  78.10    78.6\npearson 0.752 spearman 0.814\nBMI 2896 [np.float64(1.0), np.float64(19.3), np.float64(43.35), np.float64(56.1), np.float64(77.6)]\n       count   mean  median\n BMI                       \n0        728  63.07    62.9\n1        720  64.48    65.0\n2        727  73.06    73.5\n3        721  76.81    76.5\npearson 0.568 spearman 0.585\nIncome composition of resources 2768 [np.float64(0.0), np.float64(0.49), np.float64(0.68), np.float64(0.78), np.float64(0.95)]\n                                 count   mean  median\nIncome composition of resources                      \n0                                  695  58.29    58.4\n1                                  692  67.12    67.9\n2                                  689  73.19    73.6\n3                                  692  78.86    78.8\npearson 0.725 spearman 0.866\nHIV/AIDS 2928 [np.float64(0.1), np.float64(0.1), np.float64(0.1), np.float64(0.8), np.float64(50.6)]\n           count   mean  median\n HIV/AIDS                      \n0           2217  73.30    73.8\n1            711  56.53    56.4\npearson -0.557 spearman -0.754\nGDP 2485 [np.float64(1.68), np.float64(463.85), np.float64(1764.97), np.float64(5932.9), np.float64(119172.74)]\n     count   mean  median\nGDP                      \n0      622  62.05    62.3\n1      621  66.12    66.6\n2      621  72.40    73.4\n3      621  76.92    76.9\npearson 0.461 spearman 0.642\n",
+      "error": null,
+      "seconds": 7.97
+    },
+    {
+      "attempt": 3,
+      "revision": 1,
+      "step": 1,
+      "code": "import matplotlib.pyplot as plt\nLE = 'Life expectancy '\ndrivers = [('am','Adult Mortality','Adult Mortality'),('sch','Schooling','Schooling'),('bmi','BMI',' BMI '),('icr','Income composition of resources','Income composition of resources'),('hiv','HIV/AIDS',' HIV/AIDS'),('gdp','GDP','GDP')]\nfor key, label, c in drivers:\n    sub = df[[LE, c]].dropna()\n    fig, ax = plt.subplots(figsize=(6,4))\n    ax.scatter(sub[c], sub[LE], s=6, alpha=0.4)\n    ax.set_title(f'Life expectancy vs {label}, rows with both values')\n    ax.set_xlabel(label)\n    ax.set_ylabel('Life expectancy (years)')\n    save_chart(fig, f'scatter_{key}', f'Scatter of Life expectancy (years) against {label}, plotting only rows with both Life expectancy and {label} present, one point per row')\n    plt.close(fig)",
+      "output": "",
+      "error": null,
+      "seconds": 9.81
+    }
+  ],
+  "metadata": {
+    "steps": 3
+  },
+  "brief": {
+    "id": "eda_2",
+    "specialist": "eda",
+    "question": "How does mean Life expectancy differ across bands of the key numeric drivers Adult Mortality, Schooling, BMI, Income composition of resources, HIV/AIDS and GDP?",
+    "complete_when": "For each driver, splits rows into quartile bands and reports mean and median Life expectancy per band, the band edges, and the Pearson and Spearman correlation with Life expectancy. Includes one scatter plot per driver.",
+    "depends_on": [
+      "eda_1"
+    ],
+    "outputs": []
+  },
+  "revisions": 1,
+  "reviews": [
+    {
+      "reasoning": "Checked each report figure against its cited fact. Schooling, Income composition, Adult Mortality, BMI, HIV/AIDS and GDP band means, medians, edges, counts and n all match the facts. Pearson values match where shown. Spearman values for Schooling, ICR, Adult Mortality, BMI and GDP, and the GDP medians, are cut off in the fact text, so they cannot be verified here. The 'strongest rank association' claim for ICR holds on the reported Spearman values (0.866 is the largest magnitude). The HIV/AIDS two-band split matches the facts (2217 and 711 rows, edges 0.1, 0.8, 50.6). The report states the HIV/AIDS unit as 'per 1000', which is not in the dataset profile and is unsupported. The chart descriptions say 'one point per row', but the code plots only rows with both values, as its title says. All six brief components are present (quartile bands, edges, mean and median, Pearson and Spearman, one scatter per driver). Automatic checks report no problems.",
+      "verdict": "revise",
+      "feedback": "Remove the 'per 1000' unit from the HIV/AIDS finding, or state it as an assumption, since the dataset profile gives no unit for HIV/AIDS. Correct the six scatter chart descriptions to say they plot only rows with both Life expectancy and the driver present, matching the code's title. Keep the rest of the findings unchanged.",
+      "follow_ups": []
+    },
+    {
+      "reasoning": "Each driver's band edges, band counts, band means and medians, and Pearson values match the cited facts (sch, icr, am, bmi, hiv, gdp). The HIV/AIDS two-band split at 0.8 follows from the collapsed quartile edges and is disclosed. The Spearman values for the other drivers are not visible in the truncated facts, so they are accepted as recorded by the code. The scatter charts exist for all six drivers, and the second code cell re-saves them with the captions the report cites. The Adult Mortality non-monotone pattern is reported as a fact, not explained, and is an open question. Associations are described without causal language. The automatic checks raised no problems. The report covers the brief. Two open questions are not in the backlog: whether the Adult Mortality reversal persists within Status groups, and whether the driver correlations hold within Status or mainly reflect the Developed-Developing gap.",
+      "verdict": "accept",
+      "feedback": "",
+      "follow_ups": [
+        {
+          "id": "eda_6",
+          "specialist": "eda",
+          "question": "Within Developed and within Developing countries separately, does the Adult Mortality band pattern still show the second band (74 to 144) above the first band (1 to 74), and which countries drive the second band?",
+          "complete_when": "Per Status group, quartile band edges, n, mean and median Life expectancy by Adult Mortality band; list of countries contributing most rows to the second band; a statement of whether the reversal persists within each Status group.",
+          "depends_on": [
+            "eda_2"
+          ],
+          "outputs": []
+        },
+        {
+          "id": "stat_3",
+          "specialist": "statistical",
+          "question": "Do the Schooling, Income composition of resources and HIV/AIDS correlations with Life expectancy hold within each Status group, or do they mostly reflect the Developed-Developing gap?",
+          "complete_when": "Pearson and Spearman correlations with Life expectancy computed separately within Developed and within Developing rows, with n for each; comparison against the pooled values in eda_2; a test or interval showing whether the within-group coefficients differ from the pooled ones.",
+          "depends_on": [
+            "eda_2"
+          ],
+          "outputs": []
+        }
+      ]
+    }
+  ]
+}

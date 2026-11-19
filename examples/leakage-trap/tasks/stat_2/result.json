@@ -1,0 +1,315 @@
+{
+  "task_id": "stat_2",
+  "specialist": "statistical",
+  "description": "Does plan or refund_issued change the effect of tenure_months or usage_hours on churn?",
+  "code": "# %%\nimport matplotlib.pyplot as plt\nimport numpy as np\nimport pandas as pd\n\nfrom agent.execution.runtime import (\n    df,\n    load,\n    publish,\n    record_fact,\n    record_model,\n    save_chart,\n)\n\n# %%\nd = df.copy()\nprint(d.dtypes)\nprint(d['plan'].value_counts())\nprint(d['refund_issued'].value_counts())\nprint(d[['usage_hours','tenure_months','churned']].describe().round(3))\nprint(pd.crosstab(d['plan'], d['refund_issued']))\n\n# %%\nimport statsmodels.formula.api as smf\nd = df.copy()\nd['tenure_c'] = (d['tenure_months'] - d['tenure_months'].mean())/d['tenure_months'].std()\nd['usage_c'] = (d['usage_hours'] - d['usage_hours'].mean())/d['usage_hours'].std()\nd['plan'] = pd.Categorical(d['plan'], categories=['basic','plus','pro'])\nf = 'churned ~ C(plan) * tenure_c + C(plan) * usage_c + refund_issued * tenure_c'\nm = smf.logit(f, data=d).fit(disp=0)\nci = m.conf_int()\ntab = pd.DataFrame({'coef': m.params, 'p': m.pvalues, 'lo': ci[0], 'hi': ci[1]}).round(4)\nprint(tab)\ninter = [k for k in tab.index if ':' in k]\nprint(tab.loc[inter])\nrecord_fact('stat2_interaction_terms', {k: {'coef': float(tab.loc[k,'coef']), 'p': float(tab.loc[k,'p']), 'ci_low': float(tab.loc[k,'lo']), 'ci_high': float(tab.loc[k,'hi'])} for k in inter}, 'Logit interaction coefficients (standardized tenure/usage; basic plan and refund=0 as reference), with p-values and 95% CIs')\nd['tenure_bin'] = pd.qcut(d['tenure_months'], 4, labels=['T1','T2','T3','T4'])\nrates = d.pivot_table(index='tenure_bin', columns='plan', values='churned', aggfunc='mean', observed=False).round(3)\nns = d.pivot_table(index='tenure_bin', columns='plan', values='churned', aggfunc='size', observed=False)\nprint(rates)\nprint(ns)\nrecord_fact('stat2_churn_by_plan_tenure_bin', {str(k): {str(c): float(rates.loc[k,c]) for c in rates.columns} for k in rates.index}, 'Churn rate by plan within tenure quartile bins')\nfig, ax = plt.subplots(figsize=(7,4))\nfor p in rates.columns:\n    ax.plot(rates.index.astype(str), rates[p], marker='o', label=p)\nax.set_title('Churn rate by plan within tenure quartiles')\nax.set_xlabel('Tenure quartile (T1 lowest to T4 highest)')\nax.set_ylabel('Churn rate (share churned)')\nax.legend(title='plan')\nsave_chart(fig, 'stat2_churn_by_plan_tenure', 'Churn rate by plan within tenure quartiles')\n\n# %%\nr = d.groupby('refund_issued')['churned'].agg(['mean','size'])\nprint(r)\nrecord_fact('stat2_churn_by_refund', {str(k): {'churn_rate': float(r.loc[k,'mean']), 'n': int(r.loc[k,'size'])} for k in r.index}, 'Churn rate and n by refund_issued, recomputed in this task')\nrecord_fact('stat2_overall_churn_rate', {'rate': float(df['churned'].mean()), 'n': int(len(df))}, 'Overall churn rate and n, recomputed in this task')\n\n# %%\nimport statsmodels.formula.api as smf\nd = df.copy()\nd['tenure_c'] = (d['tenure_months'] - d['tenure_months'].mean())/d['tenure_months'].std()\nd['usage_c'] = (d['usage_hours'] - d['usage_hours'].mean())/d['usage_hours'].std()\nd['plan'] = pd.Categorical(d['plan'], categories=['basic','plus','pro'])\nm = smf.logit('churned ~ C(plan)*tenure_c + C(plan)*usage_c + refund_issued*tenure_c', data=d).fit(disp=0)\nci = m.conf_int()\ntab = pd.DataFrame({'coef': m.params, 'p': m.pvalues, 'lo': ci[0], 'hi': ci[1]}).round(4)\ninter = [k for k in tab.index if ':' in k]\nprint(tab.loc[inter].to_string())\nrecord_fact('stat2_interaction_terms_full', {k: {'coef': float(tab.loc[k,'coef']), 'p': float(tab.loc[k,'p']), 'ci_low': float(tab.loc[k,'lo']), 'ci_high': float(tab.loc[k,'hi'])} for k in inter}, 'All interaction terms from the logit with plan x tenure_c, plan x usage_c, refund_issued x tenure_c (standardized; basic plan and refund=0 reference), with p-values and 95% CIs')\nd['tenure_bin'] = pd.qcut(d['tenure_months'], 4, labels=['T1','T2','T3','T4'])\nrates = d.pivot_table(index='tenure_bin', columns='plan', values='churned', aggfunc='mean', observed=False).round(3)\nns = d.pivot_table(index='tenure_bin', columns='plan', values='churned', aggfunc='size', observed=False)\nprint(rates.to_string())\nprint(ns.to_string())\nrecord_fact('stat2_churn_by_plan_tenure_bin_full', {str(k): {str(c): {'rate': float(rates.loc[k,c]), 'n': int(ns.loc[k,c])} for c in rates.columns} for k in rates.index}, 'Churn rate and n by plan within tenure quartiles, all four tiers including pro')\n",
+  "output": "usage_hours      float64\ntenure_months      int64\nplan              object\nrefund_issued      int64\nchurned            int64\ndtype: object\nplan\nbasic    512\nplus     297\npro      191\nName: count, dtype: int64\nrefund_issued\n0    632\n1    368\nName: count, dtype: int64\n       usage_hours  tenure_months   churned\ncount     1000.000       1000.000  1000.000\nmean        20.144         35.751     0.363\nstd          9.946         20.139     0.481\nmin          1.900          1.000     0.000\n25%         12.500         18.000     0.000\n50%         18.900         36.000     0.000\n75%         25.525         53.000     1.000\nmax         67.700         71.000     1.000\nrefund_issued    0    1\nplan                   \nbasic          291  221\nplus           210   87\npro            131   60\n                            coef       p      lo      hi\nIntercept                -4.1255  0.0000 -4.9131 -3.3379\nC(plan)[T.plus]          -0.2800  0.5577 -1.2160  0.6560\nC(plan)[T.pro]           -0.8771  0.1257 -1.9998  0.2455\ntenure_c                 -0.2727  0.4748 -1.0206  0.4752\nC(plan)[T.plus]:tenure_c  0.0151  0.9744 -0.9069  0.9370\nC(plan)[T.pro]:tenure_c   0.5075  0.3749 -0.6136  1.6287\nusage_c                  -0.6957  0.0188 -1.2760 -0.1154\nC(plan)[T.plus]:usage_c  -0.5192  0.2955 -1.4918  0.4535\nC(plan)[T.pro]:usage_c    0.0855  0.8981 -1.2230  1.3941\nrefund_issued             7.5452  0.0000  6.5838  8.5065\nrefund_issued:tenure_c   -0.2636  0.5429 -1.1126  0.5855\n                            coef       p      lo      hi\nC(plan)[T.plus]:tenure_c  0.0151  0.9744 -0.9069  0.9370\nC(plan)[T.pro]:tenure_c   0.5075  0.3749 -0.6136  1.6287\nC(plan)[T.plus]:usage_c  -0.5192  0.2955 -1.4918  0.4535\nC(plan)[T.pro]:usage_c    0.0855  0.8981 -1.2230  1.3941\nrefund_issued:tenure_c   -0.2636  0.5429 -1.1126  0.5855\nplan        basic   plus    pro\ntenure_bin                     \nT1          0.549  0.443  0.419\nT2          0.471  0.361  0.357\nT3          0.372  0.188  0.212\nT4          0.291  0.173  0.241\nplan        basic  plus  pro\ntenure_bin                  \nT1            144    70   43\nT2            121    83   42\nT3            137    69   52\nT4            110    75   54\n                   mean  size\nrefund_issued                \n0              0.015823   632\n1              0.959239   368\n                            coef       p      lo      hi\nC(plan)[T.plus]:tenure_c  0.0151  0.9744 -0.9069  0.9370\nC(plan)[T.pro]:tenure_c   0.5075  0.3749 -0.6136  1.6287\nC(plan)[T.plus]:usage_c  -0.5192  0.2955 -1.4918  0.4535\nC(plan)[T.pro]:usage_c    0.0855  0.8981 -1.2230  1.3941\nrefund_issued:tenure_c   -0.2636  0.5429 -1.1126  0.5855\nplan        basic   plus    pro\ntenure_bin                     \nT1          0.549  0.443  0.419\nT2          0.471  0.361  0.357\nT3          0.372  0.188  0.212\nT4          0.291  0.173  0.241\nplan        basic  plus  pro\ntenure_bin                  \nT1            144    70   43\nT2            121    83   42\nT3            137    69   52\nT4            110    75   54\n",
+  "execution_time": 27.93,
+  "success": true,
+  "error": null,
+  "report": {
+    "status": "complete",
+    "findings": [
+      {
+        "statement": "No plan or refund interaction with tenure_months or usage_hours is statistically supported at the 0.05 level. The five terms are: plus x tenure_c 0.015 (p=0.974, 95% CI -0.907 to 0.937); pro x tenure_c 0.508 (p=0.375, 95% CI -0.614 to 1.629); plus x usage_c -0.519 (p=0.296, 95% CI -1.492 to 0.454); pro x usage_c 0.086 (p=0.898, 95% CI -1.223 to 1.394); refund_issued x tenure_c -0.264 (p=0.543, 95% CI -1.113 to 0.586). Coefficients are on standardized tenure and usage, with basic plan and refund_issued=0 as reference.",
+        "facts": [
+          "stat2_interaction_terms_full"
+        ]
+      },
+      {
+        "statement": "Interaction terms are not worth reporting as effect modifiers. Every 95% CI spans zero and every p-value is above 0.29, so the data do not show that plan or refund_issued changes the tenure or usage slope of churn.",
+        "facts": [
+          "stat2_interaction_terms_full"
+        ]
+      },
+      {
+        "statement": "Basic plan has the highest churn in every tenure quartile, but the gap does not change detectably with tenure. Basic vs plus vs pro churn rates are: T1 0.549 vs 0.443 vs 0.419 (n=144/70/43); T2 0.471 vs 0.361 vs 0.357 (n=121/83/42); T3 0.372 vs 0.188 vs 0.212 (n=137/69/52); T4 0.291 vs 0.173 vs 0.241 (n=110/75/54). The T4 pro value is 0.241, so the 'every tenure level' claim holds for all four tiers, but it is descriptive and not a tested interaction.",
+        "facts": [
+          "stat2_churn_by_plan_tenure_bin_full"
+        ]
+      },
+      {
+        "statement": "refund_issued is a possible leakage column and cannot be used to show a refund effect on churn. Churn is 0.959 (n=368) when refund_issued=1 versus 0.016 (n=632) when refund_issued=0. Its interaction with tenure (-0.264, p=0.543) is not evidence of a refund effect until its timing relative to the churn decision is confirmed.",
+        "facts": [
+          "stat2_churn_by_refund",
+          "stat2_interaction_terms_full"
+        ]
+      }
+    ],
+    "follow_ups": [
+      "Confirm whether refund_issued is recorded before or after the churn decision; if after, exclude it from all models.",
+      "Refit the logit without refund_issued to check whether the plan, usage and tenure effects hold on their own.",
+      "Test whether the plan gap across tenure is stable with a likelihood-ratio test of the full interaction model against the main-effects model."
+    ]
+  },
+  "facts": {
+    "stat2_interaction_terms": {
+      "value": {
+        "C(plan)[T.plus]:tenure_c": {
+          "coef": 0.0151,
+          "p": 0.9744,
+          "ci_low": -0.9069,
+          "ci_high": 0.937
+        },
+        "C(plan)[T.pro]:tenure_c": {
+          "coef": 0.5075,
+          "p": 0.3749,
+          "ci_low": -0.6136,
+          "ci_high": 1.6287
+        },
+        "C(plan)[T.plus]:usage_c": {
+          "coef": -0.5192,
+          "p": 0.2955,
+          "ci_low": -1.4918,
+          "ci_high": 0.4535
+        },
+        "C(plan)[T.pro]:usage_c": {
+          "coef": 0.0855,
+          "p": 0.8981,
+          "ci_low": -1.223,
+          "ci_high": 1.3941
+        },
+        "refund_issued:tenure_c": {
+          "coef": -0.2636,
+          "p": 0.5429,
+          "ci_low": -1.1126,
+          "ci_high": 0.5855
+        }
+      },
+      "desc": "Logit interaction coefficients (standardized tenure/usage; basic plan and refund=0 as reference), with p-values and 95% CIs",
+      "cell": 2
+    },
+    "stat2_churn_by_plan_tenure_bin": {
+      "value": {
+        "T1": {
+          "basic": 0.549,
+          "plus": 0.443,
+          "pro": 0.419
+        },
+        "T2": {
+          "basic": 0.471,
+          "plus": 0.361,
+          "pro": 0.357
+        },
+        "T3": {
+          "basic": 0.372,
+          "plus": 0.188,
+          "pro": 0.212
+        },
+        "T4": {
+          "basic": 0.291,
+          "plus": 0.173,
+          "pro": 0.241
+        }
+      },
+      "desc": "Churn rate by plan within tenure quartile bins",
+      "cell": 2
+    },
+    "stat2_churn_by_refund": {
+      "value": {
+        "0": {
+          "churn_rate": 0.015822784810126583,
+          "n": 632
+        },
+        "1": {
+          "churn_rate": 0.9592391304347826,
+          "n": 368
+        }
+      },
+      "desc": "Churn rate and n by refund_issued, recomputed in this task",
+      "cell": 3
+    },
+    "stat2_overall_churn_rate": {
+      "value": {
+        "rate": 0.363,
+        "n": 1000
+      },
+      "desc": "Overall churn rate and n, recomputed in this task",
+      "cell": 3
+    },
+    "stat2_interaction_terms_full": {
+      "value": {
+        "C(plan)[T.plus]:tenure_c": {
+          "coef": 0.0151,
+          "p": 0.9744,
+          "ci_low": -0.9069,
+          "ci_high": 0.937
+        },
+        "C(plan)[T.pro]:tenure_c": {
+          "coef": 0.5075,
+          "p": 0.3749,
+          "ci_low": -0.6136,
+          "ci_high": 1.6287
+        },
+        "C(plan)[T.plus]:usage_c": {
+          "coef": -0.5192,
+          "p": 0.2955,
+          "ci_low": -1.4918,
+          "ci_high": 0.4535
+        },
+        "C(plan)[T.pro]:usage_c": {
+          "coef": 0.0855,
+          "p": 0.8981,
+          "ci_low": -1.223,
+          "ci_high": 1.3941
+        },
+        "refund_issued:tenure_c": {
+          "coef": -0.2636,
+          "p": 0.5429,
+          "ci_low": -1.1126,
+          "ci_high": 0.5855
+        }
+      },
+      "desc": "All interaction terms from the logit with plan x tenure_c, plan x usage_c, refund_issued x tenure_c (standardized; basic plan and refund=0 reference), with p-values and 95% CIs",
+      "cell": 4
+    },
+    "stat2_churn_by_plan_tenure_bin_full": {
+      "value": {
+        "T1": {
+          "basic": {
+            "rate": 0.549,
+            "n": 144
+          },
+          "plus": {
+            "rate": 0.443,
+            "n": 70
+          },
+          "pro": {
+            "rate": 0.419,
+            "n": 43
+          }
+        },
+        "T2": {
+          "basic": {
+            "rate": 0.471,
+            "n": 121
+          },
+          "plus": {
+            "rate": 0.361,
+            "n": 83
+          },
+          "pro": {
+            "rate": 0.357,
+            "n": 42
+          }
+        },
+        "T3": {
+          "basic": {
+            "rate": 0.372,
+            "n": 137
+          },
+          "plus": {
+            "rate": 0.188,
+            "n": 69
+          },
+          "pro": {
+            "rate": 0.212,
+            "n": 52
+          }
+        },
+        "T4": {
+          "basic": {
+            "rate": 0.291,
+            "n": 110
+          },
+          "plus": {
+            "rate": 0.173,
+            "n": 75
+          },
+          "pro": {
+            "rate": 0.241,
+            "n": 54
+          }
+        }
+      },
+      "desc": "Churn rate and n by plan within tenure quartiles, all four tiers including pro",
+      "cell": 4
+    }
+  },
+  "charts": {
+    "stat2_churn_by_plan_tenure": {
+      "file": "charts/stat2_churn_by_plan_tenure.png",
+      "caption": "Churn rate by plan within tenure quartiles",
+      "cell": 2
+    }
+  },
+  "published": [],
+  "artifacts": [],
+  "attempts": [
+    {
+      "attempt": 1,
+      "revision": 0,
+      "step": 1,
+      "code": "d = df.copy()\nprint(d.dtypes)\nprint(d['plan'].value_counts())\nprint(d['refund_issued'].value_counts())\nprint(d[['usage_hours','tenure_months','churned']].describe().round(3))\nprint(pd.crosstab(d['plan'], d['refund_issued']))",
+      "output": "usage_hours      float64\ntenure_months      int64\nplan              object\nrefund_issued      int64\nchurned            int64\ndtype: object\nplan\nbasic    512\nplus     297\npro      191\nName: count, dtype: int64\nrefund_issued\n0    632\n1    368\nName: count, dtype: int64\n       usage_hours  tenure_months   churned\ncount     1000.000       1000.000  1000.000\nmean        20.144         35.751     0.363\nstd          9.946         20.139     0.481\nmin          1.900          1.000     0.000\n25%         12.500         18.000     0.000\n50%         18.900         36.000     0.000\n75%         25.525         53.000     1.000\nmax         67.700         71.000     1.000\nrefund_issued    0    1\nplan                   \nbasic          291  221\nplus           210   87\npro            131   60\n",
+      "error": null,
+      "seconds": 4.09
+    },
+    {
+      "attempt": 2,
+      "revision": 0,
+      "step": 2,
+      "code": "import statsmodels.formula.api as smf\nd = df.copy()\nd['tenure_c'] = (d['tenure_months'] - d['tenure_months'].mean())/d['tenure_months'].std()\nd['usage_c'] = (d['usage_hours'] - d['usage_hours'].mean())/d['usage_hours'].std()\nd['plan'] = pd.Categorical(d['plan'], categories=['basic','plus','pro'])\nf = 'churned ~ C(plan) * tenure_c + C(plan) * usage_c + refund_issued * tenure_c'\nm = smf.logit(f, data=d).fit(disp=0)\nci = m.conf_int()\ntab = pd.DataFrame({'coef': m.params, 'p': m.pvalues, 'lo': ci[0], 'hi': ci[1]}).round(4)\nprint(tab)\ninter = [k for k in tab.index if ':' in k]\nprint(tab.loc[inter])\nrecord_fact('stat2_interaction_terms', {k: {'coef': float(tab.loc[k,'coef']), 'p': float(tab.loc[k,'p']), 'ci_low': float(tab.loc[k,'lo']), 'ci_high': float(tab.loc[k,'hi'])} for k in inter}, 'Logit interaction coefficients (standardized tenure/usage; basic plan and refund=0 as reference), with p-values and 95% CIs')\nd['tenure_bin'] = pd.qcut(d['tenure_months'], 4, labels=['T1','T2','T3','T4'])\nrates = d.pivot_table(index='tenure_bin', columns='plan', values='churned', aggfunc='mean', observed=False).round(3)\nns = d.pivot_table(index='tenure_bin', columns='plan', values='churned', aggfunc='size', observed=False)\nprint(rates)\nprint(ns)\nrecord_fact('stat2_churn_by_plan_tenure_bin', {str(k): {str(c): float(rates.loc[k,c]) for c in rates.columns} for k in rates.index}, 'Churn rate by plan within tenure quartile bins')\nfig, ax = plt.subplots(figsize=(7,4))\nfor p in rates.columns:\n    ax.plot(rates.index.astype(str), rates[p], marker='o', label=p)\nax.set_title('Churn rate by plan within tenure quartiles')\nax.set_xlabel('Tenure quartile (T1 lowest to T4 highest)')\nax.set_ylabel('Churn rate (share churned)')\nax.legend(title='plan')\nsave_chart(fig, 'stat2_churn_by_plan_tenure', 'Churn rate by plan within tenure quartiles')",
+      "output": "                            coef       p      lo      hi\nIntercept                -4.1255  0.0000 -4.9131 -3.3379\nC(plan)[T.plus]          -0.2800  0.5577 -1.2160  0.6560\nC(plan)[T.pro]           -0.8771  0.1257 -1.9998  0.2455\ntenure_c                 -0.2727  0.4748 -1.0206  0.4752\nC(plan)[T.plus]:tenure_c  0.0151  0.9744 -0.9069  0.9370\nC(plan)[T.pro]:tenure_c   0.5075  0.3749 -0.6136  1.6287\nusage_c                  -0.6957  0.0188 -1.2760 -0.1154\nC(plan)[T.plus]:usage_c  -0.5192  0.2955 -1.4918  0.4535\nC(plan)[T.pro]:usage_c    0.0855  0.8981 -1.2230  1.3941\nrefund_issued             7.5452  0.0000  6.5838  8.5065\nrefund_issued:tenure_c   -0.2636  0.5429 -1.1126  0.5855\n                            coef       p      lo      hi\nC(plan)[T.plus]:tenure_c  0.0151  0.9744 -0.9069  0.9370\nC(plan)[T.pro]:tenure_c   0.5075  0.3749 -0.6136  1.6287\nC(plan)[T.plus]:usage_c  -0.5192  0.2955 -1.4918  0.4535\nC(plan)[T.pro]:usage_c    0.0855  0.8981 -1.2230  1.3941\nrefund_issued:tenure_c   -0.2636  0.5429 -1.1126  0.5855\nplan        basic   plus    pro\ntenure_bin                     \nT1          0.549  0.443  0.419\nT2          0.471  0.361  0.357\nT3          0.372  0.188  0.212\nT4          0.291  0.173  0.241\nplan        basic  plus  pro\ntenure_bin                  \nT1            144    70   43\nT2            121    83   42\nT3            137    69   52\nT4            110    75   54\n",
+      "error": null,
+      "seconds": 9.13
+    },
+    {
+      "attempt": 3,
+      "revision": 0,
+      "step": 4,
+      "code": "r = d.groupby('refund_issued')['churned'].agg(['mean','size'])\nprint(r)\nrecord_fact('stat2_churn_by_refund', {str(k): {'churn_rate': float(r.loc[k,'mean']), 'n': int(r.loc[k,'size'])} for k in r.index}, 'Churn rate and n by refund_issued, recomputed in this task')\nrecord_fact('stat2_overall_churn_rate', {'rate': float(df['churned'].mean()), 'n': int(len(df))}, 'Overall churn rate and n, recomputed in this task')",
+      "output": "                   mean  size\nrefund_issued                \n0              0.015823   632\n1              0.959239   368\n",
+      "error": null,
+      "seconds": 7.92
+    },
+    {
+      "attempt": 4,
+      "revision": 1,
+      "step": 1,
+      "code": "import statsmodels.formula.api as smf\nd = df.copy()\nd['tenure_c'] = (d['tenure_months'] - d['tenure_months'].mean())/d['tenure_months'].std()\nd['usage_c'] = (d['usage_hours'] - d['usage_hours'].mean())/d['usage_hours'].std()\nd['plan'] = pd.Categorical(d['plan'], categories=['basic','plus','pro'])\nm = smf.logit('churned ~ C(plan)*tenure_c + C(plan)*usage_c + refund_issued*tenure_c', data=d).fit(disp=0)\nci = m.conf_int()\ntab = pd.DataFrame({'coef': m.params, 'p': m.pvalues, 'lo': ci[0], 'hi': ci[1]}).round(4)\ninter = [k for k in tab.index if ':' in k]\nprint(tab.loc[inter].to_string())\nrecord_fact('stat2_interaction_terms_full', {k: {'coef': float(tab.loc[k,'coef']), 'p': float(tab.loc[k,'p']), 'ci_low': float(tab.loc[k,'lo']), 'ci_high': float(tab.loc[k,'hi'])} for k in inter}, 'All interaction terms from the logit with plan x tenure_c, plan x usage_c, refund_issued x tenure_c (standardized; basic plan and refund=0 reference), with p-values and 95% CIs')\nd['tenure_bin'] = pd.qcut(d['tenure_months'], 4, labels=['T1','T2','T3','T4'])\nrates = d.pivot_table(index='tenure_bin', columns='plan', values='churned', aggfunc='mean', observed=False).round(3)\nns = d.pivot_table(index='tenure_bin', columns='plan', values='churned', aggfunc='size', observed=False)\nprint(rates.to_string())\nprint(ns.to_string())\nrecord_fact('stat2_churn_by_plan_tenure_bin_full', {str(k): {str(c): {'rate': float(rates.loc[k,c]), 'n': int(ns.loc[k,c])} for c in rates.columns} for k in rates.index}, 'Churn rate and n by plan within tenure quartiles, all four tiers including pro')",
+      "output": "                            coef       p      lo      hi\nC(plan)[T.plus]:tenure_c  0.0151  0.9744 -0.9069  0.9370\nC(plan)[T.pro]:tenure_c   0.5075  0.3749 -0.6136  1.6287\nC(plan)[T.plus]:usage_c  -0.5192  0.2955 -1.4918  0.4535\nC(plan)[T.pro]:usage_c    0.0855  0.8981 -1.2230  1.3941\nrefund_issued:tenure_c   -0.2636  0.5429 -1.1126  0.5855\nplan        basic   plus    pro\ntenure_bin                     \nT1          0.549  0.443  0.419\nT2          0.471  0.361  0.357\nT3          0.372  0.188  0.212\nT4          0.291  0.173  0.241\nplan        basic  plus  pro\ntenure_bin                  \nT1            144    70   43\nT2            121    83   42\nT3            137    69   52\nT4            110    75   54\n",
+      "error": null,
+      "seconds": 6.79
+    }
+  ],
+  "metadata": {
+    "steps": 4
+  },
+  "brief": {
+    "id": "stat_2",
+    "specialist": "statistical",
+    "question": "Does plan or refund_issued change the effect of tenure_months or usage_hours on churn?",
+    "complete_when": "Fits a logistic regression with interaction terms (plan x tenure_months, plan x usage_hours, refund_issued x tenure_months), reports the interaction coefficients with p-values and confidence intervals, and gives churn rates by plan within tenure bins to show any interaction visually or in a table; states whether any interaction is worth reporting.",
+    "depends_on": [
+      "eda_1"
+    ],
+    "outputs": []
+  },
+  "revisions": 1,
+  "reviews": [
+    {
+      "reasoning": "The plan x tenure coefficients match stat2_interaction_terms (plus 0.015, p=0.974, CI -0.907 to 0.937; pro 0.508, p=0.375, CI -0.614 to 1.629), and the tenure-quartile rates match stat2_churn_by_plan_tenure_bin for T1 to T3. The refund rates 0.959 (n=368) and 0.016 (n=632) match stat2_churn_by_refund. However, the brief asks for three interaction families: plan x tenure, plan x usage, and refund_issued x tenure. The report gives coefficients only for plan x tenure. The plan x usage_hours and refund_issued x tenure_months terms are in the fact but not reported, and the specialist's own follow-up says they were not reviewed. The brief also asks for a statement of whether any interaction is worth reporting; the report gives a partial answer, and the refund finding dismisses the refund interaction without the coefficient or p-value. The claim that the basic gap is 'visible at every tenure level' cannot be checked for T4 because the pro value in T4 is truncated in the fact and absent from the report. The refund finding also needs to keep the leakage caveat from stat_1 rather than treat the split as settled.",
+      "verdict": "revise",
+      "feedback": "1) Report the coefficients, p-values and 95% CIs for all interaction terms in stat2_interaction_terms, including the plan x usage_c terms (plus and pro) and the refund_issued x tenure_c term, not only plan x tenure. 2) State explicitly whether any interaction is worth reporting, using those p-values and CIs. 3) Give the full T4 row of stat2_churn_by_plan_tenure_bin, including the pro value, or restrict the 'every tenure level' claim to the tiers you can show. 4) For the refund finding, keep the caveat from stat_1: refund_issued is a possible leakage column, so any interaction with it is not evidence of a refund effect on churn until its timing relative to the churn decision is confirmed.",
+      "follow_ups": []
+    },
+    {
+      "reasoning": "Checked each finding against its cited facts. The five interaction coefficients, CIs and p-values match stat2_interaction_terms_full, and the 'every CI spans zero' and 'every p above 0.29' claims hold (minimum p is 0.296). The quartile churn rates and n values match stat2_churn_by_plan_tenure_bin_full, and basic is highest in all four tiers. The refund churn rates (0.959 vs 0.016) match stat2_churn_by_refund. The brief is covered: interaction coefficients with p-values and CIs, churn by plan within tenure bins, and a statement on whether to report. The refund_issued column is a probable leakage column and is correctly flagged as not usable as evidence of a refund effect. Remaining caveat: the model that generated these interactions includes refund_issued, which may distort the plan and usage terms, so the null result is provisional. The specialist's suggested refit without refund_issued is worth running as a follow-up. The automatic checks passed.",
+      "verdict": "accept",
+      "feedback": "",
+      "follow_ups": [
+        {
+          "id": "stat_3",
+          "specialist": "statistical",
+          "question": "Do plan x tenure, plan x usage interactions still show no effect on churn when refund_issued is excluded from the logit?",
+          "complete_when": "Refits the logit with plan x tenure_c, plan x usage_c and no refund_issued term; reports interaction coefficients with p-values and 95% CIs; gives a likelihood-ratio test of the full interaction model against the main-effects model; states whether the conclusion from stat_2 changes.",
+          "depends_on": [
+            "stat_2"
+          ],
+          "outputs": []
+        }
+      ]
+    }
+  ]
+}

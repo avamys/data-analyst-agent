@@ -1,0 +1,266 @@
+{
+  "status": "ok",
+  "run_id": "4fc0f7c5-5764-4d29-ba04-a6305a242893",
+  "dataset": "titanic",
+  "dataset_path": "/workspaces/agents/evals/data/titanic.csv",
+  "target": "Survived",
+  "started": "2026-11-19T12:53:35",
+  "command": [
+    "run.py",
+    "/workspaces/agents/evals/data/titanic.csv",
+    "--target",
+    "Survived",
+    "--model",
+    "qwen3.5:9b",
+    "--provider",
+    "ollama"
+  ],
+  "commit": "2728719",
+  "dirty": false,
+  "network_blocked": true,
+  "parallel_tasks": 1,
+  "settings": {
+    "preset": "local",
+    "model_provider": "ollama",
+    "ollama_base_url": "http://host.docker.internal:11434",
+    "ollama_model": "qwen3.5:9b",
+    "openrouter_base_url": "https://openrouter.ai/api/v1",
+    "openrouter_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "openrouter_reasoning": true,
+    "anthropic_model": "claude-haiku-5-5",
+    "analyst_model": "qwen3.5:9b",
+    "coder_model": "qwen3.5:9b",
+    "reporter_model": "qwen3.5:9b",
+    "llm_reasoning": false,
+    "llm_num_ctx": 32768,
+    "llm_max_tokens": 4096,
+    "anthropic_max_tokens": 16000,
+    "anthropic_report_max_tokens": 32000,
+    "lead_effort": null,
+    "specialist_effort": null,
+    "llm_timeout_s": 1800,
+    "llm_num_gpu": 17,
+    "llm_retries": 1,
+    "lead_temperature": 0.2,
+    "eda_temperature": 0.3,
+    "statistical_temperature": 0.2,
+    "ml_temperature": 0.1,
+    "reporter_temperature": 0.3,
+    "max_tasks": 6,
+    "max_follow_ups": 2,
+    "max_revisions": 1,
+    "max_question_tasks": 2,
+    "max_parallel_tasks": null,
+    "max_specialist_steps": 5,
+    "max_report_rewrites": 1,
+    "code_timeout_s": 300,
+    "max_cell_output_chars": 3000,
+    "prompt_fact_chars": 200,
+    "review_script_chars": 8000,
+    "plan_description_chars": 1000,
+    "overfit_gap": 0.1,
+    "near_perfect_score": 0.99,
+    "baseline_margin": 0.02,
+    "leakage_score": 0.9,
+    "imbalance_ratio": 2.0,
+    "number_check_max_label": 10,
+    "number_check_conventions": [
+      0.05
+    ],
+    "judge_model": "claude-sonnet-5-5",
+    "runs_directory": "/workspaces/agents/evals/runs/20261119-125318_current_qwen3.5:9b/titanic/r1",
+    "log_level": "INFO"
+  },
+  "nodes": [
+    {
+      "node": "profile",
+      "seconds": 3.0
+    },
+    {
+      "node": "plan",
+      "seconds": 161.7
+    },
+    {
+      "node": "run_task",
+      "seconds": 438.8
+    },
+    {
+      "node": "review",
+      "seconds": 108.0
+    },
+    {
+      "node": "run_task",
+      "seconds": 375.0
+    },
+    {
+      "node": "review",
+      "seconds": 66.4
+    },
+    {
+      "node": "run_task",
+      "seconds": 177.1
+    },
+    {
+      "node": "review",
+      "seconds": 54.1
+    },
+    {
+      "node": "run_task",
+      "seconds": 746.1
+    },
+    {
+      "node": "review",
+      "seconds": 116.2
+    },
+    {
+      "node": "run_task",
+      "seconds": 936.3
+    },
+    {
+      "node": "review",
+      "seconds": 44.7
+    },
+    {
+      "node": "run_task",
+      "seconds": 963.1
+    },
+    {
+      "node": "review",
+      "seconds": 82.4
+    },
+    {
+      "node": "run_task",
+      "seconds": 487.6
+    },
+    {
+      "node": "review",
+      "seconds": 29.5
+    },
+    {
+      "node": "run_task",
+      "seconds": 396.0
+    },
+    {
+      "node": "review",
+      "seconds": 96.6
+    },
+    {
+      "node": "run_task",
+      "seconds": 282.8
+    },
+    {
+      "node": "review",
+      "seconds": 106.2
+    },
+    {
+      "node": "run_task",
+      "seconds": 387.7
+    },
+    {
+      "node": "review",
+      "seconds": 101.2
+    },
+    {
+      "node": "run_task",
+      "seconds": 1244.6
+    },
+    {
+      "node": "review",
+      "seconds": 142.7
+    },
+    {
+      "node": "run_task",
+      "seconds": 835.4
+    },
+    {
+      "node": "review",
+      "seconds": 194.7
+    },
+    {
+      "node": "run_task",
+      "seconds": 1432.2
+    },
+    {
+      "node": "review",
+      "seconds": 213.5
+    },
+    {
+      "node": "run_task",
+      "seconds": 342.8
+    },
+    {
+      "node": "review",
+      "seconds": 78.5
+    },
+    {
+      "node": "run_task",
+      "seconds": 398.5
+    },
+    {
+      "node": "review",
+      "seconds": 54.3
+    },
+    {
+      "node": "report",
+      "seconds": 819.5
+    }
+  ],
+  "finished": "2026-11-19T16:12:17",
+  "seconds": 11918.0,
+  "llm_calls": 99,
+  "input_tokens": 410161,
+  "output_tokens": 81631,
+  "calls_cut_off": 0,
+  "calls_window_full": 0,
+  "calls_empty": 0,
+  "tasks_completed": 8,
+  "tasks_failed": 0,
+  "unverified_numbers": [
+    "0.34",
+    "263.05",
+    "0.54",
+    "26.49",
+    "50.4%",
+    "13.6%",
+    "18.86",
+    "16.28",
+    "25.66"
+  ],
+  "context": {
+    "largest_prompt_tokens": 13738,
+    "window_warnings": [],
+    "prompt_cuts": {
+      "dataset description": 1,
+      "fact value": 174,
+      "review script": 5
+    }
+  },
+  "ollama": {
+    "load_seconds": 24.98,
+    "prompt_seconds": 379.34,
+    "generation_seconds": 11081.33,
+    "generation_tokens": 81631,
+    "loaded": [
+      {
+        "model": "qwen3.5:9b",
+        "size_gb": 7.38,
+        "vram_gb": 3.81,
+        "on_gpu": 0.52,
+        "context_length": 32768
+      }
+    ]
+  },
+  "grades": {
+    "run_ok": true,
+    "tasks_completed": 8,
+    "tasks_failed": 0,
+    "llm_calls": 99,
+    "input_tokens": 410161,
+    "output_tokens": 81631,
+    "cost_usd": null,
+    "unverified_numbers": 9,
+    "revisions": 7,
+    "unresolved_objections": 5,
+    "follow_ups": 2
+  }
+}

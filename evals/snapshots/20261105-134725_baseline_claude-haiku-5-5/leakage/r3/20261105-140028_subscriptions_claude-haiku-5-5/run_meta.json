@@ -1,0 +1,60 @@
+{
+  "status": "ok",
+  "started": "2026-11-05T14:00:28",
+  "command": [
+    "run.py",
+    "/workspaces/agents/evals/data/subscriptions.csv",
+    "--target",
+    "churned",
+    "--model",
+    "claude-haiku-5-5"
+  ],
+  "commit": "49bd21c",
+  "dirty": false,
+  "settings": {
+    "ollama_base_url": "http://host.docker.internal:11434",
+    "analyst_model": "claude-haiku-5-5",
+    "coder_model": "claude-haiku-5-5",
+    "reporter_model": "claude-haiku-5-5",
+    "llm_reasoning": false,
+    "llm_num_ctx": 8192,
+    "llm_max_tokens": 4096,
+    "llm_timeout_s": 900,
+    "llm_num_gpu": 17,
+    "model_provider": "anthropic",
+    "reporter_temperature": 0.3,
+    "max_code_retries": 2,
+    "max_tasks": 6,
+    "runs_directory": "/workspaces/agents/evals/runs/20261105-134725_baseline_claude-haiku-5-5/leakage/r3",
+    "log_level": "INFO"
+  },
+  "nodes": [
+    {
+      "node": "orchestrator",
+      "seconds": 3.8
+    },
+    {
+      "node": "planner",
+      "seconds": 5.9
+    },
+    {
+      "node": "execution_manager",
+      "seconds": 133.5
+    },
+    {
+      "node": "synthesizer",
+      "seconds": 21.7
+    },
+    {
+      "node": "reporter",
+      "seconds": 31.1
+    }
+  ],
+  "finished": "2026-11-05T14:03:44",
+  "seconds": 196.1,
+  "llm_calls": 10,
+  "input_tokens": 16864,
+  "output_tokens": 33901,
+  "tasks_completed": 6,
+  "tasks_failed": 0
+}

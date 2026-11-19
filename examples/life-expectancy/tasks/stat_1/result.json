@@ -1,0 +1,226 @@
+{
+  "task_id": "stat_1",
+  "specialist": "statistical",
+  "description": "Is the difference in Life expectancy between Developing and Developed countries statistically significant, and how large is the effect?",
+  "code": "# %%\nimport matplotlib.pyplot as plt\nimport numpy as np\nimport pandas as pd\n\nfrom agent.execution.runtime import (\n    df,\n    load,\n    publish,\n    record_fact,\n    record_model,\n    save_chart,\n)\n\n# %%\nd = df.copy()\nd.columns = [c.strip() for c in d.columns]\nprint(d.columns.tolist())\nprint(d['Status'].value_counts(dropna=False))\nprint(d[['Life expectancy','Schooling','Adult Mortality']].isna().sum())\nprint(d[['Life expectancy','Schooling','Adult Mortality']].describe().round(2))\n\n# %%\nfrom scipy import stats\nd['Status'] = d['Status'].str.strip()\nres = {}\nfor var in ['Life expectancy', 'Schooling', 'Adult Mortality']:\n    s = d[[var, 'Status']].dropna()\n    a = s.loc[s.Status == 'Developed', var]\n    b = s.loc[s.Status == 'Developing', var]\n    na, nb = len(a), len(b)\n    ma, mb = a.mean(), b.mean()\n    sa, sb = a.std(ddof=1), b.std(ddof=1)\n    se_a, se_b = sa/np.sqrt(na), sb/np.sqrt(nb)\n    tcrit_a = stats.t.ppf(0.975, na-1)\n    tcrit_b = stats.t.ppf(0.975, nb-1)\n    ci_a = (ma - tcrit_a*se_a, ma + tcrit_a*se_a)\n    ci_b = (mb - tcrit_b*se_b, mb + tcrit_b*se_b)\n    welch = stats.ttest_ind(a, b, equal_var=False)\n    mw = stats.mannwhitneyu(a, b, alternative='two-sided')\n    sp = np.sqrt(((na-1)*sa**2 + (nb-1)*sb**2)/(na+nb-2))\n    d_val = (ma - mb)/sp\n    se_d = np.sqrt((na+nb)/(na*nb) + d_val**2/(2*(na+nb)))\n    d_ci = (d_val - 1.96*se_d, d_val + 1.96*se_d)\n    diff = ma - mb\n    se_diff = np.sqrt(se_a**2 + se_b**2)\n    dfw = (se_a**2 + se_b**2)**2 / (se_a**4/(na-1) + se_b**4/(nb-1))\n    tc = stats.t.ppf(0.975, dfw)\n    diff_ci = (diff - tc*se_diff, diff + tc*se_diff)\n    out = {'n_developed': na, 'n_developing': nb, 'mean_developed': ma, 'mean_developing': mb, 'ci_developed': list(ci_a), 'ci_developing': list(ci_b), 'mean_diff_dev_minus_ing': diff, 'diff_ci': list(diff_ci), 'welch_t': float(welch.statistic), 'welch_p': float(welch.pvalue), 'mannwhitney_p': float(mw.pvalue), 'cohens_d': d_val, 'cohens_d_ci': list(d_ci)}\n    res[var] = out\n    print(var, {k: (round(v, 4) if isinstance(v, float) else v) for k, v in out.items() if not isinstance(v, list)})\n    print('  CI dev', np.round(ci_a, 3), 'CI ing', np.round(ci_b, 3), 'diff CI', np.round(diff_ci, 3), 'd CI', np.round(d_ci, 3))\n    record_fact('stat1_' + var.replace(' ', '_').lower(), out, 'Developed vs Developing comparison for ' + var + ': group means, 95% CIs, Welch t, Mann-Whitney p, Cohen d with CI')\n\n# %%\nfig, ax = plt.subplots(figsize=(7, 4))\ng_dev = d.loc[d.Status == 'Developed', 'Life expectancy'].dropna()\ng_ing = d.loc[d.Status == 'Developing', 'Life expectancy'].dropna()\nax.boxplot([g_dev, g_ing])\nax.set_xticks([1, 2])\nax.set_xticklabels(['Developed (n=%d)' % len(g_dev), 'Developing (n=%d)' % len(g_ing)])\nax.set_ylabel('Life expectancy (years)')\nax.set_xlabel('Status of country (rows per group in brackets)')\nax.set_title('Life expectancy (years) by Status: Developed vs Developing countries')\nfig.tight_layout()\nsave_chart(fig, 'stat1_le_box_by_status', 'Box plot of Life expectancy in years for Developed and Developing country rows')\nplt.close(fig)\nprint(len(g_dev), len(g_ing))\n\n# %%\nfor var, o in res.items():\n    print(var, 'welch_t', round(o['welch_t'], 3), 'welch_p', o['welch_p'], 'mw_p', o['mannwhitney_p'], 'd', round(o['cohens_d'], 3), 'd_ci', np.round(o['cohens_d_ci'], 3), 'diff', round(o['mean_diff_dev_minus_ing'], 3), 'diff_ci', np.round(o['diff_ci'], 3))\n",
+  "output": "['Country', 'Year', 'Status', 'Life expectancy', 'Adult Mortality', 'infant deaths', 'Alcohol', 'percentage expenditure', 'Hepatitis B', 'Measles', 'BMI', 'under-five deaths', 'Polio', 'Total expenditure', 'Diphtheria', 'HIV/AIDS', 'GDP', 'Population', 'thinness  1-19 years', 'thinness 5-9 years', 'Income composition of resources', 'Schooling']\nStatus\nDeveloping    2426\nDeveloped      512\nName: count, dtype: int64\nLife expectancy     10\nSchooling          163\nAdult Mortality     10\ndtype: int64\n       Life expectancy  Schooling  Adult Mortality\ncount          2928.00    2775.00          2928.00\nmean             69.22      11.99           164.80\nstd               9.52       3.36           124.29\nmin              36.30       0.00             1.00\n25%              63.10      10.10            74.00\n50%              72.10      12.30           144.00\n75%              75.70      14.30           228.00\nmax              89.00      20.70           723.00\nLife expectancy {'n_developed': 512, 'n_developing': 2416, 'mean_developed': np.float64(79.1979), 'mean_developing': np.float64(67.1115), 'mean_diff_dev_minus_ing': np.float64(12.0864), 'welch_t': 47.8684, 'welch_p': 0.0, 'mannwhitney_p': 0.0, 'cohens_d': np.float64(1.4483)}\n  CI dev [78.857 79.539] CI ing [66.752 67.471] diff CI [11.591 12.582] d CI [1.346 1.551]\nSchooling {'n_developed': 464, 'n_developing': 2311, 'mean_developed': np.float64(15.8455), 'mean_developing': np.float64(11.2193), 'mean_diff_dev_minus_ing': np.float64(4.6262), 'welch_t': 44.5772, 'welch_p': 0.0, 'mannwhitney_p': 0.0, 'cohens_d': np.float64(1.6054)}\n  CI dev [15.684 16.007] CI ing [11.095 11.344] diff CI [4.423 4.83 ] d CI [1.497 1.714]\nAdult Mortality {'n_developed': 512, 'n_developing': 2416, 'mean_developed': np.float64(79.6855), 'mean_developing': np.float64(182.8332), 'mean_diff_dev_minus_ing': np.float64(-103.1476), 'welch_t': -30.7447, 'welch_p': 0.0, 'mannwhitney_p': 0.0, 'cohens_d': np.float64(-0.8743)}\n  CI dev [75.529 83.843] CI ing [177.728 187.939] diff CI [-109.727  -96.568] d CI [-0.972 -0.776]\n512 2416\nLife expectancy welch_t 47.868 welch_p 2e-323 mw_p 1.3711134997397622e-191 d 1.448 d_ci [1.346 1.551] diff 12.086 diff_ci [11.591 12.582]\nSchooling welch_t 44.577 welch_p 2.7269276518984804e-249 mw_p 2.558001527729989e-184 d 1.605 d_ci [1.497 1.714] diff 4.626 diff_ci [4.423 4.83 ]\nAdult Mortality welch_t -30.745 welch_p 1.1254736342876857e-172 mw_p 2.4826765324359342e-84 d -0.874 d_ci [-0.972 -0.776] diff -103.148 diff_ci [-109.727  -96.568]\n",
+  "execution_time": 26.66,
+  "success": true,
+  "error": null,
+  "report": {
+    "status": "complete",
+    "findings": [
+      {
+        "statement": "Developed countries have higher Life expectancy than Developing countries: mean 79.20 years (95% CI 78.86 to 79.54, n=512) vs 67.11 years (95% CI 66.75 to 67.47, n=2416). The mean difference is 12.09 years (95% CI 11.59 to 12.58). Welch t = 47.87, p < 1e-100; Mann-Whitney p < 1e-100 (about 1.4e-191). The gap is statistically significant, but these tests assume independent observations, and the rows are country-year observations (about 32 Developed and 151 Developing rows per Year across 2000 to 2015) that are not independent, so the p-values and CIs are likely too narrow and too significant. The direction and size of the gap are the robust findings.",
+        "facts": [
+          "stat1_life_expectancy"
+        ]
+      },
+      {
+        "statement": "The effect size for Life expectancy is large: Cohen's d = 1.45 (95% CI 1.35 to 1.55), with Developed minus Developing as the sign convention. Because the rows are country-year observations and not independent, this CI is likely too narrow; the size of the effect is the robust part of this result.",
+        "facts": [
+          "stat1_life_expectancy"
+        ]
+      },
+      {
+        "statement": "Schooling is significantly higher in Developed countries: mean 15.85 years (95% CI 15.68 to 16.01, n=464) vs 11.22 years (95% CI 11.09 to 11.35 approximately, n=2311). The difference is 4.63 years (95% CI 4.42 to 4.83). Welch t = 44.58, p < 1e-100; Mann-Whitney p < 1e-100 (about 2.6e-184). Cohen's d = 1.61 (95% CI 1.50 to 1.71). The same non-independence caveat applies: the country-year rows are not independent, so these tests and CIs are likely too narrow and too significant, and the direction and size of the gap are the robust findings.",
+        "facts": [
+          "stat1_schooling"
+        ]
+      },
+      {
+        "statement": "Adult Mortality is significantly lower in Developed countries: mean 79.69 (95% CI 75.53 to 83.84, n=512) vs 182.83 (95% CI 177.73 to 187.9, n=2416), a difference of -103.15 (95% CI -109.73 to -96.57). Welch t = -30.75, p < 1e-100; Mann-Whitney p < 1e-100 (about 2.5e-84). Cohen's d = -0.87 (95% CI -0.97 to -0.78). The same non-independence caveat applies: the country-year rows are not independent, so these tests and CIs are likely too narrow and too significant, and the direction and size of the gap are the robust findings.",
+        "facts": [
+          "stat1_adult_mortality"
+        ]
+      }
+    ],
+    "follow_ups": [
+      "Does Adult Mortality, schooling or income composition explain the Developed-Developing Life expectancy gap after adjusting for each other?",
+      "Is the Developed-Developing Life expectancy gap stable over time, or does it narrow across 2000 to 2015? Per-year SD and quartiles would be needed before any spread claim.",
+      "Are the Developing low-Life-expectancy outliers concentrated in specific countries or years?",
+      "Would a clustered analysis by Country (for example mixed models or cluster-robust standard errors) give valid CIs and p-values for the Status gaps, given the country-year structure?"
+    ]
+  },
+  "facts": {
+    "stat1_life_expectancy": {
+      "value": {
+        "n_developed": 512,
+        "n_developing": 2416,
+        "mean_developed": 79.1978515625,
+        "mean_developing": 67.11146523178807,
+        "ci_developed": [
+          78.85654896285773,
+          79.53915416214228
+        ],
+        "ci_developing": [
+          66.75216812162147,
+          67.47076234195468
+        ],
+        "mean_diff_dev_minus_ing": 12.086386330711932,
+        "diff_ci": [
+          11.591179547386512,
+          12.581593114037352
+        ],
+        "welch_t": 47.86840603524898,
+        "welch_p": 2e-323,
+        "mannwhitney_p": 1.3711134997397622e-191,
+        "cohens_d": 1.448295141113998,
+        "cohens_d_ci": [
+          1.3459759702199097,
+          1.5506143120080862
+        ]
+      },
+      "desc": "Developed vs Developing comparison for Life expectancy: group means, 95% CIs, Welch t, Mann-Whitney p, Cohen d with CI",
+      "cell": 2
+    },
+    "stat1_schooling": {
+      "value": {
+        "n_developed": 464,
+        "n_developing": 2311,
+        "mean_developed": 15.845474137931033,
+        "mean_developing": 11.219255733448726,
+        "ci_developed": [
+          15.684293475573794,
+          16.00665480028827
+        ],
+        "ci_developing": [
+          11.094570646979186,
+          11.343940819918267
+        ],
+        "mean_diff_dev_minus_ing": 4.626218404482307,
+        "diff_ci": [
+          4.4225905544648265,
+          4.829846254499787
+        ],
+        "welch_t": 44.57715346226021,
+        "welch_p": 2.7269276518984804e-249,
+        "mannwhitney_p": 2.558001527729989e-184,
+        "cohens_d": 1.6053903748451743,
+        "cohens_d_ci": [
+          1.4971057408465842,
+          1.7136750088437644
+        ]
+      },
+      "desc": "Developed vs Developing comparison for Schooling: group means, 95% CIs, Welch t, Mann-Whitney p, Cohen d with CI",
+      "cell": 2
+    },
+    "stat1_adult_mortality": {
+      "value": {
+        "n_developed": 512,
+        "n_developing": 2416,
+        "mean_developed": 79.685546875,
+        "mean_developing": 182.8331953642384,
+        "ci_developed": [
+          75.5285931989332,
+          83.8425005510668
+        ],
+        "ci_developing": [
+          177.72766367038557,
+          187.93872705809125
+        ],
+        "mean_diff_dev_minus_ing": -103.1476484892384,
+        "diff_ci": [
+          -109.7269343121388,
+          -96.56836266633802
+        ],
+        "welch_t": -30.744711810460043,
+        "welch_p": 1.1254736342876857e-172,
+        "mannwhitney_p": 2.4826765324359342e-84,
+        "cohens_d": -0.8743327111698819,
+        "cohens_d_ci": [
+          -0.9722851681294571,
+          -0.7763802542103067
+        ]
+      },
+      "desc": "Developed vs Developing comparison for Adult Mortality: group means, 95% CIs, Welch t, Mann-Whitney p, Cohen d with CI",
+      "cell": 2
+    }
+  },
+  "charts": {
+    "stat1_le_box_by_status": {
+      "file": "charts/stat1_le_box_by_status.png",
+      "caption": "Box plot of Life expectancy in years for Developed and Developing country rows",
+      "cell": 3
+    }
+  },
+  "published": [],
+  "artifacts": [],
+  "attempts": [
+    {
+      "attempt": 1,
+      "revision": 0,
+      "step": 1,
+      "code": "d = df.copy()\nd.columns = [c.strip() for c in d.columns]\nprint(d.columns.tolist())\nprint(d['Status'].value_counts(dropna=False))\nprint(d[['Life expectancy','Schooling','Adult Mortality']].isna().sum())\nprint(d[['Life expectancy','Schooling','Adult Mortality']].describe().round(2))",
+      "output": "['Country', 'Year', 'Status', 'Life expectancy', 'Adult Mortality', 'infant deaths', 'Alcohol', 'percentage expenditure', 'Hepatitis B', 'Measles', 'BMI', 'under-five deaths', 'Polio', 'Total expenditure', 'Diphtheria', 'HIV/AIDS', 'GDP', 'Population', 'thinness  1-19 years', 'thinness 5-9 years', 'Income composition of resources', 'Schooling']\nStatus\nDeveloping    2426\nDeveloped      512\nName: count, dtype: int64\nLife expectancy     10\nSchooling          163\nAdult Mortality     10\ndtype: int64\n       Life expectancy  Schooling  Adult Mortality\ncount          2928.00    2775.00          2928.00\nmean             69.22      11.99           164.80\nstd               9.52       3.36           124.29\nmin              36.30       0.00             1.00\n25%              63.10      10.10            74.00\n50%              72.10      12.30           144.00\n75%              75.70      14.30           228.00\nmax              89.00      20.70           723.00\n",
+      "error": null,
+      "seconds": 3.59
+    },
+    {
+      "attempt": 2,
+      "revision": 0,
+      "step": 2,
+      "code": "from scipy import stats\nd['Status'] = d['Status'].str.strip()\nres = {}\nfor var in ['Life expectancy', 'Schooling', 'Adult Mortality']:\n    s = d[[var, 'Status']].dropna()\n    a = s.loc[s.Status == 'Developed', var]\n    b = s.loc[s.Status == 'Developing', var]\n    na, nb = len(a), len(b)\n    ma, mb = a.mean(), b.mean()\n    sa, sb = a.std(ddof=1), b.std(ddof=1)\n    se_a, se_b = sa/np.sqrt(na), sb/np.sqrt(nb)\n    tcrit_a = stats.t.ppf(0.975, na-1)\n    tcrit_b = stats.t.ppf(0.975, nb-1)\n    ci_a = (ma - tcrit_a*se_a, ma + tcrit_a*se_a)\n    ci_b = (mb - tcrit_b*se_b, mb + tcrit_b*se_b)\n    welch = stats.ttest_ind(a, b, equal_var=False)\n    mw = stats.mannwhitneyu(a, b, alternative='two-sided')\n    sp = np.sqrt(((na-1)*sa**2 + (nb-1)*sb**2)/(na+nb-2))\n    d_val = (ma - mb)/sp\n    se_d = np.sqrt((na+nb)/(na*nb) + d_val**2/(2*(na+nb)))\n    d_ci = (d_val - 1.96*se_d, d_val + 1.96*se_d)\n    diff = ma - mb\n    se_diff = np.sqrt(se_a**2 + se_b**2)\n    dfw = (se_a**2 + se_b**2)**2 / (se_a**4/(na-1) + se_b**4/(nb-1))\n    tc = stats.t.ppf(0.975, dfw)\n    diff_ci = (diff - tc*se_diff, diff + tc*se_diff)\n    out = {'n_developed': na, 'n_developing': nb, 'mean_developed': ma, 'mean_developing': mb, 'ci_developed': list(ci_a), 'ci_developing': list(ci_b), 'mean_diff_dev_minus_ing': diff, 'diff_ci': list(diff_ci), 'welch_t': float(welch.statistic), 'welch_p': float(welch.pvalue), 'mannwhitney_p': float(mw.pvalue), 'cohens_d': d_val, 'cohens_d_ci': list(d_ci)}\n    res[var] = out\n    print(var, {k: (round(v, 4) if isinstance(v, float) else v) for k, v in out.items() if not isinstance(v, list)})\n    print('  CI dev', np.round(ci_a, 3), 'CI ing', np.round(ci_b, 3), 'diff CI', np.round(diff_ci, 3), 'd CI', np.round(d_ci, 3))\n    record_fact('stat1_' + var.replace(' ', '_').lower(), out, 'Developed vs Developing comparison for ' + var + ': group means, 95% CIs, Welch t, Mann-Whitney p, Cohen d with CI')",
+      "output": "Life expectancy {'n_developed': 512, 'n_developing': 2416, 'mean_developed': np.float64(79.1979), 'mean_developing': np.float64(67.1115), 'mean_diff_dev_minus_ing': np.float64(12.0864), 'welch_t': 47.8684, 'welch_p': 0.0, 'mannwhitney_p': 0.0, 'cohens_d': np.float64(1.4483)}\n  CI dev [78.857 79.539] CI ing [66.752 67.471] diff CI [11.591 12.582] d CI [1.346 1.551]\nSchooling {'n_developed': 464, 'n_developing': 2311, 'mean_developed': np.float64(15.8455), 'mean_developing': np.float64(11.2193), 'mean_diff_dev_minus_ing': np.float64(4.6262), 'welch_t': 44.5772, 'welch_p': 0.0, 'mannwhitney_p': 0.0, 'cohens_d': np.float64(1.6054)}\n  CI dev [15.684 16.007] CI ing [11.095 11.344] diff CI [4.423 4.83 ] d CI [1.497 1.714]\nAdult Mortality {'n_developed': 512, 'n_developing': 2416, 'mean_developed': np.float64(79.6855), 'mean_developing': np.float64(182.8332), 'mean_diff_dev_minus_ing': np.float64(-103.1476), 'welch_t': -30.7447, 'welch_p': 0.0, 'mannwhitney_p': 0.0, 'cohens_d': np.float64(-0.8743)}\n  CI dev [75.529 83.843] CI ing [177.728 187.939] diff CI [-109.727  -96.568] d CI [-0.972 -0.776]\n",
+      "error": null,
+      "seconds": 8.04
+    },
+    {
+      "attempt": 3,
+      "revision": 0,
+      "step": 3,
+      "code": "fig, ax = plt.subplots(figsize=(7, 4))\ng_dev = d.loc[d.Status == 'Developed', 'Life expectancy'].dropna()\ng_ing = d.loc[d.Status == 'Developing', 'Life expectancy'].dropna()\nax.boxplot([g_dev, g_ing])\nax.set_xticks([1, 2])\nax.set_xticklabels(['Developed (n=%d)' % len(g_dev), 'Developing (n=%d)' % len(g_ing)])\nax.set_ylabel('Life expectancy (years)')\nax.set_xlabel('Status of country (rows per group in brackets)')\nax.set_title('Life expectancy (years) by Status: Developed vs Developing countries')\nfig.tight_layout()\nsave_chart(fig, 'stat1_le_box_by_status', 'Box plot of Life expectancy in years for Developed and Developing country rows')\nplt.close(fig)\nprint(len(g_dev), len(g_ing))",
+      "output": "512 2416\n",
+      "error": null,
+      "seconds": 7.41
+    },
+    {
+      "attempt": 4,
+      "revision": 0,
+      "step": 4,
+      "code": "for var, o in res.items():\n    print(var, 'welch_t', round(o['welch_t'], 3), 'welch_p', o['welch_p'], 'mw_p', o['mannwhitney_p'], 'd', round(o['cohens_d'], 3), 'd_ci', np.round(o['cohens_d_ci'], 3), 'diff', round(o['mean_diff_dev_minus_ing'], 3), 'diff_ci', np.round(o['diff_ci'], 3))",
+      "output": "Life expectancy welch_t 47.868 welch_p 2e-323 mw_p 1.3711134997397622e-191 d 1.448 d_ci [1.346 1.551] diff 12.086 diff_ci [11.591 12.582]\nSchooling welch_t 44.577 welch_p 2.7269276518984804e-249 mw_p 2.558001527729989e-184 d 1.605 d_ci [1.497 1.714] diff 4.626 diff_ci [4.423 4.83 ]\nAdult Mortality welch_t -30.745 welch_p 1.1254736342876857e-172 mw_p 2.4826765324359342e-84 d -0.874 d_ci [-0.972 -0.776] diff -103.148 diff_ci [-109.727  -96.568]\n",
+      "error": null,
+      "seconds": 7.62
+    }
+  ],
+  "metadata": {
+    "steps": 4
+  },
+  "brief": {
+    "id": "stat_1",
+    "specialist": "statistical",
+    "question": "Is the difference in Life expectancy between Developing and Developed countries statistically significant, and how large is the effect?",
+    "complete_when": "Reports group means with 95% confidence intervals, a Welch t-test p-value, a Mann-Whitney p-value, and Cohen's d with its confidence interval. Also tests whether the Status gap in Schooling and Adult Mortality is significant.",
+    "depends_on": [
+      "eda_1"
+    ],
+    "outputs": []
+  },
+  "revisions": 1,
+  "reviews": [
+    {
+      "reasoning": "The reported group means, 95% CIs and n values match the facts for Life expectancy, Schooling and Adult Mortality. The Cohen's d of 1.45 is consistent with the accepted SDs (3.93 and 9.01) and the mean gap of 12.09. The brief's required items are all present: means with CIs, Welch and Mann-Whitney p-values, Cohen's d with CI, and the Schooling and Adult Mortality tests. The code's logic matches the reported formulas. Two problems remain. First, rows are country-year observations, with 183 rows per Year (about 32 Developed and 151 Developing per Year), so they are repeated measures on the same countries and not independent. The Welch and Mann-Whitney p-values and the CIs assume independence and are therefore overstated, and the report never states this. Second, p-values such as 2e-323 imply precision that the test cannot support, and should be reported as bounds. The direction and size of the gap are unlikely to change, but the inference language must be qualified.",
+      "verdict": "revise",
+      "feedback": "Add a caveat that the 2928 rows are country-year observations (about 32 Developed and 151 Developing rows per Year across 2000 to 2015), so they are not independent. State that the Welch, Mann-Whitney, CI and Cohen's d values assume independence and are likely too narrow or too significant, and that the gap direction and size are the robust findings. Report very small p-values as bounds (for example p < 1e-100) rather than to three significant figures. Apply the same caveat to the Schooling and Adult Mortality tests. Do not change the reported means, CIs or d values, which match the facts.",
+      "follow_ups": []
+    },
+    {
+      "reasoning": "Every requested element of the brief is present: group means with 95% CIs, Welch and Mann-Whitney p-values, Cohen's d with CI, and the Schooling and Adult Mortality tests. The reported means, differences and Welch t values are consistent with the computed facts and the code. The code's CI and Cohen's d formulas match the reported bounds. The non-independence of country-year rows is stated clearly, and the claims are hedged to the direction and size of the gap. The Schooling Developing CI is written as 'approximately' even though the code computes an exact value; the specialist should report that exact value. The automatic checks raised no problems. The main significance claim rests on non-independent rows, so a clustered test by Country is worth adding as a follow-up.",
+      "verdict": "accept",
+      "feedback": "",
+      "follow_ups": [
+        {
+          "id": "stat_4",
+          "specialist": "statistical",
+          "question": "Does the Developed-Developing gap in Life expectancy, Schooling and Adult Mortality remain significant when standard errors account for the country-year structure (cluster-robust SEs or a mixed model with Country as the grouping factor)?",
+          "complete_when": "Reports the Status coefficient for each of the three outcomes with a cluster-robust or mixed-model 95% CI and p-value, the number of Country clusters, and a comparison with the naive Welch CIs from stat_1, stating whether the conclusions change.",
+          "depends_on": [
+            "stat_1"
+          ],
+          "outputs": []
+        }
+      ]
+    }
+  ]
+}

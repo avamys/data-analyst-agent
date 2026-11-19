@@ -1,0 +1,206 @@
+{
+  "task_id": "stat_3",
+  "specialist": "statistical",
+  "description": "Do plan x tenure, plan x usage interactions still show no effect on churn when refund_issued is excluded from the logit?",
+  "code": "# %%\nimport matplotlib.pyplot as plt\nimport numpy as np\nimport pandas as pd\n\nfrom agent.execution.runtime import (\n    df,\n    load,\n    publish,\n    record_fact,\n    record_model,\n    save_chart,\n)\n\n# %%\nimport statsmodels.formula.api as smf\nfrom scipy import stats\nd = df.copy()\nd['tenure_c'] = (d['tenure_months'] - d['tenure_months'].mean()) / d['tenure_months'].std()\nd['usage_c'] = (d['usage_hours'] - d['usage_hours'].mean()) / d['usage_hours'].std()\nfull = smf.logit('churned ~ C(plan) * tenure_c + C(plan) * usage_c', data=d).fit(disp=0)\nmain = smf.logit('churned ~ C(plan) + tenure_c + usage_c', data=d).fit(disp=0)\nlr_stat = 2 * (full.llf - main.llf)\nlr_df = full.df_model - main.df_model\nlr_p = stats.chi2.sf(lr_stat, lr_df)\nci = full.conf_int()\nterms = [k for k in full.params.index if ':' in k]\ntab = {k: {'coef': float(full.params[k]), 'p': float(full.pvalues[k]), 'ci_low': float(ci.loc[k, 0]), 'ci_high': float(ci.loc[k, 1])} for k in terms}\nfor k, v in tab.items():\n    print(k, {a: round(b, 4) for a, b in v.items()})\nprint('LR', round(lr_stat, 3), 'df', lr_df, 'p', round(lr_p, 4))\nrecord_fact('stat3_interaction_terms', tab, 'Interaction logit coefficients (standardized tenure/usage, no refund_issued; basic plan reference) with p-values and 95% CIs')\nrecord_fact('stat3_lr_test', {'lr_stat': float(lr_stat), 'df': float(lr_df), 'p': float(lr_p)}, 'LR test full interaction model vs main-effects model, no refund_issued')\n\n# %%\nref_full = smf.logit('churned ~ C(plan) * tenure_c + C(plan) * usage_c + refund_issued * tenure_c', data=d).fit(disp=0)\nci_r = ref_full.conf_int()\nref_terms = [k for k in ref_full.params.index if ':' in k]\nref_tab = {k: {'coef': float(ref_full.params[k]), 'p': float(ref_full.pvalues[k]), 'ci_low': float(ci_r.loc[k, 0]), 'ci_high': float(ci_r.loc[k, 1])} for k in ref_terms}\nrecord_fact('stat3_refund_included_interactions', ref_tab, 'Comparison: interaction logit coefficients with refund_issued x tenure_c included (standardized; basic plan and refund=0 reference)')\nall_tab = {k: v for k, v in tab.items()}\nrecord_fact('stat3_interaction_terms_all', all_tab, 'All plan x tenure_c and plan x usage_c interaction coefficients, no refund_issued, with p-values and 95% CIs')\nfor k, v in all_tab.items():\n    print(k, {a: round(b, 3) for a, b in v.items()})\nprint('refund-included:')\nfor k, v in ref_tab.items():\n    print(k, {a: round(b, 3) for a, b in v.items()})\n",
+  "output": "C(plan)[T.plus]:tenure_c {'coef': -0.169, 'p': 0.3267, 'ci_low': -0.5067, 'ci_high': 0.1687}\nC(plan)[T.pro]:tenure_c {'coef': 0.1129, 'p': 0.5597, 'ci_low': -0.2664, 'ci_high': 0.4922}\nC(plan)[T.plus]:usage_c {'coef': 0.0378, 'p': 0.8357, 'ci_low': -0.3196, 'ci_high': 0.3952}\nC(plan)[T.pro]:usage_c {'coef': -0.2871, 'p': 0.2311, 'ci_low': -0.7569, 'ci_high': 0.1828}\nLR 3.576 df 4.0 p 0.4664\nC(plan)[T.plus]:tenure_c {'coef': -0.169, 'p': 0.327, 'ci_low': -0.507, 'ci_high': 0.169}\nC(plan)[T.pro]:tenure_c {'coef': 0.113, 'p': 0.56, 'ci_low': -0.266, 'ci_high': 0.492}\nC(plan)[T.plus]:usage_c {'coef': 0.038, 'p': 0.836, 'ci_low': -0.32, 'ci_high': 0.395}\nC(plan)[T.pro]:usage_c {'coef': -0.287, 'p': 0.231, 'ci_low': -0.757, 'ci_high': 0.183}\nrefund-included:\nC(plan)[T.plus]:tenure_c {'coef': 0.015, 'p': 0.974, 'ci_low': -0.907, 'ci_high': 0.937}\nC(plan)[T.pro]:tenure_c {'coef': 0.508, 'p': 0.375, 'ci_low': -0.614, 'ci_high': 1.629}\nC(plan)[T.plus]:usage_c {'coef': -0.519, 'p': 0.296, 'ci_low': -1.492, 'ci_high': 0.454}\nC(plan)[T.pro]:usage_c {'coef': 0.086, 'p': 0.898, 'ci_low': -1.223, 'ci_high': 1.394}\nrefund_issued:tenure_c {'coef': -0.264, 'p': 0.543, 'ci_low': -1.113, 'ci_high': 0.585}\n",
+  "execution_time": 13.39,
+  "success": true,
+  "error": null,
+  "report": {
+    "status": "complete",
+    "findings": [
+      {
+        "statement": "With refund_issued excluded, no plan x tenure_c or plan x usage_c interaction was detected at the 0.05 level. plus x tenure_c -0.169 (p=0.327, 95% CI -0.507 to 0.169); pro x tenure_c 0.113 (p=0.560, 95% CI -0.266 to 0.492); plus x usage_c 0.038 (p=0.836, 95% CI -0.320 to 0.395); pro x usage_c -0.287 (p=0.231, 95% CI -0.757 to 0.183). Coefficients are on standardized tenure and usage, with basic plan as reference. The CIs give the range of interaction effects still compatible with the data. Absence of evidence is not evidence of absence, so these intervals do not rule out plan-dependent slopes.",
+        "facts": [
+          "stat3_interaction_terms",
+          "stat3_interaction_terms_all"
+        ]
+      },
+      {
+        "statement": "The joint likelihood-ratio test of the full plan interaction model against the main-effects model (no refund_issued) detects no plan interaction at the 0.05 level: LR chi2 = 3.576 on 4 df, p = 0.466. This is not evidence that plan-dependent tenure or usage slopes are absent.",
+        "facts": [
+          "stat3_lr_test"
+        ]
+      },
+      {
+        "statement": "The stat_2 conclusion is unchanged in direction, with no detected interactions. Under both specifications no plan or refund interaction is statistically supported at the 0.05 level. With refund_issued x tenure_c included, refund_issued x tenure_c is -0.264 (p=0.543, 95% CI -1.113 to 0.585), and the plan interactions have wide CIs spanning zero (e.g. plus x usage_c -0.519, 95% CI -1.492 to 0.454). The refund-included model therefore does not show that the refund-free model rules out interaction effects; its wide intervals leave those effects compatible with the data.",
+        "facts": [
+          "stat3_refund_included_interactions",
+          "stat3_interaction_terms"
+        ]
+      },
+      {
+        "statement": "Removing refund_issued shifts the plan x usage estimates (plus x usage_c from -0.519 to 0.038; pro x usage_c from 0.086 to -0.287) and narrows their CIs by about half. This is consistent with refund_issued (churn 0.959 when 1 vs 0.016 when 0) dominating the fit, so the refund-included estimates are unstable and should not be read as evidence about plan effects.",
+        "facts": [
+          "stat3_refund_included_interactions",
+          "stat3_interaction_terms",
+          "stat3_interaction_terms_all"
+        ]
+      }
+    ],
+    "follow_ups": [
+      "Confirm whether refund_issued is recorded before or after the churn decision; if after, it should be excluded from all models, as this refit does.",
+      "Estimate the plan main effects and tenure/usage slopes in the no-refund main-effects model and check their stability.",
+      "Investigate why refund_issued almost perfectly separates churn (0.959 vs 0.016) before any refund-based inference."
+    ]
+  },
+  "facts": {
+    "stat3_interaction_terms": {
+      "value": {
+        "C(plan)[T.plus]:tenure_c": {
+          "coef": -0.16897884194115712,
+          "p": 0.32668814609440844,
+          "ci_low": -0.5066524059227672,
+          "ci_high": 0.16869472204045297
+        },
+        "C(plan)[T.pro]:tenure_c": {
+          "coef": 0.11288118480151182,
+          "p": 0.559666830665374,
+          "ci_low": -0.2663906014721495,
+          "ci_high": 0.49215297107517314
+        },
+        "C(plan)[T.plus]:usage_c": {
+          "coef": 0.03780927031739141,
+          "p": 0.8357377382493378,
+          "ci_low": -0.3195833600493918,
+          "ci_high": 0.3952019006841746
+        },
+        "C(plan)[T.pro]:usage_c": {
+          "coef": -0.28705756295600965,
+          "p": 0.2311185448291021,
+          "ci_low": -0.7568953144326158,
+          "ci_high": 0.18278018852059652
+        }
+      },
+      "desc": "Interaction logit coefficients (standardized tenure/usage, no refund_issued; basic plan reference) with p-values and 95% CIs",
+      "cell": 1
+    },
+    "stat3_lr_test": {
+      "value": {
+        "lr_stat": 3.5763934042856818,
+        "df": 4.0,
+        "p": 0.46635801905598073
+      },
+      "desc": "LR test full interaction model vs main-effects model, no refund_issued",
+      "cell": 1
+    },
+    "stat3_refund_included_interactions": {
+      "value": {
+        "C(plan)[T.plus]:tenure_c": {
+          "coef": 0.01506990705994064,
+          "p": 0.9744418988276738,
+          "ci_low": -0.9068556442605745,
+          "ci_high": 0.9369954583804557
+        },
+        "C(plan)[T.pro]:tenure_c": {
+          "coef": 0.5075471288809679,
+          "p": 0.3749227521326063,
+          "ci_low": -0.6135902875672954,
+          "ci_high": 1.6286845453292311
+        },
+        "C(plan)[T.plus]:usage_c": {
+          "coef": -0.5191598902228792,
+          "p": 0.2955065348716981,
+          "ci_low": -1.4918366276882655,
+          "ci_high": 0.45351684724250707
+        },
+        "C(plan)[T.pro]:usage_c": {
+          "coef": 0.0855372775983265,
+          "p": 0.898054602457297,
+          "ci_low": -1.2230091250530508,
+          "ci_high": 1.3940836802497039
+        },
+        "refund_issued:tenure_c": {
+          "coef": -0.2635558875360324,
+          "p": 0.5429102680969847,
+          "ci_low": -1.1125775093794468,
+          "ci_high": 0.5854657343073821
+        }
+      },
+      "desc": "Comparison: interaction logit coefficients with refund_issued x tenure_c included (standardized; basic plan and refund=0 reference)",
+      "cell": 2
+    },
+    "stat3_interaction_terms_all": {
+      "value": {
+        "C(plan)[T.plus]:tenure_c": {
+          "coef": -0.16897884194115712,
+          "p": 0.32668814609440844,
+          "ci_low": -0.5066524059227672,
+          "ci_high": 0.16869472204045297
+        },
+        "C(plan)[T.pro]:tenure_c": {
+          "coef": 0.11288118480151182,
+          "p": 0.559666830665374,
+          "ci_low": -0.2663906014721495,
+          "ci_high": 0.49215297107517314
+        },
+        "C(plan)[T.plus]:usage_c": {
+          "coef": 0.03780927031739141,
+          "p": 0.8357377382493378,
+          "ci_low": -0.3195833600493918,
+          "ci_high": 0.3952019006841746
+        },
+        "C(plan)[T.pro]:usage_c": {
+          "coef": -0.28705756295600965,
+          "p": 0.2311185448291021,
+          "ci_low": -0.7568953144326158,
+          "ci_high": 0.18278018852059652
+        }
+      },
+      "desc": "All plan x tenure_c and plan x usage_c interaction coefficients, no refund_issued, with p-values and 95% CIs",
+      "cell": 2
+    }
+  },
+  "charts": {},
+  "published": [],
+  "artifacts": [],
+  "attempts": [
+    {
+      "attempt": 1,
+      "revision": 0,
+      "step": 1,
+      "code": "import statsmodels.formula.api as smf\nfrom scipy import stats\nd = df.copy()\nd['tenure_c'] = (d['tenure_months'] - d['tenure_months'].mean()) / d['tenure_months'].std()\nd['usage_c'] = (d['usage_hours'] - d['usage_hours'].mean()) / d['usage_hours'].std()\nfull = smf.logit('churned ~ C(plan) * tenure_c + C(plan) * usage_c', data=d).fit(disp=0)\nmain = smf.logit('churned ~ C(plan) + tenure_c + usage_c', data=d).fit(disp=0)\nlr_stat = 2 * (full.llf - main.llf)\nlr_df = full.df_model - main.df_model\nlr_p = stats.chi2.sf(lr_stat, lr_df)\nci = full.conf_int()\nterms = [k for k in full.params.index if ':' in k]\ntab = {k: {'coef': float(full.params[k]), 'p': float(full.pvalues[k]), 'ci_low': float(ci.loc[k, 0]), 'ci_high': float(ci.loc[k, 1])} for k in terms}\nfor k, v in tab.items():\n    print(k, {a: round(b, 4) for a, b in v.items()})\nprint('LR', round(lr_stat, 3), 'df', lr_df, 'p', round(lr_p, 4))\nrecord_fact('stat3_interaction_terms', tab, 'Interaction logit coefficients (standardized tenure/usage, no refund_issued; basic plan reference) with p-values and 95% CIs')\nrecord_fact('stat3_lr_test', {'lr_stat': float(lr_stat), 'df': float(lr_df), 'p': float(lr_p)}, 'LR test full interaction model vs main-effects model, no refund_issued')",
+      "output": "C(plan)[T.plus]:tenure_c {'coef': -0.169, 'p': 0.3267, 'ci_low': -0.5067, 'ci_high': 0.1687}\nC(plan)[T.pro]:tenure_c {'coef': 0.1129, 'p': 0.5597, 'ci_low': -0.2664, 'ci_high': 0.4922}\nC(plan)[T.plus]:usage_c {'coef': 0.0378, 'p': 0.8357, 'ci_low': -0.3196, 'ci_high': 0.3952}\nC(plan)[T.pro]:usage_c {'coef': -0.2871, 'p': 0.2311, 'ci_low': -0.7569, 'ci_high': 0.1828}\nLR 3.576 df 4.0 p 0.4664\n",
+      "error": null,
+      "seconds": 6.58
+    },
+    {
+      "attempt": 2,
+      "revision": 0,
+      "step": 3,
+      "code": "ref_full = smf.logit('churned ~ C(plan) * tenure_c + C(plan) * usage_c + refund_issued * tenure_c', data=d).fit(disp=0)\nci_r = ref_full.conf_int()\nref_terms = [k for k in ref_full.params.index if ':' in k]\nref_tab = {k: {'coef': float(ref_full.params[k]), 'p': float(ref_full.pvalues[k]), 'ci_low': float(ci_r.loc[k, 0]), 'ci_high': float(ci_r.loc[k, 1])} for k in ref_terms}\nrecord_fact('stat3_refund_included_interactions', ref_tab, 'Comparison: interaction logit coefficients with refund_issued x tenure_c included (standardized; basic plan and refund=0 reference)')\nall_tab = {k: v for k, v in tab.items()}\nrecord_fact('stat3_interaction_terms_all', all_tab, 'All plan x tenure_c and plan x usage_c interaction coefficients, no refund_issued, with p-values and 95% CIs')\nfor k, v in all_tab.items():\n    print(k, {a: round(b, 3) for a, b in v.items()})\nprint('refund-included:')\nfor k, v in ref_tab.items():\n    print(k, {a: round(b, 3) for a, b in v.items()})",
+      "output": "C(plan)[T.plus]:tenure_c {'coef': -0.169, 'p': 0.327, 'ci_low': -0.507, 'ci_high': 0.169}\nC(plan)[T.pro]:tenure_c {'coef': 0.113, 'p': 0.56, 'ci_low': -0.266, 'ci_high': 0.492}\nC(plan)[T.plus]:usage_c {'coef': 0.038, 'p': 0.836, 'ci_low': -0.32, 'ci_high': 0.395}\nC(plan)[T.pro]:usage_c {'coef': -0.287, 'p': 0.231, 'ci_low': -0.757, 'ci_high': 0.183}\nrefund-included:\nC(plan)[T.plus]:tenure_c {'coef': 0.015, 'p': 0.974, 'ci_low': -0.907, 'ci_high': 0.937}\nC(plan)[T.pro]:tenure_c {'coef': 0.508, 'p': 0.375, 'ci_low': -0.614, 'ci_high': 1.629}\nC(plan)[T.plus]:usage_c {'coef': -0.519, 'p': 0.296, 'ci_low': -1.492, 'ci_high': 0.454}\nC(plan)[T.pro]:usage_c {'coef': 0.086, 'p': 0.898, 'ci_low': -1.223, 'ci_high': 1.394}\nrefund_issued:tenure_c {'coef': -0.264, 'p': 0.543, 'ci_low': -1.113, 'ci_high': 0.585}\n",
+      "error": null,
+      "seconds": 6.81
+    }
+  ],
+  "metadata": {
+    "steps": 2
+  },
+  "brief": {
+    "id": "stat_3",
+    "specialist": "statistical",
+    "question": "Do plan x tenure, plan x usage interactions still show no effect on churn when refund_issued is excluded from the logit?",
+    "complete_when": "Refits the logit with plan x tenure_c, plan x usage_c and no refund_issued term; reports interaction coefficients with p-values and 95% CIs; gives a likelihood-ratio test of the full interaction model against the main-effects model; states whether the conclusion from stat_2 changes.",
+    "depends_on": [
+      "stat_2"
+    ],
+    "outputs": []
+  },
+  "revisions": 1,
+  "reviews": [
+    {
+      "reasoning": "The reported coefficients, p-values and CIs for the four no-refund interaction terms match the stat3_interaction_terms fact, and the LR statistic (3.576, df 4, p 0.466) matches stat3_lr_test. The refund-included comparison values match the stat_2 accepted numbers. The main problem is interpretive: the report says the interactions 'still show no effect' and that the data 'do not support any plan-dependent tenure or usage slope'. Non-significant tests with CIs spanning zero do not establish absence of an effect, and the CIs in the facts (e.g. -0.507 to 0.169) are wide enough to include meaningful slopes. The wording must be no stronger than the numbers allow. The brief's coverage is otherwise complete.",
+      "verdict": "revise",
+      "feedback": "Reword the first finding and the LR-test finding so they state that no plan interaction was detected at the 0.05 level, not that the interactions show no effect or that the data rule out plan-dependent slopes. Report the CI bounds from stat3_interaction_terms as the range of effects still compatible with the data, and say the absence of evidence is not evidence of absence. Make the same change in the refund-included finding, which currently says 'no plan or refund interaction is statistically supported' (acceptable) but should not imply the refund-free model rules out interaction effects. Keep the stat_2 conclusion statement, but describe it as 'unchanged in direction, with no detected interactions'.",
+      "follow_ups": []
+    },
+    {
+      "reasoning": "The core answers match the facts: interaction coefficients and CIs agree with stat3_interaction_terms_all, the LR test matches stat3_lr_test (3.576, 4 df, p 0.466), and the stat_2 comparison matches the accepted findings. Three problems remain. First, the claim that removing refund_issued narrows the plan x usage CIs by about half is not supported by the CIs in stat3_refund_included_interactions and stat3_interaction_terms; the narrowing is closer to a third, so the wording overstates it. Second, the sentence saying the refund-included model does not show that the refund-free model rules out interaction effects is logically confused and should say the refund-free intervals are narrower but still span zero. Third, the refund x tenure upper CI is given as 0.585 while the accepted stat_2 finding gives 0.586; it should be taken from the fact directly. The statistics are otherwise sound and properly hedged, but these are unresolved issues in a task that cannot be redone.",
+      "verdict": "revise",
+      "feedback": "Fix three items. (1) Replace the claim that removing refund_issued narrows the plan x usage CIs by about half with the actual CI widths taken from stat3_refund_included_interactions and stat3_interaction_terms, or say narrower without a fraction. (2) Rewrite the sentence beginning 'The refund-included model therefore does not show that the refund-free model rules out interaction effects' so it states plainly that the refund-free intervals are narrower yet still span zero, so interaction effects are not ruled out. (3) Check the refund x tenure_c upper CI against stat3_refund_included_interactions and use the exact fact value, reconciling it with the 0.586 reported in the accepted stat_2 finding.",
+      "follow_ups": []
+    }
+  ]
+}

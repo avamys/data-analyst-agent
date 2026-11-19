@@ -1,0 +1,176 @@
+{
+  "status": "ok",
+  "run_id": "f99c1dcc-340b-4607-9e96-128a48b973ba",
+  "started": "2026-11-05T15:30:11",
+  "command": [
+    "run.py",
+    "/workspaces/agents/evals/data/daily_sales.csv",
+    "--target",
+    "sales",
+    "--model",
+    "claude-haiku-5-5",
+    "--provider",
+    "anthropic",
+    "--preset",
+    "hosted"
+  ],
+  "commit": "9066886",
+  "dirty": true,
+  "settings": {
+    "preset": "hosted",
+    "model_provider": "anthropic",
+    "ollama_base_url": "http://host.docker.internal:11434",
+    "ollama_model": "qwen3.5:9b",
+    "openrouter_base_url": "https://openrouter.ai/api/v1",
+    "openrouter_model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "openrouter_reasoning": true,
+    "anthropic_model": "claude-haiku-5-5",
+    "analyst_model": "claude-haiku-5-5",
+    "coder_model": "claude-haiku-5-5",
+    "reporter_model": "claude-haiku-5-5",
+    "llm_reasoning": false,
+    "llm_num_ctx": 16384,
+    "llm_max_tokens": 4096,
+    "anthropic_max_tokens": 16000,
+    "llm_timeout_s": 900,
+    "llm_num_gpu": 17,
+    "llm_retries": 1,
+    "lead_temperature": 0.2,
+    "eda_temperature": 0.3,
+    "statistical_temperature": 0.2,
+    "ml_temperature": 0.1,
+    "reporter_temperature": 0.3,
+    "max_tasks": 6,
+    "max_follow_ups": 5,
+    "max_revisions": 2,
+    "max_specialist_steps": 5,
+    "max_report_rewrites": 1,
+    "code_timeout_s": 300,
+    "max_cell_output_chars": 3000,
+    "prompt_fact_chars": 200,
+    "review_script_chars": 8000,
+    "plan_description_chars": 1000,
+    "overfit_gap": 0.1,
+    "near_perfect_score": 0.99,
+    "baseline_margin": 0.02,
+    "leakage_score": 0.9,
+    "imbalance_ratio": 2.0,
+    "number_check_max_label": 10,
+    "number_check_conventions": [
+      0.05
+    ],
+    "judge_model": "claude-sonnet-5-5",
+    "runs_directory": "/workspaces/agents/evals/runs/20261105-152942_current_claude-haiku-5-5/datetime_trend/r1",
+    "log_level": "INFO"
+  },
+  "nodes": [
+    {
+      "node": "profile",
+      "seconds": 2.3
+    },
+    {
+      "node": "plan",
+      "seconds": 8.4
+    },
+    {
+      "node": "run_task",
+      "seconds": 48.8
+    },
+    {
+      "node": "review",
+      "seconds": 8.0
+    },
+    {
+      "node": "run_task",
+      "seconds": 25.1
+    },
+    {
+      "node": "review",
+      "seconds": 6.5
+    },
+    {
+      "node": "run_task",
+      "seconds": 67.0
+    },
+    {
+      "node": "review",
+      "seconds": 10.6
+    },
+    {
+      "node": "run_task",
+      "seconds": 24.6
+    },
+    {
+      "node": "review",
+      "seconds": 7.0
+    },
+    {
+      "node": "run_task",
+      "seconds": 62.3
+    },
+    {
+      "node": "review",
+      "seconds": 7.7
+    },
+    {
+      "node": "run_task",
+      "seconds": 50.7
+    },
+    {
+      "node": "review",
+      "seconds": 12.4
+    },
+    {
+      "node": "run_task",
+      "seconds": 27.4
+    },
+    {
+      "node": "review",
+      "seconds": 16.1
+    },
+    {
+      "node": "run_task",
+      "seconds": 61.9
+    },
+    {
+      "node": "review",
+      "seconds": 10.6
+    },
+    {
+      "node": "run_task",
+      "seconds": 35.7
+    },
+    {
+      "node": "review",
+      "seconds": 6.3
+    },
+    {
+      "node": "run_task",
+      "seconds": 31.6
+    },
+    {
+      "node": "review",
+      "seconds": 7.5
+    },
+    {
+      "node": "report",
+      "seconds": 47.1
+    }
+  ],
+  "finished": "2026-11-05T15:40:00",
+  "seconds": 586.5,
+  "llm_calls": 48,
+  "input_tokens": 306052,
+  "output_tokens": 67252,
+  "tasks_completed": 6,
+  "tasks_failed": 0,
+  "unverified_numbers": [],
+  "context": {
+    "largest_prompt_tokens": 17603,
+    "window_warnings": [],
+    "prompt_cuts": {
+      "dataset description": 1,
+      "fact value": 154
+    }
+  }
+}

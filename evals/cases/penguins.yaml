@@ -1,0 +1,26 @@
+description: >
+  Real data: 344 Palmer penguins (palmerpenguins, CC0). Confounding: bill depth
+  is negatively associated with body mass across all penguins (r = -0.47) but
+  positively within each species (r = 0.58 to 0.72), because Gentoo penguins
+  are heavy and have shallow bills. Expected answers computed in
+  tests/test_eval_cases.py.
+# The agents see the file name, so it must not hint at the answer
+file: colony.csv
+target: body_mass_g
+data:
+  url: https://raw.githubusercontent.com/allisonhorst/palmerpenguins/main/inst/extdata/penguins.csv
+  sha256: f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93
+facts:
+  - {name: mean_mass, value: 4201.754386, near: [mass, weight, average, mean]}
+  - {name: gentoo_mass, value: 5076.01626, near: [Gentoo]}
+  - {name: adelie_mass, value: 3700.662252, near: [Adelie]}
+must_find:
+  - Gentoo penguins are much heavier than Adelie and Chinstrap penguins (about 5,100 g against about 3,700 g).
+  - Flipper length has the strongest association with body mass, positive.
+  - Males are heavier than females within each species.
+  - Bill depth is negatively associated with body mass across all penguins but positively within each species (the pooled association is confounded by species).
+must_not_claim:
+  - Penguins with deeper bills are lighter, stated without accounting for species.
+  - Adelie or Chinstrap penguins are heavier than Gentoo penguins.
+caveats:
+  missing_values: [missing]

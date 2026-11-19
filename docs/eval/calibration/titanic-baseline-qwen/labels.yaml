@@ -1,0 +1,35 @@
+case: titanic
+source: docs/baseline/run/report.md
+must_find:
+- item: Women survived at a much higher rate than men (about 74% against 19%).
+  label: partly
+  note: Sex is the strongest predictor; the direction is only implied ("Female + 1st Class"
+    highest), no rates
+- item: Survival falls with passenger class, highest in first class and lowest in third.
+  label: 'yes'
+- item: Passengers who survived had paid higher fares on average.
+  label: 'no'
+- item: Passengers without a recorded cabin survived less often than those with one.
+  label: 'no'
+  note: No cabin is tied to class, not to survival
+- item: Passengers with a missing Age survived less often than those with a recorded Age.
+  label: 'no'
+- item: A predictive model is compared with the majority-class baseline (about 62% accuracy)
+    and beats it.
+  label: 'no'
+  note: 61.62% appears as the class balance, never as a baseline for the models
+- item: Model results include precision, recall or F1, not only accuracy.
+  label: 'no'
+  note: Says precision, recall and F1 were truncated
+must_not_claim:
+- item: Most passengers survived.
+  label: 'no'
+- item: Men survived at a higher rate than women.
+  label: 'no'
+- item: Third-class passengers survived at a higher rate than first-class passengers.
+  label: 'no'
+- item: Age is the strongest predictor of survival.
+  label: 'no'
+caveats:
+- item: missing_cabin
+  label: 'yes'
