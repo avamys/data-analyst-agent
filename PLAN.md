@@ -813,12 +813,57 @@ load run → ask ─┬─ answerable from recorded facts ───────�
 
 ### Phase 7: Stretch (post-v1.0)
 - Resume an interrupted run: a LangGraph checkpointer and `run.py --resume`; `evals run --resume` for suites (was P4.3; moved 2026-11-18).
-- Human-in-the-loop plan approval (LangGraph interrupt).
+- Human-in-the-loop plan approval (LangGraph interrupt): detailed below.
 - Time-series and clustering specialists (`datetime_trend` case becomes a real target).
 - Parallel execution tuning; larger datasets (sampling / DuckDB).
 - Memory of successful analysis patterns across runs.
 - Sub-delegation: specialists split a brief into sub-tasks for their own sub-agents (deferred 2026-10-31; briefs and task reports already allow it).
 - Specialists look at their own charts (qwen3.5 accepts images).
+
+#### Plan approval (M), on branch `plan-approval`
+
+**Goal:** the lead shows its plan and waits. The human chats with it, as in Claude Code or ChatGPT: asks about the plan, or tells it to add, change or remove tasks; the lead replies and revises. The run starts only when the human approves.
+
+**Decided (owner, 2026-11-20)**
+- The lead does what the human asks. Additions raise the task cap, with no upper limit; to stay within it, the human names the tasks to drop. The lead may point out a problem (a column that doesn't exist) but still makes the change. The cap (`max_tasks`) bounds only what the lead proposes itself: its first plan, and follow-ups in reviews (`max_follow_ups`, unchanged).
+- Chat only; no editing briefs by hand.
+- Off by default in the CLI and evals (suites run unattended; the committed results regrade unchanged); on by default in the app.
+
+**Design**
+```
+profile → plan → await_approval ──approve──→ run_task ⇄ review → report
+                    ↑      │ message
+                    │      ↓
+                    └── revise_plan (lead: reply + revised plan)
+```
+- `await_approval` calls `interrupt()` with the plan and the lead's last reply, and does nothing else: on resume the node re-runs from its start, so nothing may come before the call. One `interrupt()` per node call; the loop is the graph's edges, not a `while` around `interrupt()` (LangGraph's interrupts guide).
+- `revise_plan`: the lead sees the profile, the current plan, the conversation and the new message, and returns `PlanRevision{reply, plan}`. A question leaves the plan unchanged. Revisions go through `validate_plan` without the cap (ids, dependencies, cycles); the lead changes only what it's asked to.
+- State: `plan_chat: list[{role, text}]`, saved with each node's update in `state/`, like everything else.
+- Pausing: an in-memory checkpointer (`InMemorySaver`), thread id = the run id. `stream()` returns with `__interrupt__`; `analyst run` writes a `plan_waiting` progress event and `awaiting_approval` in `run_meta.json`, reads one reply from stdin, and resumes with `stream(Command(resume=reply), config)`. `approve` (or the app's button) approves; anything else goes to the lead. In a terminal it's a prompt; the app starts the run with `stdin=PIPE` and writes to it. A process that dies while waiting can't be resumed: it has lost the profile and one plan call.
+- The recursion limit is computed from the approved plan's length, not `max_tasks`. Time spent waiting isn't counted in the run's minutes.
+- `report.html` gets a "Plan" section: the conversation and the approved plan.
+
+**Exit criteria**
+- [ ] With approval off, the graph and a scripted run are unchanged (test)
+- [ ] `analyst run --approve-plan` shows the plan, takes messages until `approve`, then runs the approved plan (tests)
+- [ ] An addition beyond the cap is kept; a removal or change is made as asked; a question leaves the plan unchanged (scripted tests)
+- [ ] The app: the plan as a table, the chat, an "Approve and run" button (AppTest smoke test)
+- [ ] One real check on Haiku, read by the owner
+
+**Steps**
+- [ ] **H1** Checkpointer and `await_approval` behind a `plan_approval` setting; with it off, nothing changes (S–M).
+- [ ] **H2** `revise_plan`: prompt, `PlanRevision`, `validate_plan` without the cap for revisions; scripted tests: an addition over the cap, a removal, a change, a question, approve → the revised plan runs (M).
+- [ ] **H3** CLI: `--approve-plan`, the stdin loop, `plan_waiting` / `plan_revised` / `plan_approved` progress events, `awaiting_approval` status, the recursion limit and waiting time; the "Plan" section of `report.html` (S–M).
+- [ ] **H4** The app: a "Review the plan before it runs" checkbox (on), the plan table, chat messages, the approve button; the run's stdin kept with its process (S–M).
+- [ ] **H5** A real check on Haiku, asked for first: two messages (an addition over the cap, a removal), then approve, `--max-tasks 2`. ~$0.05–0.10.
+
+**Not planned:** approving follow-ups or reviews during a run; editing briefs by hand; a timeout (a run waits until answered); resuming a waiting run after its process died (the resume item above).
+
+**Budget:** H5 only (~$0.05–0.10); development uses scripted models.
+
+**Risks**
+- The app loses a run's stdin on a page reload, as it already loses the process handle: the run waits until killed. The page says so; closing it doesn't stop the run.
+- An over-long chat pushes the revise prompt past Ollama's 32k window; that fails the run before any task (Claude has room).
 
 ---
 
@@ -911,6 +956,9 @@ PLAN.md  README.md
 | 2026-11-18 | The app runs hosted providers with the `hosted` preset (2 revisions, 5 follow-ups); the CLI and evals keep `local` as the default (owner) | The demo run on Haiku left 2 review objections open at the `local` limit of 1 revision. Changing the default everywhere would make new eval runs incomparable with the stored ones. ~2× the time and cost (~$0.18 a run) |
 | 2026-11-18 | Questions after the report built now, as Phase 5b (was Phase 7); answers sit next to the report, never change it; the lead may answer from recorded facts with no new task (owner) | The strongest agentic feature for the demo, and most of it exists: a question is a follow-up task after the report. ~3 days; ~$0.10–0.20 to check, within the budget left after Phase 6's ~$0.65 |
 | 2026-11-18 | Phase 6: the package stays `agent`; `examples/` = the hosted WHO run with its questions, a Titanic run and a dev trap case; the demo GIF is skipped for now; `phase-1` merged into `main` by a PR, old branches kept (owner) | A rename touches every import for no change in behaviour, and old tags keep the old name. The examples come from runs already made ($0) and show a real dataset, a familiar one and the checks at work; held-out cases stay blind |
+| 2026-11-20 | `v1.0.0` tagged on `main` (`65e47af`) as it was; the low specialist effort and the case study go into the next release (owner) | Tests and lint pass on a clean checkout of `main`; the changes after it were uncommitted |
+| 2026-11-20 | Plan approval: the lead does what the human asks (add, change, remove tasks); the human's additions raise the task cap, with no upper limit; to stay within it, the human names the tasks to drop (owner) | The human has full control of the plan. The cap bounds only what the lead proposes itself |
+| 2026-11-20 | Plan approval pauses with LangGraph `interrupt()` and an in-memory checkpointer; the run's process stays alive and reads replies from stdin (terminal or the app's pipe) | `interrupt()` needs a checkpointer and a thread id, not a durable store. A process that dies while waiting loses one plan call (~10–20 s, ~$0.01), so a durable checkpointer isn't worth a dependency here; Phase 7's resume item is where one pays off, and only `compile()` changes |
 | 2026-10-31 | Tracing: **LangSmith only**; MLflow removed | Built for agents; clearer traces. Tracing is opt-in via env, because when it's on, prompts and data samples leave the machine (relevant to the local-first pitch) |
 | 2026-10-31 | Delete untracked `todo.md`, `docs/`, `notebooks/`, and the `multi-specialist` branch | Confirmed by owner; superseded by this plan / `feature/new-flow` |
 | 2026-10-31 | New Phase 1 (agent quality) before the eval harness | The baseline review shows structural failures; the tagged baseline keeps the before/after story measurable |
