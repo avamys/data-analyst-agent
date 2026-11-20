@@ -971,6 +971,7 @@ PLAN.md  README.md
 | 2026-10-31 | Sub-delegation deferred | Specialist loop + lead follow-ups cover iteration and depth; nesting multiplies LLM calls at ~10 tok/s |
 | 2026-10-31 | Local runs of ~45–60 min are acceptable for now | Owner will test hosted models later |
 | 2026-10-31 | Prompts give rules and an output contract, never example pipelines | The baseline copied the examples verbatim (all 6 ML attempts used the example's model and split) |
+| 2026-11-19 | Specialists default to `low` effort (`specialist_effort`); the lead stays at the model's default (owner) | `low` × 1 on dev in P3.5: findings 95% vs 96%, −15% cost, −12% time. The eval numbers in the README were measured at `medium`; set `SPECIALIST_EFFORT=medium` to reproduce them. The lead at `low` was never measured |
 
 ### Open decisions
 - [x] **Project name / package name:** the package stays `agent`, the command is `analyst` (decided 2026-11-18).

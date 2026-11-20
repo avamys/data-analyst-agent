@@ -80,8 +80,9 @@ class Settings(BaseSettings):
     # Effort on Claude (output_config.effort), which sets how much it thinks:
     # thinking is most of the output. None: the model's default (medium on
     # Haiku 5.5). Lead: plan, reviews and report; specialists: their steps.
+    # Specialists at low (P3.5, dev x 1): findings 95% vs 96%, -15% cost, -12% time
     lead_effort: Effort | None = None
-    specialist_effort: Effort | None = None
+    specialist_effort: Effort | None = "low"
     llm_timeout_s: int = 900
     # Layers to put on the GPU; None lets Ollama decide. Ollama's estimate can be
     # very conservative on small GPUs, so this is a per-machine setting for .env.
