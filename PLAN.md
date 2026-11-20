@@ -845,17 +845,19 @@ profile → plan → await_approval ──approve──→ run_task ⇄ review �
 
 **Exit criteria**
 - [x] With approval off, the graph and a scripted run are unchanged (test)
-- [ ] `analyst run --approve-plan` shows the plan, takes messages until `approve`, then runs the approved plan (tests)
+- [x] `analyst run --approve-plan` shows the plan, takes messages until `approve`, then runs the approved plan (tests)
 - [x] An addition beyond the cap is kept; a removal or change is made as asked; a question leaves the plan unchanged (scripted tests)
-- [ ] The app: the plan as a table, the chat, an "Approve and run" button (AppTest smoke test)
+- [x] The app: the plan as a table, the chat, an "Approve and run" button (AppTest smoke test)
 - [ ] One real check on Haiku, read by the owner
 
 **Steps**
 - [x] **H1** Checkpointer and `await_approval` behind a `plan_approval` setting; with it off, nothing changes (S–M).
 - [x] **H2** `revise_plan`: prompt, `PlanRevision`, `validate_plan` without the cap for revisions; scripted tests: an addition over the cap, a removal, a change, a question, approve → the revised plan runs (M).
   - *Done 2026-11-20, H1 and H2 together (the wait needs somewhere to send a message). The human resumes with `{"approve": true}` or `{"message": "…"}`. A revision keeps the ids of the tasks it keeps (a kept id changes only if its task changes specialist), so the human can go on naming tasks as shown; `state.plan` stays the lead's first plan, the backlog is the revised one. 5 tests in `tests/test_plan_approval.py`.*
-- [ ] **H3** CLI: `--approve-plan`, the stdin loop, `plan_waiting` / `plan_revised` / `plan_approved` progress events, `awaiting_approval` status, the recursion limit and waiting time; the "Plan" section of `report.html` (S–M).
-- [ ] **H4** The app: a "Review the plan before it runs" checkbox (on), the plan table, chat messages, the approve button; the run's stdin kept with its process (S–M).
+- [x] **H3** CLI: `--approve-plan`, the stdin loop, `plan_waiting` / `plan_revised` / `plan_approved` progress events, `awaiting_approval` status, the recursion limit and waiting time; the "Plan" section of `report.html` (S–M).
+- [x] **H4** The app: a "Review the plan before it runs" checkbox (on), the plan table, chat messages, the approve button; the run's stdin kept with its process (S–M).
+  - *Done 2026-11-20. `run_meta.json` gets `plan_chat`, `plan_approved` and `seconds_waiting` (only with approval on); an empty line asks again; input closed before approval fails the run (`PlanNotApproved`) and its page says no task ran. The human's message and the lead's revision are events `plan_message` and `plan_revised`; the console prints only `plan_waiting` (the plan, with the lead's reply) and `plan_approved`. A plan the human grew past the default step limit runs (a test that fails without the fix). A run with approval still takes questions (`load_run` replays its state files). 3 CLI tests.*
+  - *H4 done 2026-11-20. The plan review is drawn outside the page's refreshing fragment, so a refresh can't clear a message being typed; the page counts the plans it has answered, so it doesn't show one again before the run has read the reply. Messages are sent as one line. 3 tests (the helpers, an AppTest of the waiting plan and the approve button, the command and its stdin).*
 - [ ] **H5** A real check on Haiku, asked for first: two messages (an addition over the cap, a removal), then approve, `--max-tasks 2`. ~$0.05–0.10.
 
 **Not planned:** approving follow-ups or reviews during a run; editing briefs by hand; a timeout (a run waits until answered); resuming a waiting run after its process died (the resume item above).

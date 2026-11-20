@@ -5,7 +5,9 @@
 Each analysis runs as its own process (`analyst run`), so a crash can't take
 the page down and per-run counters stay per run (agent/context.py); the page
 only reads the files the run writes. Past runs open the same way. A question
-about a finished run runs as `analyst ask`, recorded in that run.
+about a finished run runs as `analyst ask`, recorded in that run. With plan
+review on, the run waits after its plan; the page writes the human's replies to
+the run's stdin.
 """
 
 import json
@@ -21,7 +23,14 @@ import streamlit.components.v1 as components
 
 from agent.config import settings
 from agent.html_report import render_html, render_questions
-from app.runs import list_runs, read_events, stage, task_rows
+from app.runs import (
+    list_runs,
+    plan_chat,
+    read_events,
+    stage,
+    task_rows,
+    waiting_plan,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 PROVIDERS = {
@@ -58,6 +67,8 @@ def new_analysis(runs_root: Path):
     if launched:
         if launched.get("done"):
             show_run(launched["done"])
+        elif shown := _waiting(launched):
+            plan_review(launched, shown)
         else:
             watch(launched)
         if st.button("Start another analysis"):
@@ -87,6 +98,12 @@ def new_analysis(runs_root: Path):
     model = st.text_input("Model", getattr(settings, PROVIDERS[provider]))
     if provider == "ollama":
         st.warning("A local run takes hours on a small GPU (Claude: ~10-20 minutes).")
+    review = st.checkbox(
+        "Review the plan before it runs",
+        value=True,
+        help="The lead shows its plan and waits. Ask about it, or tell it what to "
+        "add, change or remove; nothing runs until you approve.",
+    )
 
     if st.button("Start the analysis", type="primary"):
         if upload is not None:
@@ -96,13 +113,26 @@ def new_analysis(runs_root: Path):
         else:
             csv = sample
         st.session_state["launched"] = launch(
-            csv, None if target == "(detect)" else target, provider, model, runs_root
+            csv,
+            None if target == "(detect)" else target,
+            provider,
+            model,
+            runs_root,
+            approve_plan=review,
         )
         st.rerun()
 
 
-def launch(csv: Path, target, provider: str, model: str, runs_root: Path) -> dict:
-    """Start `analyst run` in its own process; its console output goes to a log"""
+def launch(
+    csv: Path,
+    target,
+    provider: str,
+    model: str,
+    runs_root: Path,
+    approve_plan: bool = False,
+) -> dict:
+    """Start `analyst run` in its own process; its console output goes to a log.
+    With approve_plan, the page keeps the run's stdin to answer its plan."""
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     log = runs_root / "uploads" / f"{stamp}_{csv.stem}.log"
     log.parent.mkdir(parents=True, exist_ok=True)
@@ -112,11 +142,67 @@ def launch(csv: Path, target, provider: str, model: str, runs_root: Path) -> dic
         command += ["--preset", "hosted"]
     if target:
         command += ["--target", target]
+    if approve_plan:
+        command += ["--approve-plan"]
     with log.open("w") as out:
         process = subprocess.Popen(
-            command, cwd=ROOT, stdout=out, stderr=subprocess.STDOUT
+            command,
+            cwd=ROOT,
+            stdout=out,
+            stderr=subprocess.STDOUT,
+            stdin=subprocess.PIPE if approve_plan else None,
+            text=True,
         )
     return {"process": process, "log": log, "started": time.time()}
+
+
+def _waiting(launched: dict) -> dict | None:
+    """The plan the run waits on, if it's alive and waiting for a reply"""
+    run_dir = _run_dir(launched)
+    if run_dir is None or launched["process"].poll() is not None:
+        return None
+    return waiting_plan(read_events(run_dir), launched.get("answered", 0))
+
+
+def plan_review(launched: dict, shown: dict):
+    """The plan the run waits on, the conversation about it, and the replies.
+    Outside the refreshing fragment, so a refresh can't clear a message."""
+    st.subheader("The plan, waiting for your approval")
+    st.dataframe(
+        pd.DataFrame(
+            [
+                {
+                    "task": t["id"],
+                    "specialist": t["specialist"],
+                    "question": t["question"],
+                    "after": ", ".join(t["depends_on"]),
+                }
+                for t in shown["tasks"]
+            ]
+        ),
+        hide_index=True,
+    )
+    for role, text in plan_chat(read_events(_run_dir(launched))):
+        st.chat_message("user" if role == "human" else "assistant").write(text)
+    if st.button("Approve and run", type="primary"):
+        _reply(launched, "approve")
+    if text := st.chat_input("Ask about the plan, or tell the lead what to change"):
+        _reply(launched, text)
+    st.caption(
+        "The lead does what you ask: tasks you add aren't held to the plan's usual "
+        "limit, and it drops only the tasks you name."
+    )
+
+
+def _reply(launched: dict, text: str):
+    """One line to the run's stdin; the page then watches the run again"""
+    launched["answered"] = launched.get("answered", 0) + 1
+    try:
+        launched["process"].stdin.write(" ".join(text.split()) + "\n")
+        launched["process"].stdin.flush()
+    except OSError:  # the run has stopped; watch shows its console output
+        pass
+    st.rerun()
 
 
 def _run_dir(launched: dict) -> Path | None:
@@ -136,6 +222,8 @@ def watch(launched: dict):
     if any(e["event"] == "run_done" for e in events):
         launched["done"] = run_dir
         st.rerun()  # the whole page, which then shows the report once
+    if not finished and waiting_plan(events, launched.get("answered", 0)):
+        st.rerun()  # the whole page, which then shows the plan to review
     if finished:  # died before it could record its end
         st.error("The run stopped. Its console output:")
         st.code(launched["log"].read_text()[-3000:] or "(empty)")

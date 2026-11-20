@@ -45,6 +45,10 @@ def task_rows(events: list[dict]) -> list[dict]:
         if kind in ("plan", "asked"):
             for brief in e["tasks"]:
                 add(brief)
+        elif kind == "plan_revised":  # before any task ran: the new list
+            tasks.clear()
+            for brief in e["tasks"]:
+                add(brief)
         elif kind == "task_started" and e["task"] in tasks:
             row = tasks[e["task"]]
             row["state"] = "revising" if e.get("revision") else "running"
@@ -67,10 +71,32 @@ def task_rows(events: list[dict]) -> list[dict]:
     return list(tasks.values())
 
 
+def waiting_plan(events: list[dict], answered: int = 0) -> dict | None:
+    """The plan the run shows while it waits for the human, if it does: its
+    last plan_waiting, when more have come than the `answered` ones"""
+    shown = [e for e in events if e["event"] == "plan_waiting"]
+    return shown[-1] if len(shown) > answered else None
+
+
+def plan_chat(events: list[dict]) -> list[tuple[str, str]]:
+    """The conversation about the plan so far, as (role, text)"""
+    chat = []
+    for e in events:
+        if e["event"] == "plan_message":
+            chat.append(("human", e["text"]))
+        elif e["event"] == "plan_revised":
+            chat.append(("lead", e["reply"]))
+    return chat
+
+
 def stage(events: list[dict]) -> str | None:
     """What the run or question is doing when no task is: before the plan, and
     after the last review while the lead writes the report or the answer"""
     kinds = {e["event"] for e in events}
+    if events and events[-1]["event"] == "plan_message":
+        return "The lead is reading your message…"
+    if events and events[-1]["event"] == "plan_approved":
+        return "Plan approved. Starting the tasks…"
     rows = task_rows(events)
     if "question" in kinds:
         if "asked" not in kinds:

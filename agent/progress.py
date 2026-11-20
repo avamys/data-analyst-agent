@@ -2,8 +2,9 @@
 
 Specialists emit their own steps (task started, each cell run) through the
 graph's custom stream, from whichever thread runs the task. The rest comes from
-the graph's node updates: the plan, a task finished, the lead's verdict, the
-report. The CLI writes every event to the run directory and prints a line for
+the graph's node updates: the plan (and, with plan approval, the human's
+messages, the lead's revisions, the approval), a task finished, the lead's
+verdict, the report. The CLI adds plan_waiting when the run stops for the human. The CLI writes every event to the run directory and prints a line for
 it; the app (P5.5) reads the file.
 """
 
@@ -92,6 +93,26 @@ class Progress:
                     ],
                 }
             )
+        elif node == "await_approval":
+            if update.get("plan_approved"):
+                self.event({"event": "plan_approved"})
+            elif update.get("plan_chat"):
+                self.event(
+                    {"event": "plan_message", "text": update["plan_chat"][-1].text}
+                )
+        elif node == "revise_plan":
+            briefs = update.get("backlog", [])
+            self.known = {b.id for b in briefs}  # Not follow-ups when they run
+            self.event(
+                {
+                    "event": "plan_revised",
+                    "tasks": [
+                        {"id": b.id, "specialist": b.specialist, "question": b.question}
+                        for b in briefs
+                    ],
+                    "reply": update["plan_chat"][-1].text,
+                }
+            )
         elif node == "run_task" and update.get("under_review") is not None:
             result = update["under_review"]
             report = result.report
@@ -168,6 +189,20 @@ class Progress:
         if kind == "plan":
             ids = ", ".join(t["id"] for t in event["tasks"])
             return f"Plan: {_count(len(event['tasks']), 'task')} ({ids})"
+        if kind == "plan_waiting":
+            lines = ["The plan, waiting for your approval:"]
+            for t in event["tasks"]:
+                after = (
+                    f" [after {', '.join(t['depends_on'])}]" if t["depends_on"] else ""
+                )
+                lines.append(f"  {t['id']} ({t['specialist']}): {t['question']}{after}")
+            if event["reply"]:
+                lines.insert(0, f"Lead: {event['reply']}")
+            return "\n".join(lines)
+        if kind == "plan_approved":
+            return "✓ Plan approved"
+        if kind in ("plan_message", "plan_revised"):
+            return None  # Typed by the human; the plan is shown when it waits
         if kind == "task_started":
             self.started[event["task"]] = event["time"]
             if event.get("revision"):

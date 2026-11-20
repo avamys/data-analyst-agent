@@ -4,7 +4,7 @@ import os
 import pytest
 
 from agent.config import settings
-from app.runs import list_runs, read_events, stage, task_rows
+from app.runs import list_runs, plan_chat, read_events, stage, task_rows, waiting_plan
 
 
 def _brief(task_id):
@@ -139,3 +139,81 @@ def test_the_app_shows_answers_and_asks_a_question(monkeypatch, tmp_path):
     assert not app.exception
     assert commands[0][-3:] == ["ask", str(run.resolve()), "Does it hold for women?"]
     assert app.info[0].value == "Loading the run…"
+
+
+# Plan review
+
+
+def _waiting(tasks, reply=None):
+    full = [{**t, "depends_on": []} for t in tasks]
+    return {"event": "plan_waiting", "tasks": full, "reply": reply}
+
+
+def test_the_plan_waits_and_a_revision_replaces_the_task_list():
+    plan = {"event": "plan", "tasks": [_brief("eda_1"), _brief("eda_2")]}
+    message = {"event": "plan_message", "text": "drop eda_2, add fare"}
+    revised = {
+        "event": "plan_revised",
+        "tasks": [_brief("eda_1"), _brief("eda_3")],
+        "reply": "Dropped eda_2, added eda_3",
+    }
+    events = [plan, _waiting(plan["tasks"]), message]
+    assert waiting_plan(events, answered=1) is None  # answered, not shown again
+    assert "reading your message" in stage(events)
+    events += [revised, _waiting(revised["tasks"], revised["reply"])]
+    assert waiting_plan(events, answered=1)["reply"] == "Dropped eda_2, added eda_3"
+    assert [r["task"] for r in task_rows(events)] == ["eda_1", "eda_3"]
+    assert plan_chat(events) == [
+        ("human", "drop eda_2, add fare"),
+        ("lead", "Dropped eda_2, added eda_3"),
+    ]
+    assert waiting_plan([plan]) is None
+
+
+def test_the_app_shows_the_waiting_plan_and_sends_the_approval(monkeypatch, tmp_path):
+    testing = pytest.importorskip("streamlit.testing.v1")
+    import io
+
+    run = tmp_path / "20261120-120000_small_m"
+    run.mkdir()
+    tasks = [_brief("eda_1")]
+    events = [{"event": "plan", "tasks": tasks}, _waiting(tasks)]
+    (run / "progress.jsonl").write_text("".join(json.dumps(e) + "\n" for e in events))
+    log = tmp_path / "console.log"
+    log.write_text(f"Run directory: {run} (anthropic, m)\n")
+
+    class Waiting:
+        stdin = io.StringIO()
+
+        def poll(self):
+            return None
+
+    process = Waiting()
+    monkeypatch.setattr(settings, "runs_directory", str(tmp_path))
+    app = testing.AppTest.from_file("../app/streamlit_app.py", default_timeout=30)
+    app.session_state["launched"] = {"process": process, "log": log, "started": 0}
+    app.run()
+    assert not app.exception
+    assert app.subheader[0].value == "The plan, waiting for your approval"
+    assert list(app.dataframe[0].value["task"]) == ["eda_1"]
+    app.button[0].click().run()  # Approve and run
+    assert not app.exception
+    assert process.stdin.getvalue() == "approve\n"
+    assert app.session_state["launched"]["answered"] == 1
+
+
+def test_plan_review_reaches_the_command_and_keeps_stdin(monkeypatch, tmp_path):
+    pytest.importorskip("streamlit")
+    import subprocess
+
+    from app import streamlit_app
+
+    calls = []
+    monkeypatch.setattr(
+        subprocess, "Popen", lambda command, **kw: calls.append((command, kw))
+    )
+    streamlit_app.launch(tmp_path / "a.csv", None, "anthropic", "m", tmp_path, True)
+    streamlit_app.launch(tmp_path / "a.csv", None, "anthropic", "m", tmp_path)
+    (on, on_kw), (off, off_kw) = calls
+    assert "--approve-plan" in on and on_kw["stdin"] is subprocess.PIPE
+    assert "--approve-plan" not in off and off_kw["stdin"] is None
