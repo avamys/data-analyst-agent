@@ -848,7 +848,7 @@ profile → plan → await_approval ──approve──→ run_task ⇄ review �
 - [x] `analyst run --approve-plan` shows the plan, takes messages until `approve`, then runs the approved plan (tests)
 - [x] An addition beyond the cap is kept; a removal or change is made as asked; a question leaves the plan unchanged (scripted tests)
 - [x] The app: the plan as a table, the chat, an "Approve and run" button (AppTest smoke test)
-- [ ] One real check on Haiku, read by the owner
+- [x] One real check on Haiku, read by the owner
 
 **Steps**
 - [x] **H1** Checkpointer and `await_approval` behind a `plan_approval` setting; with it off, nothing changes (S–M).
@@ -858,7 +858,8 @@ profile → plan → await_approval ──approve──→ run_task ⇄ review �
 - [x] **H4** The app: a "Review the plan before it runs" checkbox (on), the plan table, chat messages, the approve button; the run's stdin kept with its process (S–M).
   - *Done 2026-11-20. `run_meta.json` gets `plan_chat`, `plan_approved` and `seconds_waiting` (only with approval on); an empty line asks again; input closed before approval fails the run (`PlanNotApproved`) and its page says no task ran. The human's message and the lead's revision are events `plan_message` and `plan_revised`; the console prints only `plan_waiting` (the plan, with the lead's reply) and `plan_approved`. A plan the human grew past the default step limit runs (a test that fails without the fix). A run with approval still takes questions (`load_run` replays its state files). 3 CLI tests.*
   - *H4 done 2026-11-20. The plan review is drawn outside the page's refreshing fragment, so a refresh can't clear a message being typed; the page counts the plans it has answered, so it doesn't show one again before the run has read the reply. Messages are sent as one line. 3 tests (the helpers, an AppTest of the waiting plan and the approve button, the command and its stdin).*
-- [ ] **H5** A real check on Haiku, asked for first: two messages (an addition over the cap, a removal), then approve, `--max-tasks 2`. ~$0.05–0.10.
+- [x] **H5** A real check on Haiku, asked for first: two messages (an addition over the cap, a removal), then approve, `--max-tasks 2`. ~$0.05–0.10.
+  - *Done 2026-11-20, $0.031, 3.5 min (36 s waiting, not counted), specialists at `low`. Titanic, `--max-tasks 2`, through the CLI with replies on stdin. The lead planned stat_1 and ml_1. Three messages: an eda task on family size (added as eda_1, 3 tasks at a cap of 2, nothing else changed); "Why does ml_1 depend on stat_1?" (answered: it loads the prepared features and split stat_1 publishes; plan unchanged); "Remove ml_1." (removed; stat_1 and eda_1 kept their ids). Then approve: stat_1 and eda_1 ran, reviews added 2 follow-ups, 4 tasks done, 2 open objections. One wrong detail in a reply: the lead said it left stat_1's unused output in place, but `validate_plan` drops outputs no task loads, as it should. Run `runs/20261120-195652_titanic_claude-haiku-5-5`.*
 
 **Not planned:** approving follow-ups or reviews during a run; editing briefs by hand; a timeout (a run waits until answered); resuming a waiting run after its process died (the resume item above).
 
