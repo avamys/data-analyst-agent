@@ -2,13 +2,18 @@
 
 import logging
 
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
 
+from agent.config import settings
 from agent.nodes.lead import (
+    after_approval,
+    await_approval_node,
     next_step,
     plan_node,
     profile_node,
     review_node,
+    revise_plan_node,
     run_task_node,
 )
 from agent.nodes.question import answer_node, ask_node
@@ -24,6 +29,7 @@ def build_hierarchical_graph() -> StateGraph:
 
     Flow:
     START → profile → plan → run_task ⇄ review → report → END
+    With settings.plan_approval: plan → await_approval ⇄ revise_plan → run_task …
 
     - profile: deterministic dataset profile (no LLM)
     - plan: the lead writes a backlog of briefs
@@ -44,14 +50,24 @@ def build_hierarchical_graph() -> StateGraph:
     routes = {"run_task": "run_task", "report": "report"}
     graph.add_edge(START, "profile")
     graph.add_edge("profile", "plan")
-    graph.add_conditional_edges("plan", next_step, routes)
     graph.add_edge("run_task", "review")
     graph.add_conditional_edges("review", next_step, routes)
     graph.add_edge("report", END)
 
-    logger.info("Hierarchical graph built successfully")
+    if not settings.plan_approval:
+        graph.add_conditional_edges("plan", next_step, routes)
+        return graph.compile()
 
-    return graph.compile()
+    # The run pauses in await_approval until the human approves; its state is
+    # held by the checkpointer, in memory, so the run's process must stay alive
+    graph.add_node("await_approval", await_approval_node)
+    graph.add_node("revise_plan", revise_plan_node)
+    graph.add_edge("plan", "await_approval")
+    graph.add_conditional_edges(
+        "await_approval", after_approval, {**routes, "revise_plan": "revise_plan"}
+    )
+    graph.add_edge("revise_plan", "await_approval")
+    return graph.compile(checkpointer=InMemorySaver())
 
 
 def build_question_graph() -> StateGraph:

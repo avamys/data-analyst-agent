@@ -844,15 +844,16 @@ profile → plan → await_approval ──approve──→ run_task ⇄ review �
 - `report.html` gets a "Plan" section: the conversation and the approved plan.
 
 **Exit criteria**
-- [ ] With approval off, the graph and a scripted run are unchanged (test)
+- [x] With approval off, the graph and a scripted run are unchanged (test)
 - [ ] `analyst run --approve-plan` shows the plan, takes messages until `approve`, then runs the approved plan (tests)
-- [ ] An addition beyond the cap is kept; a removal or change is made as asked; a question leaves the plan unchanged (scripted tests)
+- [x] An addition beyond the cap is kept; a removal or change is made as asked; a question leaves the plan unchanged (scripted tests)
 - [ ] The app: the plan as a table, the chat, an "Approve and run" button (AppTest smoke test)
 - [ ] One real check on Haiku, read by the owner
 
 **Steps**
-- [ ] **H1** Checkpointer and `await_approval` behind a `plan_approval` setting; with it off, nothing changes (S–M).
-- [ ] **H2** `revise_plan`: prompt, `PlanRevision`, `validate_plan` without the cap for revisions; scripted tests: an addition over the cap, a removal, a change, a question, approve → the revised plan runs (M).
+- [x] **H1** Checkpointer and `await_approval` behind a `plan_approval` setting; with it off, nothing changes (S–M).
+- [x] **H2** `revise_plan`: prompt, `PlanRevision`, `validate_plan` without the cap for revisions; scripted tests: an addition over the cap, a removal, a change, a question, approve → the revised plan runs (M).
+  - *Done 2026-11-20, H1 and H2 together (the wait needs somewhere to send a message). The human resumes with `{"approve": true}` or `{"message": "…"}`. A revision keeps the ids of the tasks it keeps (a kept id changes only if its task changes specialist), so the human can go on naming tasks as shown; `state.plan` stays the lead's first plan, the backlog is the revised one. 5 tests in `tests/test_plan_approval.py`.*
 - [ ] **H3** CLI: `--approve-plan`, the stdin loop, `plan_waiting` / `plan_revised` / `plan_approved` progress events, `awaiting_approval` status, the recursion limit and waiting time; the "Plan" section of `report.html` (S–M).
 - [ ] **H4** The app: a "Review the plan before it runs" checkbox (on), the plan table, chat messages, the approve button; the run's stdin kept with its process (S–M).
 - [ ] **H5** A real check on Haiku, asked for first: two messages (an addition over the cap, a removal), then approve, `--max-tasks 2`. ~$0.05–0.10.
