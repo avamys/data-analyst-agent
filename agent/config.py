@@ -80,8 +80,9 @@ class Settings(BaseSettings):
     # Effort on Claude (output_config.effort), which sets how much it thinks:
     # thinking is most of the output. None: the model's default (medium on
     # Haiku 5.5). Lead: plan, reviews and report; specialists: their steps.
+    # Specialists at low (P3.5, dev x 1): findings 95% vs 96%, -15% cost, -12% time
     lead_effort: Effort | None = None
-    specialist_effort: Effort | None = None
+    specialist_effort: Effort | None = "low"
     llm_timeout_s: int = 900
     # Layers to put on the GPU; None lets Ollama decide. Ollama's estimate can be
     # very conservative on small GPUs, so this is a per-machine setting for .env.
@@ -101,6 +102,9 @@ class Settings(BaseSettings):
     max_follow_ups: int = 2  # Tasks the lead may add during reviews, per run
     max_revisions: int = 1  # Times the lead may send one task back
     max_question_tasks: int = 2  # Tasks one question after the report may run
+    # The lead shows its plan and waits for the human to approve it; until then
+    # the human's messages make it answer or revise (tasks they add raise max_tasks)
+    plan_approval: bool = False
     # Tasks worked at once (reviews stay one at a time). None: 3 on hosted
     # providers, 1 on Ollama, where a small GPU serves one request at a time
     max_parallel_tasks: int | None = None

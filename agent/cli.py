@@ -12,6 +12,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from dotenv import load_dotenv
+from langgraph.types import Command
 
 from agent import context
 from agent.config import PRESETS, settings
@@ -67,6 +68,11 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--target", help="Target column (detected when omitted)")
     run.add_argument("--max-tasks", type=int, help="Upper bound on planned tasks")
     run.add_argument(
+        "--approve-plan",
+        action="store_true",
+        help="Show the plan and wait: approve it, or tell the lead what to change",
+    )
+    run.add_argument(
         "--out", type=Path, help="Directory for run directories (default: runs)"
     )
     ask = commands.add_parser(
@@ -106,6 +112,8 @@ def apply_flags(args: argparse.Namespace) -> None:
         settings.use_preset(args.preset)
     if getattr(args, "max_tasks", None) is not None:
         settings.max_tasks = args.max_tasks
+    if getattr(args, "approve_plan", False):
+        settings.plan_approval = True
     if args.provider:
         settings.model_provider = args.provider
     if args.model:
@@ -159,12 +167,11 @@ def run_analysis(
         "tags": [dataset, settings.model_provider, model, settings.preset],
         "metadata": {"commit": commit, "run_dir": store.path.name, **eval_metadata()},
         "callbacks": [recorder],
-        # Each task is a run_task + review step, once more per revision
-        "recursion_limit": 10
-        + 2
-        * (settings.max_tasks + settings.max_follow_ups)
-        * (1 + settings.max_revisions),
+        "recursion_limit": _recursion_limit(settings.max_tasks),
     }
+    if settings.plan_approval:
+        # The checkpointer keeps the waiting run under this id
+        config["configurable"] = {"thread_id": str(run_id)}
     meta = {
         "status": "running",
         "run_id": str(run_id),
@@ -189,17 +196,24 @@ def run_analysis(
     )
     result = {}
     start = time.time()
+    waited = 0.0  # For the human's replies to the plan; not the run's time
     try:
-        _stream(
-            workflow,
-            initial_state,
-            config,
-            store,
-            progress,
-            meta,
-            meta["nodes"],
-            result,
-        )
+        inputs = initial_state
+        while shown := _stream(
+            workflow, inputs, config, store, progress, meta, meta["nodes"], result
+        ):
+            meta["status"] = "awaiting_approval"
+            store.write_json("run_meta.json", meta)
+            progress.event({"event": "plan_waiting", **shown})
+            asked = time.time()
+            reply = read_reply()
+            waited += time.time() - asked
+            meta["status"] = "running"
+            if reply.get("approve"):  # tasks the human added raise the limit
+                config["recursion_limit"] = _recursion_limit(
+                    max(settings.max_tasks, len(shown["tasks"]))
+                )
+            inputs = Command(resume=reply)
         if result.get("report"):
             store.write_text("report.md", result["report"])
             logger.info(f"Report saved to: {store.path / 'report.md'}")
@@ -218,7 +232,7 @@ def run_analysis(
         )
         meta.update(
             finished=datetime.now().isoformat(timespec="seconds"),
-            seconds=round(time.time() - start, 1),
+            seconds=round(time.time() - start - waited, 1),
             llm_calls=recorder.calls,
             input_tokens=recorder.input_tokens,
             output_tokens=recorder.output_tokens,
@@ -239,6 +253,10 @@ def run_analysis(
             },
             trace_url=trace_url(run_id),
         )
+        if settings.plan_approval:
+            meta["plan_chat"] = result.get("plan_chat", [])
+            meta["plan_approved"] = result.get("plan_approved", False)
+            meta["seconds_waiting"] = round(waited, 1)
         if recorder.ollama:
             # Where local time went, and how the model sat in VRAM at the end
             meta["ollama"] = {
@@ -271,11 +289,42 @@ def run_analysis(
     return store.path
 
 
-def _stream(workflow, state, config, store, progress, meta, nodes, result) -> None:
-    """Run a graph. Each task is saved as soon as it has run or been reviewed,
-    each node's update to state/NN_<node>.json (numbered after those there) and
-    its time to `nodes` in meta; `result` holds the last full state."""
+def _recursion_limit(tasks: int) -> int:
+    """Graph steps a run may take: each task is a run_task + review step, once
+    more per revision"""
+    return 10 + 2 * (tasks + settings.max_follow_ups) * (1 + settings.max_revisions)
+
+
+class PlanNotApproved(RuntimeError):
+    pass
+
+
+def read_reply() -> dict:
+    """The human's reply to the plan, from stdin: a terminal, or the app's pipe"""
+    while True:
+        print(
+            "Type 'approve' to run the plan, or tell the lead what to change: ",
+            end="",
+            flush=True,
+        )
+        line = sys.stdin.readline()
+        if not line:
+            raise PlanNotApproved("Input closed before the plan was approved")
+        if line.strip().lower() == "approve":
+            return {"approve": True}
+        if line.strip():
+            return {"message": line.strip()}
+
+
+def _stream(workflow, state, config, store, progress, meta, nodes, result):
+    """Run a graph, or resume it (state is a Command). Each task is saved as
+    soon as it has run or been reviewed, each node's update to
+    state/NN_<node>.json (numbered after those there) and its time to `nodes`
+    in meta; `result` holds the last full state. Returns what the graph shows
+    the human when it stops to wait for them, else None."""
     first_step = len(state_files(store.path)) + 1
+    known = len(nodes)  # From earlier calls, whose state files are counted
+    waiting = None
     node_start = time.time()
     # "updates" gives each node's output, "values" the full state after it,
     # "custom" the progress events sent from inside nodes (agent/progress.py)
@@ -289,17 +338,21 @@ def _stream(workflow, state, config, store, progress, meta, nodes, result) -> No
             progress.event(chunk)
             continue
         for node, update in chunk.items():
+            if node == "__interrupt__":
+                waiting = update[0].value
+                continue
             if isinstance(update, dict):
                 tasks = [update.get("under_review")]
                 tasks += update.get("completed_tasks", [])[-1:]
                 tasks += update.get("failed_tasks", [])[-1:]
                 store.write_tasks([t for t in tasks if t is not None])
-            step = first_step + len(nodes)
+            step = first_step + len(nodes) - known
             nodes.append({"node": node, "seconds": round(time.time() - node_start, 1)})
             store.write_json(f"state/{step:02d}_{node}.json", update)
             store.write_json("run_meta.json", meta)
             progress.update(node, update)
             node_start = time.time()
+    return waiting
 
 
 def use_run_settings(run_dir: Path) -> None:

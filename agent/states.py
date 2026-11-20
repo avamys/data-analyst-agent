@@ -67,6 +67,26 @@ class LeadPlan(BaseModel):
     briefs: list[Brief]
 
 
+class PlanMessage(BaseModel):
+    """One message in the conversation about the plan before it runs"""
+
+    role: Literal["human", "lead"]
+    text: str
+
+
+class PlanRevision(BaseModel):
+    """The lead's answer to the human's message about the plan"""
+
+    reply: str = Field(
+        description="To the human, briefly: what you changed, or the answer to "
+        "their question, and any problem with what they asked"
+    )
+    briefs: list[Brief] = Field(
+        description="The whole plan after the change, in order. Unchanged for a "
+        "question. Keep each kept task's id; leave new tasks' ids empty"
+    )
+
+
 class Review(BaseModel):
     """The lead's decision on a task report"""
 
@@ -189,6 +209,9 @@ class HierarchicalState(BaseModel):
     dataset_profile: DatasetProfile | None = None
     plan: LeadPlan | None = None  # As planned, before follow-ups
     backlog: list[Brief] = Field(default_factory=list)  # Briefs not started yet
+    # Plan approval (settings.plan_approval): the conversation, and its outcome
+    plan_chat: list[PlanMessage] = Field(default_factory=list)
+    plan_approved: bool = False
     under_review: TaskResult | None = None  # The task just run, until accepted
     follow_ups_added: int = 0
 

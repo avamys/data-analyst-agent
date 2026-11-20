@@ -75,8 +75,27 @@ def render_html(run_dir: Path, with_questions: bool = True) -> str:
     questions = _questions(run_dir, meta) if with_questions else ""
     return _page(
         title,
-        f"{_header(run_dir, meta, grades)}\n{body}\n{questions}\n{_appendix(run_dir)}",
+        f"{_header(run_dir, meta, grades)}\n{body}\n{questions}\n"
+        f"{_plan_review(meta)}\n{_appendix(run_dir)}",
     )
+
+
+def _plan_review(meta: dict) -> str:
+    """The conversation with the lead about the plan, before it ran"""
+    if "plan_chat" not in meta:  # a run without plan approval
+        return ""
+    lines = [
+        f"<p><b>{'You' if m['role'] == 'human' else 'Lead'}:</b> "
+        f"{html.escape(m['text'])}</p>"
+        for m in meta["plan_chat"]
+    ]
+    if not meta.get("plan_approved"):
+        outcome = "The plan was never approved, so no task ran."
+    elif lines:
+        outcome = "The plan was approved after this conversation with the lead:"
+    else:
+        outcome = "The plan was approved as the lead first wrote it."
+    return f"<h2>Plan review</h2><p>{outcome}</p>" + "".join(lines)
 
 
 def render_questions(run_dir: Path) -> str | None:

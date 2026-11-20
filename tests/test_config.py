@@ -15,6 +15,11 @@ def test_the_local_preset_is_the_defaults():
     assert (s.max_follow_ups, s.max_revisions) == (2, 1)
 
 
+def test_specialists_think_at_low_effort_by_default_the_lead_at_the_models():
+    s = make()
+    assert (s.specialist_effort, s.lead_effort) == ("low", None)
+
+
 def test_tasks_run_in_parallel_on_hosted_providers_only():
     assert make(model_provider="anthropic").parallel_tasks == 3
     assert make(model_provider="openrouter").parallel_tasks == 3

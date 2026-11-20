@@ -2,17 +2,20 @@
 
 Nodes return partial state updates; `next_step` routes the loop:
 plan → run_task → review → run_task (sent back, or next brief) … → report
+With plan approval, plan → await_approval ⇄ revise_plan until the human approves.
 
 Briefs whose dependencies are all accepted are started ahead of their turn,
 in background threads (settings.parallel_tasks at once). Reviews still happen
 one at a time, in backlog order, so each sees what it would see in a serial run.
 """
 
+import json
 import logging
 from concurrent.futures import Future
 
 import pandas as pd
 from langchain_core.runnables.config import ContextThreadPoolExecutor
+from langgraph.types import interrupt
 
 from agent import context
 from agent.checks import citation_gaps, missing_outputs, sanity_checks
@@ -21,7 +24,15 @@ from agent.core.base_agent import BaseAgent
 from agent.core.specialists import format_task_report, get_specialist
 from agent.core.template_manager import prompt_templates
 from agent.profiling import auto_profile_dataset, profile_summary
-from agent.states import Brief, HierarchicalState, LeadPlan, Review, TaskResult
+from agent.states import (
+    Brief,
+    HierarchicalState,
+    LeadPlan,
+    PlanMessage,
+    PlanRevision,
+    Review,
+    TaskResult,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +69,58 @@ def plan_node(state: HierarchicalState) -> dict:
             + (f" → publishes {outputs}" if outputs else "")
         )
     return {"plan": plan, "backlog": backlog}
+
+
+def await_approval_node(state: HierarchicalState) -> dict:
+    """
+    Show the plan and wait for the human (a LangGraph interrupt). They resume
+    the run with {"approve": True}, or {"message": "..."} for the lead to
+    answer or act on. On resume the node runs again from its start, so nothing
+    comes before interrupt().
+    """
+    reply = interrupt(
+        {
+            "tasks": [b.model_dump() for b in state.backlog],
+            "reply": state.plan_chat[-1].text if state.plan_chat else None,
+        }
+    )
+    if reply.get("approve"):
+        logger.info("Plan approved")
+        return {"plan_approved": True}
+    message = PlanMessage(role="human", text=reply["message"])
+    logger.info(f"Human: {message.text}")
+    return {"plan_chat": [*state.plan_chat, message]}
+
+
+def after_approval(state: HierarchicalState) -> str:
+    """The approved plan runs; a message goes to the lead"""
+    return next_step(state) if state.plan_approved else "revise_plan"
+
+
+def revise_plan_node(state: HierarchicalState) -> dict:
+    """
+    The lead does what the human's last message asks: adds, changes or removes
+    tasks (additions aren't capped), or answers a question with the plan as it is
+    """
+    *earlier, message = state.plan_chat
+    prompt = prompt_templates.render(
+        "lead/revise_plan.jinja2",
+        profile=profile_summary(state.dataset_profile),
+        plan=json.dumps([b.model_dump() for b in state.backlog], indent=1),
+        chat=earlier,
+        message=message.text,
+    )
+    lead = BaseAgent("lead", use_structured_output=True, output_schema=PlanRevision)
+    revision: PlanRevision = lead.invoke(prompt)
+    backlog = validate_plan(
+        LeadPlan(reasoning=state.plan.reasoning, briefs=revision.briefs),
+        max_tasks=None,
+        keep_ids={b.id for b in state.backlog},
+    )
+    logger.info(f"Lead: {revision.reply}")
+    logger.info(f"Revised plan: {', '.join(b.id for b in backlog)}")
+    reply = PlanMessage(role="lead", text=revision.reply)
+    return {"backlog": backlog, "plan_chat": [*state.plan_chat, reply]}
 
 
 def run_task_node(state: HierarchicalState) -> dict:
@@ -285,27 +348,42 @@ class PlanValidationError(ValueError):
     """The lead produced a plan that can't be executed"""
 
 
-def validate_plan(plan: LeadPlan, max_tasks: int) -> list[Brief]:
+def validate_plan(
+    plan: LeadPlan, max_tasks: int | None, keep_ids: set[str] = frozenset()
+) -> list[Brief]:
     """
     Check and repair an LLM-produced plan; return the briefs in execution order
 
-    - Only the first max_tasks briefs are kept (the lead lists them by priority)
+    - Only the first max_tasks briefs are kept (the lead lists them by priority);
+      None keeps them all (a plan the human revised)
     - Ids are assigned here (eda_1, stat_1, ml_1, ...): qwen3.5 left them all
-      empty. Dependencies may name the model's id or an earlier brief's output.
+      empty. A revised plan keeps the ids in keep_ids, so the human can go on
+      naming tasks as they were shown. Dependencies may name the model's id or
+      an earlier brief's output.
     - Unknown, self, and dropped-task dependencies are removed; cycles raise
       PlanValidationError
     - Outputs of tasks no other task depends on are removed: the specialist
       must publish every output, and nothing would load these
     """
     briefs = [b.model_copy(deep=True) for b in plan.briefs]
-    if len(briefs) > max_tasks:
+    if max_tasks is not None and len(briefs) > max_tasks:
         dropped = [b.question for b in briefs[max_tasks:]]
         logger.warning(f"Plan capped at {max_tasks} tasks, dropped: {dropped}")
         briefs = briefs[:max_tasks]
 
+    # Kept only while it still names the brief's specialist
+    kept = {
+        b.id
+        for b in briefs
+        if b.id in keep_ids and b.id.startswith(f"{ID_PREFIX[b.specialist]}_")
+    }
     refs: dict[str, str] = {}
     for brief in briefs:
-        new_id = _new_id(brief.specialist, set(refs.values()))
+        taken = set(refs.values())
+        if brief.id in kept and brief.id not in taken:
+            new_id = brief.id
+        else:
+            new_id = _new_id(brief.specialist, taken | kept)
         for ref in [brief.id, *(o.name for o in brief.outputs)]:
             if ref:
                 refs.setdefault(ref, new_id)

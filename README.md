@@ -77,6 +77,8 @@ uv run analyst ask runs/latest "Does the class effect hold among women only?"
 
 **In the browser:** `uv run --group ui streamlit run app/streamlit_app.py`. You can upload a CSV, watch each task, read the report, and ask questions below it. Past runs open there too.
 
+**Review the plan first:** with `--approve-plan` (or the app's "Review the plan before it runs", on by default), the lead shows its plan and waits. Ask it about the plan, or tell it to add, change or remove tasks; it does what you ask, and tasks you add aren't held to `--max-tasks`. Type `approve` (or press "Approve and run") to start.
+
 **Options:**
 - `--preset hosted` gives a run more revisions and follow-up tasks. The app uses it for Claude.
 - `--target` names the column to explain; without it, the agent picks one or analyses without a target.
